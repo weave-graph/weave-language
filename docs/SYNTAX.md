@@ -248,3 +248,21 @@ quantity_convert(quantity "3" dimension "length" unit "metre" revision "1", {
 ```
 
 The last expression applies the caller's explicit rational factor; its labels do not establish a real-world conversion. This is pure arithmetic on authored literal data, not an authenticated conversion service over stored assertions. Graph-service conversion authority, time/context/provenance, affine offsets, quantity products/dimension algebra, general numeric function parameters and vector types remain separate requirements.
+
+## Pinned native graph services (protocol 0.13)
+
+```weave
+resolve_identity Accepted
+  source graph "physical" revision "source-revision" node "node"
+  mapping "equipment" revision "decision-revision"
+  policy "review" revision "1"
+  to space "operations" at 5 context default;
+
+cluster_navigation Navigation
+  source graph "Network" revision "snapshot-revision"
+  relation "connected" at 5 levels 3 context default;
+```
+
+Every revision and the context are mandatory. Replace `context default` with `context graph "World" revision "world-revision"` for an exact pinned context. Identity resolution reads a previously accepted decision under current trusted host policy; source cannot install, approve or revoke that policy. Cluster navigation reads one pinned stored graph, includes isolated visible nodes and returns a reusable graph with scoped partial coverage. It does not change the source or exact query semantics. Both forms are top-level reads; pure functions may consume their graph outputs but cannot hide service calls. IDs are bounded to 512 UTF-8 bytes, `levels` is an integer from 0 through 10,000, and clustering rejects the maximum signed timestamp because its output needs a representable exclusive interval end.
+
+See [native services](NATIVE_SERVICES.md) for runnable fixtures, authority boundaries and remaining requirements.

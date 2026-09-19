@@ -97,7 +97,9 @@
         "../scripts/check_assertions.py",
         "STATUS.md#exact-context-v08-verification",
         "../examples/contexts.weave",
-        "../scripts/check_contexts.py"
+        "../scripts/check_contexts.py",
+        "NATIVE_SERVICES.md",
+        "../scripts/check_services.py"
       ],
       "provisional": true
     },
@@ -141,7 +143,9 @@
         "../scripts/check_geometry.py",
         "STATUS.md#geometry-and-source-explanation-v09-verification",
         "../examples/counterparts.weave",
-        "../scripts/check_counterparts.py"
+        "../scripts/check_counterparts.py",
+        "NATIVE_SERVICES.md",
+        "../scripts/check_services.py"
       ],
       "provisional": true
     },
@@ -186,7 +190,10 @@
       "evidence": [
         "../examples/geometry.weave",
         "../scripts/check_geometry.py",
-        "STATUS.md#geometry-and-source-explanation-v09-verification"
+        "STATUS.md#geometry-and-source-explanation-v09-verification",
+        "NATIVE_SERVICES.md",
+        "../scripts/check_services.py",
+        "../tests/conformance.rs"
       ]
     },
     {

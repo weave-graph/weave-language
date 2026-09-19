@@ -12,7 +12,7 @@ parser.add_argument("--engine",type=Path,required=True)
 args=parser.parse_args()
 root=Path(__file__).resolve().parents[1]
 plan=json.loads(subprocess.check_output(["cargo","run","--locked","--quiet","--","plan","examples/quantities.weave"],cwd=root))
-assert plan["version"]=="0.12.0", "numeric plans require protocol0.12"
+assert tuple(map(int, plan["version"].split("."))) >= (0,12,0), "numeric plans require protocol0.12"
 with tempfile.TemporaryDirectory(prefix="weave-quantities-") as directory:
     work=Path(directory)
     def run(candidate,name,database=None):

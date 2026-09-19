@@ -163,7 +163,10 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             continue;
         }
         let (name, name_span) = match &statement {
-            Statement::Reason {
+            Statement::NativeService {
+                name, name_span, ..
+            }
+            | Statement::Reason {
                 name, name_span, ..
             }
             | Statement::Algebra {
@@ -511,6 +514,21 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                         data,
                     });
                 }
+            }
+            Statement::NativeService { name, service, .. } => {
+                let (expression, typed) = match service {
+                    syntax::NativeService::Identity { selection } => {
+                        (GraphExpression::ResolveIdentity { selection }, true)
+                    }
+                    syntax::NativeService::Cluster { selection } => {
+                        (GraphExpression::Cluster { selection }, false)
+                    }
+                };
+                let mut lens = Lens::concrete(base_query(String::new(), None));
+                lens.input = Some(expression);
+                lens.typed = Some(typed);
+                lens.emit(&name, &mut commands);
+                names.insert(name, lens);
             }
             Statement::Reason {
                 name,

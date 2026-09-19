@@ -1133,3 +1133,90 @@ fn pure_numeric_literal_operations_are_exact_bounded_and_explicit() {
         .is_err()
     );
 }
+
+#[test]
+fn native_services_lower_exact_pins_and_reusable_graph_values() {
+    let identity = compile(include_str!("../examples/accepted_identity.weave")).unwrap();
+    let Command::Bind {
+        value: GraphExpression::ResolveIdentity { selection },
+        ..
+    } = &identity.commands[0]
+    else {
+        panic!("identity selection missing")
+    };
+    assert_eq!(selection.mapping_id, "equipment");
+    assert_eq!(selection.source.revision, "SOURCE_REVISION");
+    assert_eq!(selection.revision, "MAPPING_REVISION");
+    assert_eq!(selection.context, weave_contract::ContextSelection::Default);
+    assert!(
+        identity
+            .commands
+            .iter()
+            .all(|c| !matches!(c, Command::Commit { .. } | Command::CommitBatch { .. }))
+    );
+    let cluster = compile(include_str!("../examples/cluster_navigation.weave")).unwrap();
+    let Command::Bind {
+        value: GraphExpression::Cluster { selection },
+        ..
+    } = &cluster.commands[1]
+    else {
+        panic!("cluster selection missing")
+    };
+    assert_eq!(
+        selection.source.revision,
+        "logical:navigation_source:Network"
+    );
+    assert_eq!(selection.levels, 3);
+    assert_eq!(selection.valid_at, 5);
+    let roundtrip: Program =
+        serde_json::from_str(&serde_json::to_string(&cluster).unwrap()).unwrap();
+    assert_eq!(roundtrip, cluster);
+}
+#[test]
+fn native_selectors_require_bounded_explicit_pins_context_and_integer_levels() {
+    let source = "cluster_navigation N source graph \"G\" revision \"r\" relation \"p\" at 5 levels 3 context default;";
+    for bad in [
+        source.replace("revision \"r\" ", ""),
+        source.replace("context default", ""),
+        source.replace("levels 3", "levels 3.0"),
+    ] {
+        assert!(compile(&bad).is_err());
+    }
+    for count in ["-1", "10001"] {
+        let bad = source.replace("levels 3", &format!("levels {count}"));
+        let error = compile(&bad).unwrap_err();
+        assert_eq!(error.code, "E_CLUSTER_INPUT");
+        assert_eq!(&bad[error.start..error.end], count);
+    }
+    assert_eq!(
+        compile(&source.replace("at 5", "at 9223372036854775807"))
+            .unwrap_err()
+            .code,
+        "E_CLUSTER_TIME"
+    );
+    assert_eq!(
+        compile(&source.replace("\"G\"", &format!("\"{}\"", "g".repeat(513))))
+            .unwrap_err()
+            .code,
+        "E_ID"
+    );
+    let body = format!("function Hidden revision \"1\" (graph input) {{ {source} return N; }}");
+    assert_eq!(compile(&body).unwrap_err().code, "E_FUNCTION_EFFECT");
+}
+#[test]
+fn service_bindings_do_not_smuggle_policy_authority_or_schema_compatibility() {
+    let cluster = "cluster_navigation N source graph \"G\" revision \"r\" relation \"p\" at 5 levels 0 context default;";
+    let identity = "resolve_identity R source graph \"S\" revision \"s\" node \"n\" mapping \"m\" revision \"mr\" policy \"p\" revision \"pr\" to space \"ops\" at 5 context default;";
+    assert_eq!(
+        compile(&format!("{cluster}{identity}union Mixed from N with R;"))
+            .unwrap_err()
+            .code,
+        "E_SCHEMA_ALGEBRA"
+    );
+    assert_eq!(
+        compile(&format!("{cluster}{cluster}")).unwrap_err().code,
+        "E_DUPLICATE"
+    );
+    assert!(compile("install_identity_policy Grant { approver \"reader\"; }").is_err());
+    assert!(compile("accept_identity Accepted mapping \"m\";").is_err());
+}

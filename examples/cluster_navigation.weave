@@ -1,0 +1,21 @@
+// The source pin is a real transaction-local immutable revision.
+transaction navigation_source {
+  graph Network {
+    node "a" entity "A" space "operations";
+    node "b" entity "B" space "operations";
+    node "c" entity "C" space "operations";
+    node "isolated" entity "I" space "operations";
+    edge "ab" from "a" to "b" relation "connected" valid 0 until 10;
+    edge "bc" from "b" to "c" relation "connected" valid 0 until 10;
+  }
+}
+cluster_navigation Navigation source graph "Network" revision "logical:navigation_source:Network"
+  relation "connected" at 5 levels 3 context default;
+union Repeated from Navigation with Navigation;
+union Nested from Repeated with Navigation;
+diff NoChange from Navigation to Repeated;
+function Consume revision "1" (graph input) {
+  lens Result from input {}
+  return Result;
+}
+apply ThroughFunction from Consume {graph input Navigation;}

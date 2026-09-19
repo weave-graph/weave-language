@@ -30,6 +30,11 @@ pub type Span = (usize, usize);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
+    NativeService {
+        name: String,
+        name_span: Span,
+        service: NativeService,
+    },
     Rules {
         name: String,
         name_span: Span,
@@ -122,6 +127,16 @@ pub enum Statement {
         valid_at: Option<TimeExpr>,
         include_metadata: bool,
         max_depth: u32,
+    },
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "service", rename_all = "snake_case")]
+pub enum NativeService {
+    Identity {
+        selection: weave_contract::IdentityResolve,
+    },
+    Cluster {
+        selection: weave_contract::ClusterRequest,
     },
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -511,6 +526,34 @@ impl Parser {
                 t.start,
                 t.end,
             ))
+        }
+    }
+    fn selector_string(&mut self) -> Result<String, Diagnostic> {
+        let token = self.peek().clone();
+        let value = self.string()?;
+        if value.len() > 512 || value.chars().any(char::is_control) {
+            return Err(Diagnostic::new(
+                "E_ID",
+                "Selector requires 1 to 512 bytes without controls",
+                token.start,
+                token.end,
+            ));
+        }
+        Ok(value)
+    }
+    fn explicit_context(&mut self) -> Result<weave_contract::ContextSelection, Diagnostic> {
+        self.word("context")?;
+        if self.peek().kind == Kind::Word("default".into()) {
+            self.take();
+            Ok(weave_contract::ContextSelection::Default)
+        } else {
+            self.word("graph")?;
+            let graph_id = self.selector_string()?;
+            self.word("revision")?;
+            let revision = self.selector_string()?;
+            Ok(weave_contract::ContextSelection::Pinned {
+                reference: weave_contract::GraphRef { graph_id, revision },
+            })
         }
     }
     fn number(&mut self) -> Result<i64, Diagnostic> {
@@ -1055,7 +1098,99 @@ impl Parser {
                     self.error("Pure functions may only compose declared input graph values")
                 );
             }
+            if context == 2 && matches!(kind.as_str(), "resolve_identity" | "cluster_navigation") {
+                return Err(Diagnostic::new(
+                    "E_FUNCTION_EFFECT",
+                    "Pinned service reads must be bound outside pure functions and passed as graph arguments",
+                    name_span.0,
+                    name_span.1,
+                ));
+            }
             match kind.as_str() {
+                "resolve_identity" | "cluster_navigation" => {
+                    self.word("source")?;
+                    self.word("graph")?;
+                    let graph_id = self.selector_string()?;
+                    self.word("revision")?;
+                    let revision = self.selector_string()?;
+                    let service = if kind == "resolve_identity" {
+                        self.word("node")?;
+                        let node_id = self.selector_string()?;
+                        self.word("mapping")?;
+                        let mapping_id = self.selector_string()?;
+                        self.word("revision")?;
+                        let mapping_revision = self.selector_string()?;
+                        self.word("policy")?;
+                        let policy_id = self.selector_string()?;
+                        self.word("revision")?;
+                        let policy_revision = self.selector_string()?;
+                        self.word("to")?;
+                        self.word("space")?;
+                        let target_space = self.selector_string()?;
+                        self.word("at")?;
+                        let valid_at = self.number()?;
+                        let context = self.explicit_context()?;
+                        NativeService::Identity {
+                            selection: weave_contract::IdentityResolve {
+                                mapping_id,
+                                revision: mapping_revision,
+                                policy: weave_contract::IdentityPolicyRef {
+                                    id: policy_id,
+                                    revision: policy_revision,
+                                },
+                                source: weave_contract::NodeRef {
+                                    graph_id,
+                                    revision,
+                                    node_id,
+                                },
+                                target_space,
+                                valid_at,
+                                context,
+                            },
+                        }
+                    } else {
+                        self.word("relation")?;
+                        let predicate = self.selector_string()?;
+                        self.word("at")?;
+                        let time = self.peek().clone();
+                        let valid_at = self.number()?;
+                        if valid_at == i64::MAX {
+                            return Err(Diagnostic::new(
+                                "E_CLUSTER_TIME",
+                                "Sample time requires a representable exclusive end",
+                                time.start,
+                                time.end,
+                            ));
+                        }
+                        self.word("levels")?;
+                        let level = self.peek().clone();
+                        let levels = self.number()?;
+                        if !(0..=10000).contains(&levels) {
+                            return Err(Diagnostic::new(
+                                "E_CLUSTER_INPUT",
+                                "Levels must be between 0 and 10000",
+                                level.start,
+                                level.end,
+                            ));
+                        }
+                        let context = self.explicit_context()?;
+                        NativeService::Cluster {
+                            selection: weave_contract::ClusterRequest {
+                                source: weave_contract::GraphRef { graph_id, revision },
+                                context,
+                                valid_at,
+                                predicate,
+                                levels: levels as usize,
+                            },
+                        }
+                    };
+                    self.symbol(';')?;
+                    statements.push(Statement::NativeService {
+                        name,
+                        name_span,
+                        service,
+                    });
+                }
                 "rules" => {
                     statements.push(self.rules(name, name_span)?);
                 }

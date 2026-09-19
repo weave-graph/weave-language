@@ -38,7 +38,10 @@ fn error(code: &str, message: impl Into<String>, span: Span) -> Diagnostic {
 }
 fn declaration(statement: &Statement) -> (&str, Span) {
     match statement {
-        Statement::Rules {
+        Statement::NativeService {
+            name, name_span, ..
+        }
+        | Statement::Rules {
             name, name_span, ..
         }
         | Statement::Reason {

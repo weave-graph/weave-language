@@ -4,22 +4,22 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.12 schema/metadata/algebra/assertion/rule/context/geometry implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 56 tests. Rich graph/vector/quantity types, effects and formatter remain. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.13 schema/metadata/algebra/assertion/rule/context/geometry implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 68 tests. Rich graph/vector/quantity types, effects and formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. General higher-order lenses/joins and typed contextual axes remain. |
-| L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity alignment, stratified absence and richer scenarios remain. |
+| L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity resolution now executes with explicit policy/mapping pins; general alignment, stratified absence and richer scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
-| L5 Spatial and multiscale language | in_progress, provisional | Assertion-backed distance, transforms and display projections now lower to engine services. General vector types, learned mappings and clustering syntax remain. |
+| L5 Spatial and multiscale language | in_progress, provisional | Assertion-backed distance, transforms and display projections now lower to engine services. Pinned bounded cluster navigation now executes; general vector types, learned mappings and overlapping clustering remain. |
 | L6 Distributed offline governance | proposed | Portable source structure only; no mobile, networking or governance conformance claim. |
 | L7 Tooling and release | in_progress, provisional | MIT license, independent crate, README and three-platform/WASM CI definition exist. The orchestrator verified public v0.4 CI on Ubuntu/macOS/Windows and the WASM target; later milestone publication remains tracked in PUBLICATION.md. LSP is optional proposed editor tooling, not a user-scope completion gate. |
 
 ## Local verification
 
-- `cargo test --locked`: 56 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
+- `cargo test --locked`: 68 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
-- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.12.0 protocol plan.
+- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.13.0 protocol plan.
 
 The checks above were run locally on macOS with Rust 1.94.0. A CI definition is not evidence of remote CI success. `cargo check --locked --lib --target wasm32-unknown-unknown` passed; browser-host execution and mobile integration remain unverified. Exact cross-project integration is recorded separately by the orchestrator.
 
@@ -116,3 +116,9 @@ All four actual CLI workflows (`check_geometry.py`, `check_counterparts.py`, `ch
 65 language tests (60 conformance and five exact-arithmetic tests) pass. Source schemas now declare Decimal or an exact nominal Quantity descriptor; literals normalize exact strings without Float conversion. Bounded pure literal operators perform exact scalar and quantity arithmetic, including rational conversion with cancellation before representability checks. The canonical portable module is shared with the runtime; old schema descriptor bytes remain unchanged.
 
 Actual `scripts/check_quantities.py` verifies compiler output persisted by the native engine, exact values beyond binary64 integer precision, pure expression results, pinned replay in a fresh process, unit revision mismatch/noncanonical-string/JSON-number rejection, and whole-program rollback. Old protocol profiles reject the new schema variants before writes. These are literal arithmetic and data validation capabilities: a graph-service conversion bound to authorized evidence, time, context and provenance remains open, along with quantity products, affine offsets, general numeric function parameters and vector schemas.
+
+## Native graph services v0.13 verification
+
+68 language tests (63 conformance and five exact-arithmetic tests) pass. Source `resolve_identity` and `cluster_navigation` bind reusable graph values from explicit stored snapshot pins and an explicit default/pinned context. Accepted identity requires an exact policy and mapping decision revision; plans cannot install policy, propose or accept mappings. Runtime current authorization/revocation remains authoritative. Clustering returns conservative scoped partial navigation, retains isolated source nodes and does not prune ordinary exact queries.
+
+Actual `scripts/check_services.py` uses the engine's explicitly trusted `native_services_fixture` example to seed/accept/revoke an independent-ID mapping. It verifies native/source graph equality, pure function and nested-union reuse, no hidden events, revocation rollback, pinned clustering and old-profile preflight rollback. Contract 0.13 is an exact 18-file vendor snapshot at `8c488fbb0ddffe0521dda07e5af71c9566c8409a`. Computed-input clustering, pure-function service reads, source governance authority, private pairwise identity policy and full multiscale semantics remain open. See [native service usage and boundaries](NATIVE_SERVICES.md).

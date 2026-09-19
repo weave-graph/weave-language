@@ -1,0 +1,12 @@
+// check_services.py supplies the exact revisions created by the trusted native fixture.
+// Source programs select an accepted policy/mapping; they cannot install or approve one.
+resolve_identity Accepted source graph "physical" revision "SOURCE_REVISION" node "node"
+  mapping "equipment" revision "MAPPING_REVISION" policy "review" revision "1"
+  to space "operations" at 5 context default;
+union Repeated from Accepted with Accepted;
+union Nested from Repeated with Accepted;
+function Consume revision "1" (graph input) {
+  lens Result from input {}
+  return Result;
+}
+apply ThroughFunction from Consume {graph input Accepted;}
