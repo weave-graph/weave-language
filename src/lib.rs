@@ -1,5 +1,6 @@
 //! Experimental, deterministic front end for the Weave graph language.
 //! No source program can invoke host effects: compilation only emits a plan.
+mod functions;
 pub mod syntax;
 use std::collections::{BTreeMap, BTreeSet};
 use syntax::{AlgebraOperation, BindingValue, Item, Metadata, Statement, StringExpr, TimeExpr};
@@ -82,7 +83,7 @@ impl Lens {
 /// Declarations are sequential. A lens can compose earlier lenses by adding
 /// compatible filters. Graph declarations emit new-branch snapshot commits.
 pub fn compile(source: &str) -> Result<Program, Diagnostic> {
-    let ast = parse(source)?;
+    let ast = functions::expand(parse(source)?)?;
     let mut names: BTreeMap<String, Lens> = BTreeMap::new();
     let mut commands = Vec::new();
     let mut declared = BTreeSet::new();
@@ -161,7 +162,10 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             | Statement::Metadata {
                 name, name_span, ..
             } => (name, *name_span),
-            Statement::Schema { .. } | Statement::Transaction { .. } => unreachable!(),
+            Statement::Schema { .. }
+            | Statement::Transaction { .. }
+            | Statement::Function { .. }
+            | Statement::Apply { .. } => unreachable!(),
         };
         if !declared.insert(name.clone()) {
             return Err(diagnostic(
@@ -171,7 +175,10 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             ));
         }
         match statement {
-            Statement::Schema { .. } | Statement::Transaction { .. } => unreachable!(),
+            Statement::Schema { .. }
+            | Statement::Transaction { .. }
+            | Statement::Function { .. }
+            | Statement::Apply { .. } => unreachable!(),
             Statement::Graph {
                 name,
                 name_span,

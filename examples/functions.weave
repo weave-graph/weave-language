@@ -1,0 +1,18 @@
+function Select revision "1" (graph input, string relation, time instant) {
+  lens Result from input { match relation param relation; at param instant; }
+  return Result;
+}
+function Transform revision "1" (graph input, function transform) {
+  apply Result from transform { graph input input; }
+  return Result;
+}
+graph Evidence {
+  node "a" entity "device" space "operations";
+  node "b" entity "advisory" space "knowledge";
+  edge "claim" from "a" to "b" relation "affected" valid 10 until 20;
+}
+apply AtFifteen from Select { string relation "affected"; time instant 15; }
+apply Specialized from Transform { function transform AtFifteen; }
+apply HigherOrder from Specialized { graph input Evidence; }
+apply Direct from Select { graph input Evidence; string relation "affected"; time instant 15; }
+lens Reference from Evidence { match relation "affected"; at 15; }

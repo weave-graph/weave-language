@@ -104,3 +104,25 @@ support State from Combined relation "affected"
 ```
 
 Each declaration binds a reusable immutable graph value; inputs must already be declared and fully bound. Projection IDs refer to the current value (union namespaces IDs using pinned origins). Empty projection is valid. Union/diff preserve schemas or reject incompatible typed/untyped composition. Diff attaches added/removed membership labels without turning removal into negative evidence. Support uses explicit entity/space identities and a required valid-time instant. It yields a typed status graph with evidence derivations for supported/refuted/conflicted states; unknown has no evidence assertion. Coverage remains explicit, and absent evidence never implies falsity. See [the protocol semantics](contract/v0.5/README.md) and [the runnable example](../examples/algebra.weave).
+
+## Pure graph functions (front-end specialization)
+
+```weave
+function Select revision "1" (graph input, string relation, time instant) {
+  lens Result from input { match relation param relation; at param instant; }
+  return Result;
+}
+function Transform revision "1" (graph input, function transform) {
+  apply Result from transform { graph input input; }
+  return Result;
+}
+apply AtFifteen from Select { string relation "affected"; time instant 15; }
+apply Specialized from Transform { function transform AtFifteen; }
+apply Output from Specialized { graph input Evidence; }
+```
+
+`apply` binds named arguments once. Incomplete application yields an immutable function value; complete application yields a graph value. Graph arguments are captured as immutable program-local graph bindings when supplied, including during partial application. Scalar arguments currently support strings and signed Unix-millisecond time values. Function arguments have one remaining graph parameter named `input` and return a graph. Graph parameter schemas are retained through evaluation; explicit schema-constrained signatures and runtime schema guards remain future work.
+
+Bodies may compose input graphs and previously declared pure functions. They cannot read undeclared global graphs, declare sources or writes, recurse, or access host effects. Body variables are hygienically renamed. Function definitions are checked even when unused. Expansion is bounded to depth 32, 10,000 emitted statements and 4 MiB of serialized AST; exceeding a bound is an error rather than a partial executable plan.
+
+Function revisions are explicit, nonempty source labels. In this front-end milestone they are checked but not yet carried into runtime plan identity or explanation graphs. Stable source-aware fingerprints are tracked separately. Functions specialize to existing 0.5 expressions, so this syntax does not change the runtime protocol. See [the runnable example](../examples/functions.weave) and `scripts/check_functions.py` for exact equivalence across literal, direct and higher-order evaluation.

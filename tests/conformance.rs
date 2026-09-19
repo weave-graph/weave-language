@@ -592,3 +592,106 @@ fn algebra_cannot_silently_drop_known_schema_meaning() {
     let source = "graph G{} support S from G relation \"p\" from entity \"a\" space \"s\" to entity \"b\" space \"s\" at 0; union Invalid from S with G;";
     assert_eq!(compile(source).unwrap_err().code, "E_SCHEMA_ALGEBRA");
 }
+
+#[test]
+fn graph_functions_specialize_partial_and_higher_order_values_without_hidden_commits() {
+    let p = compile(include_str!("../examples/functions.weave")).unwrap();
+    assert_eq!(
+        p.commands
+            .iter()
+            .filter(|c| matches!(c, Command::Commit { .. }))
+            .count(),
+        1
+    );
+    assert!(
+        p.commands
+            .iter()
+            .any(|c| matches!(c,Command::Bind{name,..}if name=="HigherOrder"))
+    );
+    assert!(
+        !p.commands
+            .iter()
+            .any(|c| matches!(c,Command::Bind{name,..}if name=="AtFifteen"||name=="Specialized"))
+    );
+    assert!(
+        p.commands
+            .iter()
+            .all(|c| !matches!(c, Command::CommitBatch { .. }))
+    );
+}
+#[test]
+fn graph_functions_typecheck_bodies_and_reject_hidden_reads_or_effects() {
+    assert_eq!(
+        compile("function F revision \"1\" (time instant) {lens R from instant {} return R;}")
+            .unwrap_err()
+            .code,
+        "E_FUNCTION_SCOPE"
+    );
+    assert_eq!(compile("use Hidden graph \"hidden\"; function F revision \"1\" (graph input) {lens R from Hidden {} return R;}").unwrap_err().code,"E_FUNCTION_SCOPE");
+    assert_eq!(compile("function F revision \"1\" (graph input, time t) {lens R from input {match relation param t;} return R;}").unwrap_err().code,"E_PARAMETER_TYPE");
+    assert!(compile("function F revision \"1\" (graph input) {graph G{} return G;}").is_err());
+    assert_eq!(
+        compile("function F revision \"1\" (function transform) {return transform;}")
+            .unwrap_err()
+            .code,
+        "E_FUNCTION_RETURN"
+    );
+    assert_eq!(
+        compile(
+            "function F revision \"1\" (graph input) {apply R from F {graph input input;}return R;}"
+        )
+        .unwrap_err()
+        .code,
+        "E_FUNCTION_SCOPE"
+    );
+}
+#[test]
+fn graph_function_argument_kinds_arity_and_rebinding_are_checked() {
+    let f = "function F revision \"1\" (graph input, time t) {lens R from input {at param t;}return R;} graph G{} ";
+    assert_eq!(
+        compile(&format!("{f} apply X from F {{string t \"bad\";}}"))
+            .unwrap_err()
+            .code,
+        "E_PARAMETER_TYPE"
+    );
+    assert_eq!(
+        compile(&format!("{f} apply X from F {{time t 1;time t 2;}}"))
+            .unwrap_err()
+            .code,
+        "E_DUPLICATE"
+    );
+    assert_eq!(
+        compile(&format!("{f} apply X from F {{time absent 1;}}"))
+            .unwrap_err()
+            .code,
+        "E_UNKNOWN_PARAMETER"
+    );
+    assert_eq!(
+        compile(&format!(
+            "{f} lens T from G {{at param t;}}apply X from F {{graph input T;}}"
+        ))
+        .unwrap_err()
+        .code,
+        "E_UNBOUND_PARAMETER"
+    );
+    assert_eq!(compile(&format!("{f} function Map revision \"1\" (graph input,function transform){{apply R from transform{{graph input input;}}return R;}}apply X from Map{{function transform F;}}")).unwrap_err().code,"E_FUNCTION_SIGNATURE");
+}
+#[test]
+fn graph_capture_is_immutable_and_names_are_hygienic() {
+    let s = "function F revision \"1\" (graph input,time t){lens R from input{at param t;}return R;}graph G{}apply Captured from F{graph input G;}graph Later{}apply Result from Captured{time t 5;}graph __weave_function_1_capture{}";
+    let p = compile(s).unwrap();
+    assert!(
+        matches!(&p.commands[1],Command::Bind{value:GraphExpression::Query{query},..}if query.graph_id=="G")
+    );
+    assert!(matches!(&p.commands[2],Command::Commit{graph_id,..}if graph_id=="Later"));
+    assert_eq!(p.commands.iter().filter(|c|matches!(c,Command::Bind{value:GraphExpression::Query{query},..}if query.graph_id=="G")).count(),1);
+}
+#[test]
+fn function_expansion_has_a_deterministic_budget() {
+    let mut s = String::from("function F0 revision \"1\" (graph input){return input;}");
+    for i in 1..18 {
+        s.push_str(&format!("function F{i} revision \"1\" (graph input){{apply A from F{}{{graph input input;}}apply B from F{}{{graph input A;}}return B;}}",i-1,i-1));
+    }
+    s.push_str("graph G{}apply TooMuch from F17{graph input G;}");
+    assert_eq!(compile(&s).unwrap_err().code, "E_EXPANSION_BUDGET");
+}

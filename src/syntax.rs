@@ -30,6 +30,22 @@ pub type Span = (usize, usize);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
+    Function {
+        name: String,
+        name_span: Span,
+        revision: String,
+        parameters: Vec<FunctionParameter>,
+        body: Vec<Statement>,
+        output: String,
+        output_span: Span,
+    },
+    Apply {
+        name: String,
+        name_span: Span,
+        function: String,
+        function_span: Span,
+        arguments: Vec<Argument>,
+    },
     Algebra {
         name: String,
         name_span: Span,
@@ -93,6 +109,33 @@ pub enum Statement {
         include_metadata: bool,
         max_depth: u32,
     },
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FunctionParameter {
+    pub name: String,
+    pub span: Span,
+    pub kind: ParameterKind,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterKind {
+    Graph,
+    String,
+    Time,
+    Function,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Argument {
+    pub name: String,
+    pub span: Span,
+    pub value: ArgumentValue,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum ArgumentValue {
+    Graph(String),
+    Function(String),
+    String(StringExpr),
+    Time(TimeExpr),
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "operator", rename_all = "snake_case")]
@@ -253,7 +296,7 @@ fn lex(source: &str) -> Result<Vec<Token>, Diagnostic> {
                 i += 1;
             }
             Kind::Word(source[start..i].into())
-        } else if "{};".contains(c) {
+        } else if "{};(),".contains(c) {
             i += 1;
             Kind::Symbol(c)
         } else {
@@ -571,26 +614,123 @@ impl Parser {
             _ => Err(self.error("Expected node, edge, entity or graph metadata host")),
         }
     }
-    fn program(&mut self, in_transaction: bool) -> Result<Program, Diagnostic> {
+    fn program(&mut self, context: u8) -> Result<Program, Diagnostic> {
         let mut statements = Vec::new();
         while self.peek().kind != Kind::End
-            && !(in_transaction && self.peek().kind == Kind::Symbol('}'))
+            && !(context != 0 && self.peek().kind == Kind::Symbol('}'))
         {
+            if context == 2 && self.peek().kind == Kind::Word("return".into()) {
+                break;
+            }
             let kind = self.name()?;
             let name_span = (self.peek().start, self.peek().end);
             let name = self.name()?;
-            if in_transaction && kind != "graph" {
+            if context == 1 && kind != "graph" {
                 return Err(
                     self.error("A local transaction contains only graph snapshot declarations")
                 );
             }
+            if context == 2
+                && matches!(
+                    kind.as_str(),
+                    "function" | "transaction" | "graph" | "use" | "schema"
+                )
+            {
+                return Err(
+                    self.error("Pure functions may only compose declared input graph values")
+                );
+            }
             match kind.as_str() {
+                "function" => {
+                    self.word("revision")?;
+                    let revision = self.string()?;
+                    self.symbol('(')?;
+                    let mut parameters = Vec::new();
+                    while self.peek().kind != Kind::Symbol(')') {
+                        let kind = match self.name()?.as_str() {
+                            "graph" => ParameterKind::Graph,
+                            "string" => ParameterKind::String,
+                            "time" => ParameterKind::Time,
+                            "function" => ParameterKind::Function,
+                            _ => {
+                                return Err(self
+                                    .error("Expected graph, string, time or function parameter"));
+                            }
+                        };
+                        let span = (self.peek().start, self.peek().end);
+                        let name = self.name()?;
+                        parameters.push(FunctionParameter { name, span, kind });
+                        if self.peek().kind != Kind::Symbol(')') {
+                            self.symbol(',')?;
+                        }
+                    }
+                    self.symbol(')')?;
+                    self.symbol('{')?;
+                    let body = self.program(2)?.statements;
+                    self.word("return")?;
+                    let output_span = (self.peek().start, self.peek().end);
+                    let output = self.name()?;
+                    self.symbol(';')?;
+                    self.symbol('}')?;
+                    statements.push(Statement::Function {
+                        name,
+                        name_span,
+                        revision,
+                        parameters,
+                        body,
+                        output,
+                        output_span,
+                    });
+                }
+                "apply" => {
+                    self.word("from")?;
+                    let function_span = (self.peek().start, self.peek().end);
+                    let function = self.name()?;
+                    self.symbol('{')?;
+                    let mut arguments = Vec::new();
+                    while self.peek().kind != Kind::Symbol('}') {
+                        let kind = self.name()?;
+                        let span = (self.peek().start, self.peek().end);
+                        let name = self.name()?;
+                        let value = match kind.as_str() {
+                            "graph" => ArgumentValue::Graph(self.name()?),
+                            "function" => ArgumentValue::Function(self.name()?),
+                            "string" => ArgumentValue::String(
+                                if self.peek().kind == Kind::Word("param".into()) {
+                                    self.take();
+                                    StringExpr::Parameter(self.name()?)
+                                } else {
+                                    StringExpr::Literal(self.string()?)
+                                },
+                            ),
+                            "time" => ArgumentValue::Time(
+                                if self.peek().kind == Kind::Word("param".into()) {
+                                    self.take();
+                                    TimeExpr::Parameter(self.name()?)
+                                } else {
+                                    TimeExpr::Literal(self.number()?)
+                                },
+                            ),
+                            _ => return Err(self.error("Expected a typed function argument")),
+                        };
+                        self.symbol(';')?;
+                        arguments.push(Argument { name, span, value });
+                    }
+                    self.symbol('}')?;
+                    statements.push(Statement::Apply {
+                        name,
+                        name_span,
+                        function,
+                        function_span,
+                        arguments,
+                    });
+                }
                 "transaction" => {
                     if name.len() > 64 {
                         return Err(self.error("Transaction ID exceeds 64 bytes"));
                     }
                     self.symbol('{')?;
-                    let body = self.program(true)?.statements;
+                    let body = self.program(1)?.statements;
                     self.symbol('}')?;
                     if body.is_empty() {
                         return Err(self.error("Transaction must contain at least one graph"));
@@ -981,5 +1121,5 @@ pub fn parse(source: &str) -> Result<Program, Diagnostic> {
         tokens: lex(source)?,
         cursor: 0,
     }
-    .program(false)
+    .program(0)
 }

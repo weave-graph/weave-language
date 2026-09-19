@@ -5,7 +5,7 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
 | L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.5 schema/metadata/algebra implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 35 tests. Rich graph/vector/quantity types, effects and formatter remain. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 40 tests. Rich graph/vector/quantity types, effects and formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. General higher-order lenses/joins and context remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. General identity alignment, rule evaluation, general explanation APIs and scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
@@ -15,7 +15,7 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 ## Local verification
 
-- `cargo test --locked`: 35 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
+- `cargo test --locked`: 40 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
@@ -56,3 +56,9 @@ The typed cross-schema join example deliberately reuses type names with differen
 35 frontend tests, strict Clippy and the WASM library target check pass. The vendored portable contract has 13 tests (nine algebra and four schema). Actual compiler/runtime execution of `examples/algebra.weave` passes `scripts/check_algebra.py`: endpoint-preserving projection, membership removal with unchanged positive polarity, repeated union deduplication, supported/conflicted/refuted/unknown at distinct instants, joint conflict provenance and principal-scoped output. Typed union retains nominal types across nested composition. Derivation alternatives preserve parent operator parameters and group-specific premise snapshots.
 
 Diff currently annotates node/edge membership, not attachment-only changes or inferred mutation correspondence. Four-valued support does not provide closed-world certificates or confidence arithmetic. General rules, higher-order graph functions and explicit explanation/view identity APIs remain open.
+
+## Pure graph functions verification
+
+40 frontend tests pass. `scripts/check_functions.py` runs the compiled higher-order example against the engine and verifies exact equality of graph data, schemas, snapshots, coverage and provenance against directly specialized and literal lenses. Exactly one source commit is emitted. Graph captures are immutable; function bodies cannot hide reads or writes, and invalid parameter kinds, graph/function return mismatches, recursion and bounded expansion are tested. The existing 0.5 protocol is unchanged.
+
+Schema-constrained signatures, general value types, modules, source-aware runtime identity and explanation APIs remain separate acceptance gaps. Explicit source function revisions are not yet runtime fingerprint dependencies.
