@@ -382,6 +382,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                             metadata,
                             properties,
                         } => data.nodes.push(Node {
+                            derived_nodes: Vec::new(),
                             derived_from: Vec::new(),
                             context_scope: None,
                             id,

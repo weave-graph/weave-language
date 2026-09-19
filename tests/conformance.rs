@@ -1046,3 +1046,15 @@ fn counterpart_selection_requires_explicit_distinct_bounded_spaces_and_integer_t
     .unwrap_err();
     assert_eq!(errors.code, "E_UNKNOWN_GRAPH");
 }
+
+#[test]
+fn bootstrap_nodes_do_not_claim_runtime_node_origin_authority() {
+    let plan = compile("graph G { node \"n\" entity \"e\" space \"s\" property \"derived_nodes\" \"untrusted data\"; }").unwrap();
+    let Command::Commit { data, .. } = &plan.commands[0] else {
+        panic!("commit expected")
+    };
+    assert!(data.nodes[0].derived_nodes.is_empty());
+    assert_eq!(data.nodes[0].properties["derived_nodes"], "untrusted data");
+    let wire = serde_json::to_value(&data.nodes[0]).unwrap();
+    assert!(wire.get("derived_nodes").is_none());
+}

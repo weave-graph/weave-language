@@ -30,6 +30,7 @@ with tempfile.TemporaryDirectory(prefix="weave-counterparts-") as directory:
     assert nodes["operations-device"]["space_id"] == "operations"
     assert nodes["physical-device"]["properties"]["state"] == "observed"
     assert nodes["operations-device"]["properties"]["state"] == "registered"
+    assert all({"graph_id": "Mappings", "revision": edge["structural_ref"]["revision"], "node_id": node_id} in node["derived_nodes"] for node_id, node in nodes.items())
     assert bridge["graph"] == values["ThroughFunction"]["graph"]
     assert not values["AtBoundary"]["graph"]["edges"] and not values["Reverse"]["graph"]["edges"]
     traversal = values["Traversal"]["graph"]["edges"]
