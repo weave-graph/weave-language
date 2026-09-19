@@ -49,6 +49,10 @@ pub struct PropertySchema {
 pub enum ScalarType {
     /// Finite IEEE754 binary64; this is not exact decimal arithmetic.
     Float,
+    /// Exact bounded decimal, encoded as a canonical string.
+    Decimal,
+    /// Exact amount with a required nominal unit descriptor.
+    Quantity(crate::quantity::UnitDescriptor),
     String,
     Integer,
     Boolean,
@@ -78,7 +82,10 @@ fn properties(
                 let valid = if value.is_null() {
                     declaration.nullable
                 } else {
-                    match declaration.value_type {
+                    match &declaration.value_type {
+                        ScalarType::Decimal => crate::decimal::Decimal::deserialize(value).is_ok(),
+                        ScalarType::Quantity(unit) => crate::quantity::Quantity::deserialize(value)
+                            .is_ok_and(|quantity| quantity.unit() == unit),
                         ScalarType::String => value.is_string(),
                         ScalarType::Integer => value.as_i64().is_some(),
                         ScalarType::Boolean => value.is_boolean(),

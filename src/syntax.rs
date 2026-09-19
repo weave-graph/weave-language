@@ -526,6 +526,89 @@ impl Parser {
             ))
         }
     }
+    fn unit_descriptor(&mut self) -> Result<weave_contract::quantity::UnitDescriptor, Diagnostic> {
+        let token = self.peek().clone();
+        self.word("dimension")?;
+        let dimension = self.string()?;
+        self.word("unit")?;
+        let unit = self.string()?;
+        self.word("revision")?;
+        let revision = self.string()?;
+        weave_contract::quantity::UnitDescriptor::new(dimension, unit, revision).map_err(|e| {
+            Diagnostic::new(
+                "E_QUANTITY_DESCRIPTOR",
+                e.to_string(),
+                token.start,
+                token.end,
+            )
+        })
+    }
+    fn decimal_literal(&mut self) -> Result<weave_contract::decimal::Decimal, Diagnostic> {
+        let token = self.peek().clone();
+        self.string()?
+            .parse()
+            .map_err(|e: weave_contract::decimal::DecimalError| {
+                Diagnostic::new("E_DECIMAL", e.to_string(), token.start, token.end)
+            })
+    }
+    fn numeric_literal(
+        &mut self,
+        operator: &str,
+        depth: usize,
+        span: Span,
+    ) -> Result<serde_json::Value, Diagnostic> {
+        self.symbol('(')?;
+        let left = self.literal(depth + 1)?;
+        self.symbol(',')?;
+        let right = self.literal(depth + 1)?;
+        self.symbol(')')?;
+        let error = |message: String| Diagnostic::new("E_NUMERIC", message, span.0, span.1);
+        if operator.starts_with("decimal_") {
+            let a = weave_contract::decimal::Decimal::deserialize(&left)
+                .map_err(|e| error(e.to_string()))?;
+            let b = weave_contract::decimal::Decimal::deserialize(&right)
+                .map_err(|e| error(e.to_string()))?;
+            let result = match operator {
+                "decimal_add" => a.checked_add(b),
+                "decimal_sub" => a.checked_sub(b),
+                "decimal_mul" => a.checked_mul(b),
+                "decimal_div" => a.checked_div(b),
+                _ => unreachable!("parser selects a known numeric operator"),
+            }
+            .map_err(|e| error(e.to_string()))?;
+            return Ok(serde_json::json!(result));
+        }
+        let a = weave_contract::quantity::Quantity::deserialize(&left)
+            .map_err(|e| error(e.to_string()))?;
+        let result = match operator {
+            "quantity_add" | "quantity_sub" => {
+                let b = weave_contract::quantity::Quantity::deserialize(&right)
+                    .map_err(|e| error(e.to_string()))?;
+                if operator == "quantity_add" {
+                    a.checked_add(&b)
+                } else {
+                    a.checked_sub(&b)
+                }
+            }
+            "quantity_scale" | "quantity_div" => {
+                let b = weave_contract::decimal::Decimal::deserialize(&right)
+                    .map_err(|e| error(e.to_string()))?;
+                if operator == "quantity_scale" {
+                    a.checked_mul(b)
+                } else {
+                    a.checked_div(b)
+                }
+            }
+            "quantity_convert" => {
+                let conversion = weave_contract::quantity::RationalConversion::deserialize(&right)
+                    .map_err(|e| error(e.to_string()))?;
+                a.convert(&conversion)
+            }
+            _ => unreachable!("parser selects a known numeric operator"),
+        }
+        .map_err(|e| error(e.to_string()))?;
+        Ok(serde_json::json!(result))
+    }
     fn literal(&mut self, depth: usize) -> Result<serde_json::Value, Diagnostic> {
         let token = self.take();
         if depth > 32 {
@@ -540,6 +623,28 @@ impl Parser {
             Kind::String(v) => serde_json::Value::String(v),
             Kind::Number(v) => serde_json::json!(v),
             Kind::Float(v) => serde_json::json!(v),
+            Kind::Word(v) if v == "decimal" => serde_json::json!(self.decimal_literal()?),
+            Kind::Word(v) if v == "quantity" => {
+                let amount = self.decimal_literal()?;
+                let unit = self.unit_descriptor()?;
+                serde_json::json!(weave_contract::quantity::Quantity::new(amount, unit))
+            }
+            Kind::Word(v)
+                if matches!(
+                    v.as_str(),
+                    "decimal_add"
+                        | "decimal_sub"
+                        | "decimal_mul"
+                        | "decimal_div"
+                        | "quantity_add"
+                        | "quantity_sub"
+                        | "quantity_scale"
+                        | "quantity_div"
+                        | "quantity_convert"
+                ) =>
+            {
+                self.numeric_literal(&v, depth, (token.start, token.end))?
+            }
             Kind::Word(v) if v == "true" => serde_json::Value::Bool(true),
             Kind::Word(v) if v == "false" => serde_json::Value::Bool(false),
             Kind::Word(v) if v == "null" => serde_json::Value::Null,
@@ -655,10 +760,12 @@ impl Parser {
                 "integer" => ScalarType::Integer,
                 "boolean" => ScalarType::Boolean,
                 "float" => ScalarType::Float,
+                "decimal" => ScalarType::Decimal,
+                "quantity" => ScalarType::Quantity(self.unit_descriptor()?),
                 _ => {
-                    return Err(
-                        self.error("Schema scalar type must be string, integer, float or boolean")
-                    );
+                    return Err(self.error(
+                        "Schema type must be string, integer, float, decimal, quantity or boolean",
+                    ));
                 }
             };
             let required = match self.name()?.as_str() {

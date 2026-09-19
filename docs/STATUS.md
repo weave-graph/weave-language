@@ -4,7 +4,7 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.11 schema/metadata/algebra/assertion/rule/context/geometry implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.12 schema/metadata/algebra/assertion/rule/context/geometry implementation addresses documented model gaps. Full semantic conformance remains open. |
 | L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 56 tests. Rich graph/vector/quantity types, effects and formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. General higher-order lenses/joins and typed contextual axes remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity alignment, stratified absence and richer scenarios remain. |
@@ -19,7 +19,7 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
-- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.11.0 protocol plan.
+- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.12.0 protocol plan.
 
 The checks above were run locally on macOS with Rust 1.94.0. A CI definition is not evidence of remote CI success. `cargo check --locked --lib --target wasm32-unknown-unknown` passed; browser-host execution and mobile integration remain unverified. Exact cross-project integration is recorded separately by the orchestrator.
 
@@ -110,3 +110,9 @@ This library work addresses part of the paper's required scalar family. Source l
 The compiler now uses the reviewed 0.11 contract with default-empty `Node.derived_nodes`. Public bootstrap syntax does not manufacture runtime origin envelopes; identically named data properties remain ordinary data. Runtime materialization attaches exact source NodeRefs, and subsequent composition retains their restrictions. Both assertion and node dependencies use a conservative AND policy; cycles, missing/denied dependencies and exhausted proof bounds fail closed. Node proofs and assertion proofs have separate identity namespaces.
 
 All four actual CLI workflows (`check_geometry.py`, `check_counterparts.py`, `check_contexts.py`, `check_rules.py`) pass against the reviewed 0.11 engine. The counterpart script also checks exact source node pins. Root runtime tests independently cover copied isolated nodes, capsules, scalar influences, endpoint proxy bypass, signed scope retries and dependency bounds. Derived results requiring more than 1,000 combined assertion/node influences per node return an explicit budget error rather than silently truncating proof. Conservative AND gates can overrestrict alternatives; no release/declassification policy is implied.
+
+## Exact numeric values v0.12 verification
+
+65 language tests (60 conformance and five exact-arithmetic tests) pass. Source schemas now declare Decimal or an exact nominal Quantity descriptor; literals normalize exact strings without Float conversion. Bounded pure literal operators perform exact scalar and quantity arithmetic, including rational conversion with cancellation before representability checks. The canonical portable module is shared with the runtime; old schema descriptor bytes remain unchanged.
+
+Actual `scripts/check_quantities.py` verifies compiler output persisted by the native engine, exact values beyond binary64 integer precision, pure expression results, pinned replay in a fresh process, unit revision mismatch/noncanonical-string/JSON-number rejection, and whole-program rollback. Old protocol profiles reject the new schema variants before writes. These are literal arithmetic and data validation capabilities: a graph-service conversion bound to authorized evidence, time, context and provenance remains open, along with quantity products, affine offsets, general numeric function parameters and vector schemas.

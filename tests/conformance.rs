@@ -1058,3 +1058,78 @@ fn bootstrap_nodes_do_not_claim_runtime_node_origin_authority() {
     let wire = serde_json::to_value(&data.nodes[0]).unwrap();
     assert!(wire.get("derived_nodes").is_none());
 }
+
+#[test]
+fn exact_decimal_and_nominal_quantity_literals_lower_without_float_conversion() {
+    let plan = compile(include_str!("../examples/quantities.weave")).unwrap();
+    let Command::Commit { data, .. } = &plan.commands[0] else {
+        panic!("commit expected")
+    };
+    let values = &data.nodes[0].properties;
+    assert_eq!(values["exact_count"], serde_json::json!("9007199254740993"));
+    assert_eq!(values["length"]["amount"], serde_json::json!("1.23"));
+    assert_eq!(values["length"]["unit"]["revision"], serde_json::json!("1"));
+    assert!(values["approximate"].is_f64());
+    assert!(weave_contract::validate_schema_graph(data).is_empty());
+    let source = include_str!("../examples/quantities.weave");
+    assert!(
+        compile(&source.replace("decimal \"9007199254740993\"", "9007199254740993.0")).is_err()
+    );
+    assert!(
+        compile(&source.replace(
+            "quantity \"+001.2300\" dimension \"length\" unit \"metre\" revision \"1\"",
+            "quantity \"1.23\" dimension \"length\" unit \"metre\" revision \"2\""
+        ))
+        .is_err()
+    );
+}
+#[test]
+fn decimal_literal_bounds_report_the_offending_string() {
+    let source = "graph G {node \"n\" entity \"e\" space \"s\" property \"x\" decimal \"1e-19\";}";
+    let error = compile(source).unwrap_err();
+    assert_eq!(error.code, "E_DECIMAL");
+    assert_eq!(&source[error.start..error.end], "\"1e-19\"");
+}
+
+#[test]
+fn pure_numeric_literal_operations_are_exact_bounded_and_explicit() {
+    let source = r#"graph G { node "n" entity "e" space "s"
+      property "sum" decimal_add(decimal "0.1", decimal "0.2")
+      property "difference" decimal_sub(decimal "2", decimal "1.2")
+      property "product" decimal_mul(decimal "1.25", decimal "0.8")
+      property "ratio" decimal_div(decimal "1", decimal "8")
+      property "scaled" quantity_scale(quantity "1.25" dimension "length" unit "m" revision "1", decimal "2")
+      property "converted" quantity_convert(quantity "3" dimension "length" unit "m" revision "1", {
+        "from":{"dimension_id":"length","unit_id":"m","revision":"1"},
+        "to":{"dimension_id":"length","unit_id":"third-m","revision":"1"},
+        "numerator":decimal "1", "denominator":decimal "3"}); }"#;
+    let plan = compile(source).unwrap();
+    let Command::Commit { data, .. } = &plan.commands[0] else {
+        panic!()
+    };
+    let p = &data.nodes[0].properties;
+    for (key, value) in [
+        ("sum", "0.3"),
+        ("difference", "0.8"),
+        ("product", "1"),
+        ("ratio", "0.125"),
+    ] {
+        assert_eq!(p[key], value);
+    }
+    assert_eq!(p["scaled"]["amount"], "2.5");
+    assert_eq!(p["converted"]["amount"], "1");
+    assert!(
+        compile(&source.replace(
+            "decimal_div(decimal \"1\", decimal \"8\")",
+            "decimal_div(decimal \"1\", decimal \"3\")"
+        ))
+        .is_err()
+    );
+    assert!(
+        compile(&source.replace(
+            "decimal_add(decimal \"0.1\", decimal \"0.2\")",
+            "decimal_add(0.1, 0.2)"
+        ))
+        .is_err()
+    );
+}

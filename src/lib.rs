@@ -6,6 +6,7 @@ pub mod syntax;
 use std::collections::{BTreeMap, BTreeSet};
 use syntax::{AlgebraOperation, BindingValue, Item, Metadata, Statement, StringExpr, TimeExpr};
 pub use syntax::{Diagnostic, parse};
+pub use weave_contract::quantity;
 use weave_contract::{
     Assertion, GraphProfile, MetadataAttachment, MetadataHost, SnapshotCommit, StructuralEdge,
 };

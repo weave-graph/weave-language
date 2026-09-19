@@ -215,3 +215,36 @@ join Traversal from Bridge to Conditions relation "physical_affected";
 The source graph must already contain visible positive directed bridge assertions at the selected instant. Both endpoints must declare the exact selected entity identity in distinct requested spaces; a matching bridge to a different identity is `E_IDENTITY`. The result retains its schema, endpoint state, assertion attribution, context, snapshot pins and proofs, and can feed ordinary graph functions and joins. Selection never retargets or synchronizes state. Reverse direction is a different query; intervals are half-open. Contextual evidence requires an exact prior context selection. Scoped derived endpoints cannot cross that selection.
 
 Empty results and partial coverage retain their existing meaning without an external identity catalog lookup or hidden-match counts. A positive bridge remains positive evidence even if negative evidence also exists: this operator does not infer unique membership or policy acceptance. Accepted mappings between independently assigned identifiers, supersession/splits and private pairwise identities require the subsequent identity resolver. See [the runnable example](../examples/counterparts.weave).
+
+## Exact decimals and nominal quantities (protocol 0.12)
+
+```weave
+schema Measures revision "1" {
+  node Measure {
+    property "exact" decimal required;
+    property "length" quantity dimension "length" unit "metre" revision "1" required;
+  }
+}
+graph Measurements schema Measures {
+  node "n" type Measure entity "reading" space "lab"
+    property "exact" decimal "9007199254740993"
+    property "length" quantity "1.2300" dimension "length" unit "metre" revision "1";
+}
+```
+
+Exact Decimal literals are quoted and explicitly prefixed; normalization produces canonical string values without passing through Float. Quantity literals contain an exact amount and nominal dimension/unit/revision. Schema validation requires that full descriptor. A familiar unit spelling does not establish compatibility, and ordinary numeric literals retain their existing Integer/Float semantics.
+
+Pure literal operators are `decimal_add`, `decimal_sub`, `decimal_mul`, `decimal_div`, `quantity_add`, `quantity_sub`, `quantity_scale`, `quantity_div` and `quantity_convert`. Each takes two comma-separated literal operands in parentheses and evaluates during compilation. Nesting shares the structured-literal depth limit. Numeric errors are explicit diagnostics, with no rounding or Float fallback. Canonical string/object operands use the same representations as exact literals; a noncanonical string must first use an explicit Decimal literal to normalize it.
+
+```weave
+// Property values:
+decimal_add(decimal "0.1", decimal "0.2")
+quantity_scale(quantity "1.25" dimension "length" unit "metre" revision "1", decimal "2")
+quantity_convert(quantity "3" dimension "length" unit "metre" revision "1", {
+  "from": {"dimension_id":"length", "unit_id":"metre", "revision":"1"},
+  "to": {"dimension_id":"length", "unit_id":"declared-third", "revision":"1"},
+  "numerator": decimal "1", "denominator": decimal "3"
+})
+```
+
+The last expression applies the caller's explicit rational factor; its labels do not establish a real-world conversion. This is pure arithmetic on authored literal data, not an authenticated conversion service over stored assertions. Graph-service conversion authority, time/context/provenance, affine offsets, quantity products/dimension algebra, general numeric function parameters and vector types remain separate requirements.

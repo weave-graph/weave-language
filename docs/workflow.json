@@ -58,7 +58,10 @@
         "../scripts/check_contexts.py",
         "../examples/geometry.weave",
         "../scripts/check_geometry.py",
-        "STATUS.md#geometry-and-source-explanation-v09-verification"
+        "STATUS.md#geometry-and-source-explanation-v09-verification",
+        "DECIMAL.md",
+        "../examples/quantities.weave",
+        "../scripts/check_quantities.py"
       ],
       "provisional": true
     },

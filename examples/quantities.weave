@@ -1,0 +1,22 @@
+schema Measures revision "1" {
+  node Measurement {
+    property "exact_count" decimal required;
+    property "length" quantity dimension "length" unit "metre" revision "1" required;
+    property "approximate" float required;
+    property "computed" decimal required;
+    property "converted" quantity dimension "length" unit "metre" revision "1" required;
+  }
+}
+graph Measurements schema Measures {
+  node "measurement" type Measurement entity "reading-1" space "lab"
+    property "exact_count" decimal "9007199254740993"
+    property "length" quantity "+001.2300" dimension "length" unit "metre" revision "1"
+    property "approximate" 1.23
+    property "computed" decimal_add(decimal "9007199254740992", decimal "1")
+    property "converted" quantity_convert(
+      quantity "123" dimension "length" unit "centimetre" revision "1",
+      {"from":{"dimension_id":"length","unit_id":"centimetre","revision":"1"},
+       "to":{"dimension_id":"length","unit_id":"metre","revision":"1"},
+       "numerator":decimal "1", "denominator":decimal "100"});
+}
+lens Readings from Measurements {}
