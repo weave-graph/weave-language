@@ -1,0 +1,16 @@
+// Proposed bootstrap syntax. Valid times are UTC epoch milliseconds.
+graph Fleet {
+  node "device-operational" entity "device-17" space "operational";
+  node "device-physical" entity "device-17" space "physical";
+  node "site" entity "site-9" space "physical";
+  edge "installed-1" from "device-physical" to "site" relation "installed"
+    valid 100 until 200
+    metadata graph "evidence" revision "not-yet-downloaded";
+}
+lens Installed from Fleet {
+  match relation "installed";
+  metadata depth 4;
+}
+lens At150 from Installed {
+  at 150;
+}

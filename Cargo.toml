@@ -1,0 +1,19 @@
+[package]
+name = "weave-language"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Experimental graph-native language compiler for Weave Engine"
+repository = "https://github.com/weave-graph/weave-language"
+
+[lib]
+name = "weave_language"
+
+[[bin]]
+name = "weave"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+weave-contract = { path = "vendor/weave-contract" }

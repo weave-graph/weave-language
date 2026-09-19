@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "project": "weave-language",
+  "scope": "full requested design; intermediate releases do not imply completion",
+  "source_status": "Original paper recovery blocked on source login; implementation is explicitly provisional.",
+  "states": [
+    "proposed",
+    "ready",
+    "in_progress",
+    "blocked",
+    "review",
+    "verified",
+    "released"
+  ],
+  "completion_rule": "All nodes released with acceptance evidence; all L01-L30 requirements verified or explicitly amended by owner.",
+  "nodes": [
+    {
+      "id": "L0",
+      "title": "Source and contract",
+      "status": "blocked",
+      "owner": "language-agent",
+      "depends_on": [],
+      "external_dependencies": [],
+      "requirements": [],
+      "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
+      "evidence": [
+        "STATUS.md#publication-boundary"
+      ],
+      "blocker": "Original white papers have not been recovered."
+    },
+    {
+      "id": "L1",
+      "title": "Front end",
+      "status": "in_progress",
+      "owner": "language-agent",
+      "depends_on": [
+        "L0"
+      ],
+      "external_dependencies": [],
+      "requirements": [
+        "L01",
+        "L07",
+        "L27"
+      ],
+      "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
+      "evidence": [
+        "STATUS.md#local-verification",
+        "../tests/conformance.rs"
+      ],
+      "provisional": true
+    },
+    {
+      "id": "L2",
+      "title": "Deterministic semantic kernel",
+      "status": "in_progress",
+      "owner": "language-agent",
+      "depends_on": [
+        "L1"
+      ],
+      "external_dependencies": [
+        "engine:snapshot-model"
+      ],
+      "requirements": [
+        "L02",
+        "L03",
+        "L04",
+        "L05",
+        "L18",
+        "L21",
+        "L25"
+      ],
+      "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
+      "evidence": [
+        "STATUS.md#local-verification",
+        "../tests/conformance.rs"
+      ],
+      "provisional": true
+    },
+    {
+      "id": "L3",
+      "title": "Full knowledge semantics",
+      "status": "in_progress",
+      "owner": "language-agent",
+      "depends_on": [
+        "L2"
+      ],
+      "external_dependencies": [
+        "engine:identity-references"
+      ],
+      "requirements": [
+        "L06",
+        "L08",
+        "L19",
+        "L20",
+        "L22",
+        "L23",
+        "L26"
+      ],
+      "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
+      "evidence": [
+        "STATUS.md#local-verification",
+        "../tests/conformance.rs"
+      ],
+      "provisional": true
+    },
+    {
+      "id": "L4",
+      "title": "Reactive secure integration",
+      "status": "proposed",
+      "owner": "language-agent",
+      "depends_on": [
+        "L3"
+      ],
+      "external_dependencies": [
+        "engine:atomic-events-capabilities"
+      ],
+      "requirements": [
+        "L14",
+        "L17",
+        "L24",
+        "L27"
+      ],
+      "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
+      "evidence": []
+    },
+    {
+      "id": "L5",
+      "title": "Spatial and multiscale language",
+      "status": "proposed",
+      "owner": "language-agent",
+      "depends_on": [
+        "L3"
+      ],
+      "external_dependencies": [
+        "engine:geometry-clustering"
+      ],
+      "requirements": [
+        "L09",
+        "L10",
+        "L11",
+        "L28"
+      ],
+      "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
+      "evidence": []
+    },
+    {
+      "id": "L6",
+      "title": "Distributed offline governance",
+      "status": "proposed",
+      "owner": "language-agent",
+      "depends_on": [
+        "L4",
+        "L5"
+      ],
+      "external_dependencies": [
+        "engine:sync-governance-device-host"
+      ],
+      "requirements": [
+        "L12",
+        "L13",
+        "L15",
+        "L16"
+      ],
+      "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
+      "evidence": []
+    },
+    {
+      "id": "L7",
+      "title": "Tooling and public release",
+      "status": "in_progress",
+      "owner": "language-agent",
+      "depends_on": [
+        "L6"
+      ],
+      "external_dependencies": [],
+      "requirements": [
+        "L29",
+        "L30"
+      ],
+      "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
+      "evidence": [
+        "STATUS.md#local-verification",
+        "../tests/conformance.rs"
+      ],
+      "provisional": true
+    }
+  ]
+}

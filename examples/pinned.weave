@@ -1,0 +1,7 @@
+// Substitute a real immutable engine revision before execution.
+use Fleet graph "Fleet" revision "replace-with-committed-revision";
+lens EarlierKnowledge from Fleet {
+  match relation "installed";
+  at 150;
+  metadata depth 4;
+}
