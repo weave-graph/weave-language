@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use syntax::{BindingValue, Item, Metadata, Statement, StringExpr, TimeExpr};
 pub use syntax::{Diagnostic, parse};
 use weave_contract::{
-    Command, Edge, GraphData, GraphRef, Interval, JoinMatch, Node, Polarity, Program, QueryPlan,
-    VERSION,
+    Command, Edge, GraphData, GraphExpression, GraphRef, Interval, JoinMatch, Node, Polarity,
+    Program, QueryPlan, VERSION,
 };
 
 fn diagnostic(code: &str, message: impl Into<String>, span: syntax::Span) -> Diagnostic {
@@ -37,6 +37,7 @@ fn base_query(graph_id: String, revision: Option<String>) -> QueryPlan {
 #[derive(Clone)]
 struct Lens {
     query: QueryPlan,
+    input: Option<GraphExpression>,
     relation: Option<String>,
     time: Option<String>,
 }
@@ -44,15 +45,33 @@ impl Lens {
     fn concrete(query: QueryPlan) -> Self {
         Self {
             query,
+            input: None,
             relation: None,
             time: None,
         }
     }
-    fn emit(&self, commands: &mut Vec<Command>) {
-        if self.relation.is_none() && self.time.is_none() {
-            commands.push(Command::Query {
+    fn expression(&self) -> GraphExpression {
+        match &self.input {
+            Some(input) if self.query.predicate.is_some() || self.query.valid_at.is_some() => {
+                GraphExpression::Filter {
+                    input: Box::new(input.clone()),
+                    predicate: self.query.predicate.clone(),
+                    valid_at: self.query.valid_at,
+                }
+            }
+            Some(input) => input.clone(),
+            None => GraphExpression::Query {
                 query: self.query.clone(),
+            },
+        }
+    }
+    fn emit(&mut self, name: &str, commands: &mut Vec<Command>) {
+        if self.relation.is_none() && self.time.is_none() {
+            commands.push(Command::Bind {
+                name: name.into(),
+                value: self.expression(),
             });
+            self.input = Some(GraphExpression::Reference { name: name.into() });
         }
     }
 }
@@ -119,11 +138,12 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                             entity,
                             space,
                             metadata,
+                            properties,
                         } => data.nodes.push(Node {
                             id,
                             entity_id: entity,
                             space_id: space,
-                            properties: BTreeMap::new(),
+                            properties,
                             metadata: refs(&metadata),
                             readers: Vec::new(),
                         }),
@@ -133,9 +153,11 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                             from,
                             to,
                             predicate,
+                            negative,
                             valid_from,
                             valid_to,
                             metadata,
+                            properties,
                         } => {
                             if !node_ids.contains(&from) || !node_ids.contains(&to) {
                                 return Err(diagnostic(
@@ -163,8 +185,12 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                                 from,
                                 to,
                                 valid_time,
-                                polarity: Polarity::Positive,
-                                properties: BTreeMap::new(),
+                                polarity: if negative {
+                                    Polarity::Negative
+                                } else {
+                                    Polarity::Positive
+                                },
+                                properties,
                                 metadata: refs(&metadata),
                                 readers: Vec::new(),
                                 derived_from: Vec::new(),
@@ -247,14 +273,21 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                     ));
                 }
                 if include_metadata {
+                    if lens.input.is_some() {
+                        return Err(diagnostic(
+                            "E_METADATA_VALUE",
+                            "Materialized graph values retain resolved metadata; further metadata traversal requires a stored graph query",
+                            name_span,
+                        ));
+                    }
                     lens.query.include_metadata = true;
                     lens.query.max_depth = max_depth;
                 }
-                lens.emit(&mut commands);
+                lens.emit(&name, &mut commands);
                 names.insert(name, lens);
             }
             Statement::Join {
-                name: _,
+                name,
                 name_span: _,
                 left,
                 left_span,
@@ -262,13 +295,11 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                 right_span,
                 predicate,
             } => {
-                let get = |name: &str, span| -> Result<QueryPlan, Diagnostic> {
+                let get = |name: &str, span| -> Result<GraphExpression, Diagnostic> {
                     let Some(lens) = names.get(name) else {
                         return Err(diagnostic(
                             "E_UNKNOWN_GRAPH",
-                            format!(
-                                "Unknown graph/lens '{name}'; join outputs cannot yet be reused"
-                            ),
+                            format!("Unknown graph/lens '{name}'"),
                             span,
                         ));
                     };
@@ -279,14 +310,18 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                             span,
                         ));
                     }
-                    Ok(lens.query.clone())
+                    Ok(lens.expression())
                 };
-                commands.push(Command::Join {
-                    left: get(&left, left_span)?,
-                    right: get(&right, right_span)?,
+                let expression = GraphExpression::Join {
+                    left: Box::new(get(&left, left_span)?),
+                    right: Box::new(get(&right, right_span)?),
                     output_predicate: predicate,
                     match_on: JoinMatch::EntitySpaceToFrom,
-                });
+                };
+                let mut lens = Lens::concrete(base_query(String::new(), None));
+                lens.input = Some(expression);
+                lens.emit(&name, &mut commands);
+                names.insert(name, lens);
             }
             Statement::Bind {
                 name,
@@ -339,7 +374,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                         ));
                     }
                 }
-                lens.emit(&mut commands);
+                lens.emit(&name, &mut commands);
                 names.insert(name, lens);
             }
         }

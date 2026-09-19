@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Diagnostic {
@@ -93,6 +94,7 @@ pub enum Item {
         entity: String,
         space: String,
         metadata: Vec<Metadata>,
+        properties: BTreeMap<String, serde_json::Value>,
     },
     Edge {
         id: String,
@@ -100,9 +102,11 @@ pub enum Item {
         from: String,
         to: String,
         predicate: String,
+        negative: bool,
         valid_from: i64,
         valid_to: Option<i64>,
         metadata: Vec<Metadata>,
+        properties: BTreeMap<String, serde_json::Value>,
     },
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -299,17 +303,52 @@ impl Parser {
             ))
         }
     }
-    fn metadata(&mut self) -> Result<Vec<Metadata>, Diagnostic> {
+    fn metadata(
+        &mut self,
+    ) -> Result<(Vec<Metadata>, BTreeMap<String, serde_json::Value>), Diagnostic> {
         let mut result = Vec::new();
-        while self.peek().kind == Kind::Word("metadata".into()) {
-            self.word("metadata")?;
-            self.word("graph")?;
-            let graph = self.string()?;
-            self.word("revision")?;
-            let revision = self.string()?;
-            result.push(Metadata { graph, revision });
+        let mut properties = BTreeMap::new();
+        loop {
+            if self.peek().kind == Kind::Word("metadata".into()) {
+                self.word("metadata")?;
+                self.word("graph")?;
+                let graph = self.string()?;
+                self.word("revision")?;
+                let revision = self.string()?;
+                result.push(Metadata { graph, revision });
+            } else if self.peek().kind == Kind::Word("property".into()) {
+                self.word("property")?;
+                let key_token = self.peek().clone();
+                let key = self.string()?;
+                let token = self.take();
+                let value = match token.kind {
+                    Kind::String(v) => serde_json::Value::String(v),
+                    Kind::Number(v) => serde_json::json!(v),
+                    Kind::Word(v) if v == "true" => serde_json::Value::Bool(true),
+                    Kind::Word(v) if v == "false" => serde_json::Value::Bool(false),
+                    Kind::Word(v) if v == "null" => serde_json::Value::Null,
+                    _ => {
+                        return Err(Diagnostic::new(
+                            "E_PROPERTY_TYPE",
+                            "Property value must be string, integer, boolean or null",
+                            token.start,
+                            token.end,
+                        ));
+                    }
+                };
+                if properties.insert(key, value).is_some() {
+                    return Err(Diagnostic::new(
+                        "E_DUPLICATE",
+                        "Duplicate scalar property",
+                        key_token.start,
+                        key_token.end,
+                    ));
+                }
+            } else {
+                break;
+            }
         }
-        Ok(result)
+        Ok((result, properties))
     }
     fn program(&mut self) -> Result<Program, Diagnostic> {
         let mut statements = Vec::new();
@@ -331,13 +370,14 @@ impl Parser {
                                 let entity = self.string()?;
                                 self.word("space")?;
                                 let space = self.string()?;
-                                let metadata = self.metadata()?;
+                                let (metadata, properties) = self.metadata()?;
                                 Item::Node {
                                     id,
                                     id_span,
                                     entity,
                                     space,
                                     metadata,
+                                    properties,
                                 }
                             }
                             "edge" => {
@@ -347,6 +387,21 @@ impl Parser {
                                 let to = self.string()?;
                                 self.word("relation")?;
                                 let predicate = self.string()?;
+                                let negative = if self.peek().kind == Kind::Word("polarity".into())
+                                {
+                                    self.word("polarity")?;
+                                    match self.name()?.as_str() {
+                                        "negative" => true,
+                                        "positive" => false,
+                                        _ => {
+                                            return Err(
+                                                self.error("Polarity must be positive or negative")
+                                            );
+                                        }
+                                    }
+                                } else {
+                                    false
+                                };
                                 self.word("valid")?;
                                 let valid_from = self.number()?;
                                 self.word("until")?;
@@ -357,16 +412,18 @@ impl Parser {
                                 } else {
                                     Some(self.number()?)
                                 };
-                                let metadata = self.metadata()?;
+                                let (metadata, properties) = self.metadata()?;
                                 Item::Edge {
                                     id,
                                     id_span,
                                     from,
                                     to,
                                     predicate,
+                                    negative,
                                     valid_from,
                                     valid_to,
                                     metadata,
+                                    properties,
                                 }
                             }
                             _ => return Err(self.error("Expected node or edge declaration")),

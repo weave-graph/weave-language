@@ -1,9 +1,9 @@
 {
   "source_repository": "https://github.com/weave-graph/weave-engine",
   "source_path": "crates/weave-contract",
-  "contract_version": "0.2.0",
+  "contract_version": "0.3.0",
   "files": {
-    "Cargo.toml": "35b2b612b76deb7643b2be55bd704af0a0813d23dfef61842823d8e5967c7efc",
-    "src/lib.rs": "6fb2b39947060cdf6949666111a75f221ff5a1bd103983ea35455b6e4567800e"
+    "Cargo.toml": "36822b112c2632bcdb0e1cfff36734cbc0a02fdb9d8a56eac3b310a8c8d392d2",
+    "src/lib.rs": "d1f128bb5520ac1cea5be24ab21bbde47d77cbd710fe344979580f0102b1e5d8"
   }
 }

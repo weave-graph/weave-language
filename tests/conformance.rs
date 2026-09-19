@@ -1,4 +1,4 @@
-use weave_contract::{Command, Interval, Program, VERSION};
+use weave_contract::{Command, GraphExpression, Interval, Program, VERSION};
 use weave_language::{compile, parse};
 
 #[test]
@@ -12,13 +12,30 @@ fn fleet_compiles_and_composes_temporal_lenses() {
     assert_eq!(data.nodes[0].entity_id, data.nodes[1].entity_id);
     assert_ne!(data.nodes[0].space_id, data.nodes[1].space_id);
     assert_eq!(data.edges[0].metadata[0].revision, "not-yet-downloaded");
-    let Command::Query { query } = &plan.commands[2] else {
-        panic!("query missing")
+    let Command::Bind {
+        value: GraphExpression::Query { query },
+        ..
+    } = &plan.commands[1]
+    else {
+        panic!("stored query missing")
     };
-    assert_eq!(query.predicate.as_deref(), Some("installed"));
-    assert_eq!(query.valid_at, Some(150));
     assert!(query.include_metadata);
     assert_eq!(query.max_depth, 4);
+    let Command::Bind {
+        value:
+            GraphExpression::Filter {
+                input,
+                predicate,
+                valid_at,
+            },
+        ..
+    } = &plan.commands[2]
+    else {
+        panic!("composed filter missing")
+    };
+    assert!(matches!(input.as_ref(),GraphExpression::Reference{name} if name=="Installed"));
+    assert_eq!(predicate.as_deref(), Some("installed"));
+    assert_eq!(*valid_at, Some(150));
     let roundtrip: Program = serde_json::from_str(&serde_json::to_string(&plan).unwrap()).unwrap();
     assert_eq!(roundtrip, plan);
 }
@@ -49,7 +66,11 @@ fn half_open_interval_laws() {
 fn revision_is_pinned_not_reinterpreted_as_recording_time() {
     let p =
         compile("use X graph \"remote\" revision \"r123\"; lens Y from X { at -100; }").unwrap();
-    let Command::Query { query } = &p.commands[0] else {
+    let Command::Bind {
+        value: GraphExpression::Query { query },
+        ..
+    } = &p.commands[0]
+    else {
         panic!()
     };
     assert_eq!(query.revision.as_deref(), Some("r123"));
@@ -180,7 +201,13 @@ fn duplicate_diagnostics_point_to_actual_declaration_after_comment_and_unicode()
 fn typed_parameter_partial_application_matches_concrete_query() {
     let parameterized = compile(include_str!("../examples/parameters.weave")).unwrap();
     let concrete=compile("use Fleet graph \"Fleet\"; lens A from Fleet {match relation \"installed\";at 150;metadata depth 4;}").unwrap();
-    assert_eq!(parameterized, concrete);
+    let Command::Bind { value: a, .. } = &parameterized.commands[0] else {
+        panic!()
+    };
+    let Command::Bind { value: b, .. } = &concrete.commands[0] else {
+        panic!()
+    };
+    assert_eq!(a, b);
 }
 #[test]
 fn parameter_types_unknown_names_and_duplicate_bindings_are_checked() {
@@ -221,19 +248,28 @@ fn unbound_templates_do_not_execute_incomplete_queries() {
 #[test]
 fn join_plan_uses_explicit_identity_space_contract() {
     let p = compile(include_str!("../examples/join.weave")).unwrap();
-    assert_eq!(p.version, "0.2.0");
-    let Command::Join {
-        left,
-        right,
-        output_predicate,
-        match_on,
+    assert_eq!(p.version, "0.3.0");
+    let Command::Bind {
+        value:
+            GraphExpression::Join {
+                left,
+                right,
+                output_predicate,
+                match_on,
+            },
+        ..
     } = p.commands.last().unwrap()
     else {
         panic!()
     };
-    assert_eq!(left.graph_id, "Operations");
-    assert_eq!(right.graph_id, "Advisories");
-    assert_eq!(left.predicate.as_deref(), Some("model_of"));
+    let GraphExpression::Filter { input, .. } = left.as_ref() else {
+        panic!()
+    };
+    assert!(matches!(input.as_ref(),GraphExpression::Reference{name} if name=="ModelOf"));
+    let GraphExpression::Filter { input, .. } = right.as_ref() else {
+        panic!()
+    };
+    assert!(matches!(input.as_ref(),GraphExpression::Reference{name} if name=="AffectedBy"));
     assert_eq!(output_predicate, "exposed_to");
     assert_eq!(*match_on, weave_contract::JoinMatch::EntitySpaceToFrom);
 }
@@ -254,4 +290,80 @@ fn join_rejects_unbound_and_unknown_inputs_and_duplicate_names() {
         "E_UNKNOWN_GRAPH"
     );
     assert_eq!(compile("use G graph \"g\"; join J from G to G relation \"r\"; join J from G to G relation \"r\";").unwrap_err().code,"E_DUPLICATE");
+}
+
+#[test]
+fn derived_graph_values_feed_parameterized_lenses_and_further_joins_without_commits() {
+    let p = compile(include_str!("../examples/composed.weave")).unwrap();
+    assert_eq!(
+        p.commands
+            .iter()
+            .filter(|c| matches!(c, Command::Commit { .. }))
+            .count(),
+        3
+    );
+    let bindings: Vec<_> = p
+        .commands
+        .iter()
+        .filter_map(|c| {
+            if let Command::Bind { name, value } = c {
+                Some((name.as_str(), value))
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(bindings.iter().any(|(n, _)| *n == "Exposure"));
+    assert!(!bindings.iter().any(|(n, _)| *n == "Window"));
+    let value = bindings.iter().find(|(n, _)| *n == "InWindow").unwrap().1;
+    let GraphExpression::Filter {
+        input, valid_at, ..
+    } = value
+    else {
+        panic!()
+    };
+    assert_eq!(*valid_at, Some(175));
+    assert!(matches!(input.as_ref(),GraphExpression::Reference{name} if name=="Exposure"));
+    assert!(
+        bindings
+            .iter()
+            .any(|(n, v)| *n == "Action" && matches!(v, GraphExpression::Join { .. }))
+    );
+    let (_, GraphExpression::Filter { input, .. }) = bindings.last().unwrap() else {
+        panic!()
+    };
+    assert!(matches!(input.as_ref(),GraphExpression::Reference{name} if name=="Action"));
+}
+#[test]
+fn materialized_graph_metadata_expansion_is_explicitly_unsupported() {
+    assert_eq!(
+        compile("use G graph \"g\";lens A from G {} lens B from A {metadata depth 2;}")
+            .unwrap_err()
+            .code,
+        "E_METADATA_VALUE"
+    );
+}
+#[test]
+fn negative_claims_and_scalar_metadata_preserve_existing_protocol_fields() {
+    let p=compile("graph G {node \"a\" entity \"e\" space \"s\" property \"name\" \"\" property \"active\" true;edge \"e\" from \"a\" to \"a\" relation \"r\" polarity negative valid 0 until infinity property \"weight\" -3 property \"source\" null;}").unwrap();
+    let Command::Commit { data, .. } = &p.commands[0] else {
+        panic!()
+    };
+    assert_eq!(data.edges[0].polarity, weave_contract::Polarity::Negative);
+    assert_eq!(data.nodes[0].properties["name"], serde_json::json!(""));
+    assert_eq!(data.nodes[0].properties["active"], serde_json::json!(true));
+    assert_eq!(data.edges[0].properties["weight"], serde_json::json!(-3));
+    assert!(data.edges[0].properties["source"].is_null());
+    assert_eq!(
+        compile("graph G {node \"n\" entity \"e\" space \"s\" property \"k\" 1 property \"k\" 2;}")
+            .unwrap_err()
+            .code,
+        "E_DUPLICATE"
+    );
+    assert_eq!(
+        compile("graph G {node \"n\" entity \"e\" space \"s\" property \"k\" NaN;}")
+            .unwrap_err()
+            .code,
+        "E_PROPERTY_TYPE"
+    );
 }
