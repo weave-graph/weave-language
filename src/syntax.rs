@@ -89,6 +89,8 @@ pub enum Statement {
         name_span: Span,
         revision: String,
         parameters: Vec<FunctionParameter>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        output_schema: Option<SchemaConstraint>,
         body: Vec<Statement>,
         output: String,
         output_span: Span,
@@ -185,10 +187,17 @@ pub enum NativeService {
     },
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SchemaConstraint {
+    pub name: String,
+    pub span: Span,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FunctionParameter {
     pub name: String,
     pub span: Span,
     pub kind: ParameterKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<SchemaConstraint>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -202,6 +211,7 @@ pub enum ParameterKind {
 pub struct Argument {
     pub name: String,
     pub span: Span,
+    pub value_span: Span,
     pub value: ArgumentValue,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1460,12 +1470,47 @@ impl Parser {
                         };
                         let span = (self.peek().start, self.peek().end);
                         let name = self.name()?;
-                        parameters.push(FunctionParameter { name, span, kind });
+                        let schema = if self.peek().kind == Kind::Word("schema".into()) {
+                            self.take();
+                            let span = (self.peek().start, self.peek().end);
+                            if kind != ParameterKind::Graph {
+                                return Err(Diagnostic::new(
+                                    "E_SCHEMA_PARAMETER",
+                                    "Only graph parameters accept schema constraints",
+                                    span.0,
+                                    span.1,
+                                ));
+                            }
+                            Some(SchemaConstraint {
+                                name: self.name()?,
+                                span,
+                            })
+                        } else {
+                            None
+                        };
+                        parameters.push(FunctionParameter {
+                            name,
+                            span,
+                            kind,
+                            schema,
+                        });
                         if self.peek().kind != Kind::Symbol(')') {
                             self.symbol(',')?;
                         }
                     }
                     self.symbol(')')?;
+                    let output_schema = if self.peek().kind == Kind::Word("returns".into()) {
+                        self.take();
+                        self.word("graph")?;
+                        self.word("schema")?;
+                        let span = (self.peek().start, self.peek().end);
+                        Some(SchemaConstraint {
+                            name: self.name()?,
+                            span,
+                        })
+                    } else {
+                        None
+                    };
                     self.symbol('{')?;
                     let body = self.program(2)?.statements;
                     self.word("return")?;
@@ -1478,6 +1523,7 @@ impl Parser {
                         name_span,
                         revision,
                         parameters,
+                        output_schema,
                         body,
                         output,
                         output_span,
@@ -1493,6 +1539,7 @@ impl Parser {
                         let kind = self.name()?;
                         let span = (self.peek().start, self.peek().end);
                         let name = self.name()?;
+                        let value_start = self.peek().start;
                         let value = match kind.as_str() {
                             "graph" => ArgumentValue::Graph(self.name()?),
                             "function" => ArgumentValue::Function(self.name()?),
@@ -1514,8 +1561,15 @@ impl Parser {
                             ),
                             _ => return Err(self.error("Expected a typed function argument")),
                         };
+                        let value_span =
+                            (value_start, self.tokens[self.cursor.saturating_sub(1)].end);
                         self.symbol(';')?;
-                        arguments.push(Argument { name, span, value });
+                        arguments.push(Argument {
+                            name,
+                            span,
+                            value_span,
+                            value,
+                        });
                     }
                     self.symbol('}')?;
                     statements.push(Statement::Apply {

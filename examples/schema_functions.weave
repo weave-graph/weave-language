@@ -1,0 +1,32 @@
+schema Infrastructure revision "1" {
+  node Device space "operations" { property "label" string required; }
+  edge Connected from Device to Device {}
+}
+function Select revision "1" (graph input schema Infrastructure, time instant)
+  returns graph schema Infrastructure {
+  lens Result from input { match relation "connected"; at param instant; }
+  return Result;
+}
+function Captured revision "1" (graph input schema Infrastructure)
+  returns graph schema Infrastructure {
+  apply Result from Select { graph input input; time instant 5; }
+  return Result;
+}
+function Transform revision "1" (graph input, function transform) {
+  apply Result from transform { graph input input; }
+  return Result;
+}
+transaction seed {
+  graph Network schema Infrastructure {
+    node "a" type Device entity "A" space "operations" property "label" "A";
+    node "b" type Device entity "B" space "operations" property "label" "B";
+    edge "link" type Connected from "a" to "b" relation "connected" valid 0 until 10;
+  }
+}
+apply AtFive from Select { time instant 5; }
+apply Specialized from Transform { function transform AtFive; }
+apply HigherOrder from Specialized { graph input Network; }
+apply Direct from Select { graph input Network; time instant 5; }
+apply ThroughCapture from Captured { graph input Network; }
+lens Reference from Network { match relation "connected"; at 5; }
+apply Empty from Select { graph input Network; time instant 10; }

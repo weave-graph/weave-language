@@ -5,7 +5,7 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
 | L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.14 schema/metadata/algebra/assertion/rule/context/geometry implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 83 tests. Rich graph/vector/quantity types, effects and formatter remain. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 88 tests. Rich graph/vector/quantity types, effects and formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. Typed total contextual assignments now preserve exact descriptor witnesses; general higher-order lenses/joins and explicit context compatibility remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity resolution now executes with explicit policy/mapping pins; general alignment, stratified absence and richer scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
@@ -15,7 +15,7 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 ## Local verification
 
-- `cargo test --locked`: 83 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
+- `cargo test --locked`: 88 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
@@ -136,3 +136,9 @@ The carrier deliberately gates the whole graph value with all retained descripto
 83 language tests pass (70 compiler conformance, eight axis and five Decimal tests). `scripts/check_live_handles.py` runs actual source plans against the unchanged 0.14 runtime: ordered pin-before/after-head replacement, immutable reuse, separate-execution repinning, advancing live metadata versus historical fixed metadata, explicit CAS full-snapshot attachment replacement, current-principal filtering, explicit half-open time and stale-write rollback all pass. Missing top-level heads fail generically.
 
 No shared contract bytes changed. Pinning captures one evaluation rather than installing a durable view; host registration, explicit refresh and tick policy remain separate native APIs. The source does not claim automatic push, incremental watch, policy revocation administration or per-field metadata patches. [Live references](LIVE_REFERENCES.md) records the complete supported boundary.
+
+## Exact static schema function constraints
+
+88 language tests pass: 75 compiler conformance, eight axis and five Decimal tests. The unchanged protocol 0.14 commands support graph parameter/return constraints checked by complete schema descriptor equality. Negative tests cover unknown/untyped/mismatched inputs, unsafe returns, synthesized algebra schemas, partial/higher-order/captured bypass attempts, nominal label conflicts and semantic source identity. Unknown runtime schemas produce an explicit diagnostic rather than an invented runtime check.
+
+`scripts/check_schema_functions.py` compares actual annotated/unconstrained compiler commands and native runtime results. Higher-order, partial and captured calls agree with direct filters on graph/schema/provenance/snapshot data; an empty typed result retains its exact descriptor after persistence. Annotations add no command or effect. Strict lint, formatting, WASM and vendor/source verification pass. General dynamic schema assertions, graph-type completeness/metadata shapes and schema-polymorphic function types remain open.

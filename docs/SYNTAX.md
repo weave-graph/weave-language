@@ -274,3 +274,7 @@ Protocol 0.14 adds `context_schema`, attributed `context_value` snapshot declara
 ## Live handles, per-execution pins and full snapshot replacement
 
 Protocol 0.14 source now supports `live_handle H graph "G" branch "main";` and `pin Snapshot from H [at 5] [metadata depth 2];`. Named attachments accept `live graph "G" branch "main"`; graph declarations accept explicit branch and `replace revision "expected-head"` before their complete snapshot body. See [live references](LIVE_REFERENCES.md) for exact syntax, ordered evaluation, historical pins, current authorization and the separate host view boundary. These constructs do not register watches or read a clock.
+
+## Schema-constrained pure functions
+
+Graph parameters optionally add `schema Name`, and signatures may add `returns graph schema Name` before the body. Constraints compare complete earlier-declared descriptors and must be statically proven; dynamic reads and descriptor-changing operators are not silently cast. See [schema functions](SCHEMA_FUNCTIONS.md) and [the executable example](../examples/schema_functions.weave). No protocol variant or host effect is introduced.

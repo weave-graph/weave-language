@@ -1412,3 +1412,128 @@ fn explicit_snapshot_replacement_preserves_branch_cas_and_metadata_binding_kind(
         assert!(compile(source).is_err());
     }
 }
+
+#[test]
+fn schema_constrained_functions_support_partial_higher_order_and_captured_calls() {
+    let plan = compile(include_str!("../examples/schema_functions.weave")).unwrap();
+    assert_eq!(plan.version, "0.14.0");
+    assert_eq!(
+        plan.commands
+            .iter()
+            .filter(|c| matches!(c, weave_contract::Command::CommitBatch { .. }))
+            .count(),
+        1
+    );
+    assert_eq!(plan.source_revisions.len(), 3);
+    let body = r#"
+        schema S revision "1" { node N space "s" {} }
+        function Keep revision "1" (graph input schema S) returns graph schema S {
+            context Scoped from input default;
+            project Result from Scoped { node "a"; }
+            return Result;
+        }
+        graph G schema S { node "a" type N entity "A" space "s"; }
+        apply Result from Keep { graph input G; }
+    "#;
+    assert!(compile(body).is_ok());
+}
+
+#[test]
+fn exact_schema_constraints_reject_unknown_untyped_and_distinct_nominal_graphs() {
+    let header = r#"schema S revision "1" { node N space "s" {} }
+        function Keep revision "1" (graph input schema S) returns graph schema S { return input; }
+    "#;
+    for (declaration, expected) in [
+        (r#"graph G {}"#, "E_SCHEMA_MISMATCH"),
+        (
+            r#"schema Other revision "1" { node N space "s" {} } graph G schema Other {}"#,
+            "E_SCHEMA_MISMATCH",
+        ),
+        (r#"use G graph "remote" revision "r";"#, "E_SCHEMA_UNKNOWN"),
+        (
+            r#"live_handle H graph "remote" branch "main"; pin G from H;"#,
+            "E_SCHEMA_UNKNOWN",
+        ),
+    ] {
+        let source = format!(
+            "{header}{declaration}// G mentioned before the actual argument\napply Bad from Keep {{ graph input G; }}"
+        );
+        let error = compile(&source).unwrap_err();
+        assert_eq!(error.code, expected, "{source}");
+        assert_eq!(&source[error.start..error.end], "G");
+        assert_eq!(error.start, source.rfind("G;").unwrap());
+    }
+    let unknown =
+        compile("function F revision \"1\" (graph x schema Missing) { return x; }").unwrap_err();
+    assert_eq!(unknown.code, "E_UNKNOWN_SCHEMA");
+}
+
+#[test]
+fn returns_require_proven_preservation_and_algebra_cannot_erase_constraints() {
+    let schema = r#"schema S revision "1" { node N space "s" {} edge E from N to N {} }"#;
+    for source in [
+        r#"function Bad revision "1" (graph input) returns graph schema S { return input; }"#,
+        r#"function Bad revision "1" (graph input schema S) returns graph schema S { union Result from input with input; return Result; }"#,
+        r#"function Bad revision "1" (graph input schema S) returns graph schema S { join Result from input to input relation "q"; return Result; }"#,
+        r#"function Bad revision "1" (graph input schema S) returns graph schema S { explain Result from input; return Result; }"#,
+    ] {
+        let source = format!("{schema}{source}");
+        let error = compile(&source).unwrap_err();
+        assert_eq!(error.code, "E_SCHEMA_UNKNOWN");
+        assert_eq!(error.start, source.rfind("return ").unwrap() + 7);
+    }
+    let source = format!(
+        r#"{schema}
+        function Keep revision "1" (graph input schema S) {{ return input; }}
+        graph A schema S {{}}
+        union Combined from A with A;
+        apply Bad from Keep {{ graph input Combined; }}"#
+    );
+    assert_eq!(compile(&source).unwrap_err().code, "E_SCHEMA_UNKNOWN");
+}
+
+#[test]
+fn higher_order_and_partial_capture_preserve_schema_obligations() {
+    let source = include_str!("../examples/schema_functions.weave");
+    let bad = source.replace(
+        "apply HigherOrder from Specialized { graph input Network; }",
+        "graph Wrong {} apply HigherOrder from Specialized { graph input Wrong; }",
+    );
+    assert_eq!(compile(&bad).unwrap_err().code, "E_SCHEMA_MISMATCH");
+    let bad = source.replace(
+        "function Captured revision \"1\" (graph input schema Infrastructure)",
+        "function Captured revision \"1\" (graph input)",
+    );
+    assert_eq!(compile(&bad).unwrap_err().code, "E_SCHEMA_UNKNOWN");
+    let bad = source.replace(
+        "apply AtFive from Select { time instant 5; }",
+        "graph Wrong {} apply AtFive from Select { graph input Wrong; }",
+    );
+    assert_eq!(compile(&bad).unwrap_err().code, "E_SCHEMA_MISMATCH");
+    assert!(
+        compile("function F revision \"1\" (time instant schema S) { return instant; }").is_err()
+    );
+}
+
+#[test]
+fn schema_function_identity_includes_descriptor_meaning_but_excludes_locations() {
+    let source = include_str!("../examples/schema_functions.weave");
+    let original = compile(source).unwrap().source_revisions;
+    let shifted = compile(&format!("// Unicode λ and earlier span mentions\n{source}"))
+        .unwrap()
+        .source_revisions;
+    assert_eq!(original, shifted);
+    let changed = compile(&source.replace(
+        "property \"label\" string required;",
+        "property \"label\" string optional;",
+    ))
+    .unwrap()
+    .source_revisions;
+    assert_ne!(original[0].digest, changed[0].digest);
+    assert_ne!(original[1].digest, changed[1].digest);
+    // Unconstrained Transform's source is unchanged; its concrete graph dependencies remain in result identity.
+    assert_eq!(original[2].digest, changed[2].digest);
+    let duplicate =
+        format!("{source}\nschema Infrastructure revision \"1\" {{ node Different {{}} }}");
+    assert_eq!(compile(&duplicate).unwrap_err().code, "E_DUPLICATE");
+}

@@ -1,7 +1,9 @@
 //! Hygienic, bounded specialization of pure graph-function values.
+use crate::graph_types::{self, Knowledge};
 use crate::syntax::*;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+use weave_contract::GraphSchema;
 
 #[derive(Clone)]
 struct Definition {
@@ -9,6 +11,8 @@ struct Definition {
     body: Vec<Statement>,
     output: String,
     output_span: Span,
+    parameter_schemas: BTreeMap<String, Arc<GraphSchema>>,
+    output_schema: Option<Arc<GraphSchema>>,
     captured: BTreeMap<String, Arc<Closure>>,
 }
 #[derive(Clone)]
@@ -148,6 +152,7 @@ struct Expander {
     functions: BTreeMap<String, Arc<Closure>>,
     rule_modules: BTreeSet<String>,
     graphs: BTreeMap<String, BTreeSet<String>>,
+    schemas: graph_types::State,
     reserved: BTreeSet<String>,
     output: Vec<Statement>,
     counter: usize,
@@ -223,6 +228,7 @@ impl Expander {
         if let Statement::Rules { name, .. } = &statement {
             self.rule_modules.insert(name.clone());
         }
+        self.schemas.observe(&statement)?;
         self.output.push(statement);
         Ok(())
     }
@@ -240,6 +246,7 @@ impl Expander {
                 name_span,
                 revision,
                 parameters,
+                output_schema,
                 body,
                 output,
                 output_span,
@@ -290,7 +297,18 @@ impl Expander {
                     .into_iter()
                     .filter_map(|n| self.functions.get(&n).cloned().map(|f| (n, f)))
                     .collect();
+                let parameter_schemas = parameters
+                    .iter()
+                    .filter_map(|p| p.schema.as_ref().map(|s| (p.name.clone(), s)))
+                    .map(|(name, s)| self.schemas.resolve(s).map(|schema| (name, schema)))
+                    .collect::<Result<_, _>>()?;
+                let output_schema = output_schema
+                    .as_ref()
+                    .map(|s| self.schemas.resolve(s))
+                    .transpose()?;
                 let definition = Definition {
+                    parameter_schemas,
+                    output_schema,
                     parameters,
                     body,
                     output,
@@ -372,6 +390,13 @@ impl Expander {
                                     "A graph argument must be fully bound",
                                     argument.span,
                                 ));
+                            }
+                            if let Some(expected) =
+                                closure.definition.parameter_schemas.get(&parameter.name)
+                            {
+                                self.schemas
+                                    .get(&graph)
+                                    .require(expected, argument.value_span)?;
                             }
                             let capture = self.fresh("capture");
                             self.emit(Statement::Lens {
@@ -479,6 +504,11 @@ impl Expander {
                         "Graph functions must return a graph, not an unapplied function",
                         applied.definition.output_span,
                     ));
+                }
+                if let Some(expected) = &applied.definition.output_schema {
+                    self.schemas
+                        .get(&source)
+                        .require(expected, applied.definition.output_span)?;
                 }
                 self.emit(Statement::Lens {
                     name,
@@ -602,17 +632,39 @@ fn specialize(
     }
     Ok(())
 }
-fn remaining(closure: &Closure) -> BTreeMap<String, ParameterKind> {
-    closure
-        .definition
-        .parameters
-        .iter()
-        .filter(|p| !closure.bound.contains_key(&p.name))
-        .map(|p| (p.name.clone(), p.kind.clone()))
-        .collect()
+#[derive(Clone)]
+struct Signature {
+    parameters: BTreeMap<String, ParameterKind>,
+    schemas: BTreeMap<String, Arc<GraphSchema>>,
+    output: Knowledge,
 }
-fn unary(signature: &BTreeMap<String, ParameterKind>) -> bool {
-    signature.len() == 1 && signature.get("input") == Some(&ParameterKind::Graph)
+fn remaining(closure: &Closure) -> Signature {
+    Signature {
+        parameters: closure
+            .definition
+            .parameters
+            .iter()
+            .filter(|p| !closure.bound.contains_key(&p.name))
+            .map(|p| (p.name.clone(), p.kind.clone()))
+            .collect(),
+        schemas: closure
+            .definition
+            .parameter_schemas
+            .iter()
+            .filter(|(n, _)| !closure.bound.contains_key(*n))
+            .map(|(n, schema)| (n.clone(), schema.clone()))
+            .collect(),
+        output: closure
+            .definition
+            .output_schema
+            .clone()
+            .map(Knowledge::Exact)
+            .unwrap_or_default(),
+    }
+}
+fn unary(signature: &Signature) -> bool {
+    signature.parameters.len() == 1
+        && signature.parameters.get("input") == Some(&ParameterKind::Graph)
 }
 fn validate_definition(definition: &Definition) -> Result<(), Diagnostic> {
     let mut scope: BTreeMap<_, _> = definition
@@ -626,18 +678,32 @@ fn validate_definition(definition: &Definition) -> Result<(), Diagnostic> {
         .map(|(n, c)| (n.clone(), remaining(c)))
         .collect();
     let mut graphs = BTreeSet::new();
+    let mut graph_schemas = BTreeMap::new();
     let mut values = BTreeMap::new();
     for p in &definition.parameters {
         match p.kind {
             ParameterKind::Graph => {
                 scope.insert(p.name.clone(), p.name.clone());
                 graphs.insert(p.name.clone());
+                graph_schemas.insert(
+                    p.name.clone(),
+                    definition
+                        .parameter_schemas
+                        .get(&p.name)
+                        .cloned()
+                        .map(Knowledge::Exact)
+                        .unwrap_or_default(),
+                );
             }
             ParameterKind::Function => {
                 scope.insert(p.name.clone(), p.name.clone());
                 functions.insert(
                     p.name.clone(),
-                    [("input".into(), ParameterKind::Graph)].into(),
+                    Signature {
+                        parameters: [("input".into(), ParameterKind::Graph)].into(),
+                        schemas: BTreeMap::new(),
+                        output: Knowledge::Unknown,
+                    },
                 );
             }
             ParameterKind::String => {
@@ -678,7 +744,7 @@ fn validate_definition(definition: &Definition) -> Result<(), Diagnostic> {
                     )
                 })?;
                 for a in arguments {
-                    let expected = signature.remove(&a.name).ok_or_else(|| {
+                    let expected = signature.parameters.remove(&a.name).ok_or_else(|| {
                         error(
                             "E_UNKNOWN_PARAMETER",
                             format!("Unknown or repeated argument '{}'", a.name),
@@ -688,6 +754,13 @@ fn validate_definition(definition: &Definition) -> Result<(), Diagnostic> {
                     let actual = match &a.value {
                         ArgumentValue::Graph(g) => {
                             require_graph(g, a.span)?;
+                            if let Some(expected) = signature.schemas.get(&a.name) {
+                                graph_schemas
+                                    .get(g)
+                                    .cloned()
+                                    .unwrap_or_default()
+                                    .require(expected, a.value_span)?;
+                            }
                             ParameterKind::Graph
                         }
                         ArgumentValue::Function(f) => {
@@ -718,8 +791,9 @@ fn validate_definition(definition: &Definition) -> Result<(), Diagnostic> {
                         ));
                     }
                 }
-                if signature.is_empty() {
+                if signature.parameters.is_empty() {
                     graphs.insert(name.clone());
+                    graph_schemas.insert(name.clone(), signature.output);
                 } else {
                     functions.insert(name.clone(), signature);
                 }
@@ -786,6 +860,9 @@ fn validate_definition(definition: &Definition) -> Result<(), Diagnostic> {
                 ));
             }
         }
+        if let Some((name, knowledge)) = graph_types::transfer(&statement, &graph_schemas) {
+            graph_schemas.insert(name.into(), knowledge);
+        }
         scope.insert(name.clone(), name);
     }
     if !graphs.contains(&definition.output) {
@@ -794,6 +871,13 @@ fn validate_definition(definition: &Definition) -> Result<(), Diagnostic> {
             "Function must return a graph value",
             definition.output_span,
         ));
+    }
+    if let Some(expected) = &definition.output_schema {
+        graph_schemas
+            .get(&definition.output)
+            .cloned()
+            .unwrap_or_default()
+            .require(expected, definition.output_span)?;
     }
     Ok(())
 }
@@ -820,6 +904,7 @@ pub(crate) fn expand(program: Program) -> Result<Program, Diagnostic> {
         functions: BTreeMap::new(),
         rule_modules: BTreeSet::new(),
         graphs: BTreeMap::new(),
+        schemas: graph_types::State::default(),
         reserved,
         output: Vec::new(),
         counter: 0,
@@ -851,6 +936,12 @@ fn normalized_statement(statement: &Statement) -> serde_json::Value {
         ] {
             map.remove(key);
         }
+        if let Some(schema) = map
+            .get_mut("output_schema")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            schema.remove("span");
+        }
         if let Some(operation) = map
             .get_mut("operation")
             .and_then(serde_json::Value::as_object_mut)
@@ -873,6 +964,13 @@ fn normalized_statement(statement: &Statement) -> serde_json::Value {
                 for value in values {
                     if let Some(fields) = value.as_object_mut() {
                         fields.remove("span");
+                        fields.remove("value_span");
+                        if let Some(schema) = fields
+                            .get_mut("schema")
+                            .and_then(serde_json::Value::as_object_mut)
+                        {
+                            schema.remove("span");
+                        }
                     }
                 }
             }
@@ -901,10 +999,14 @@ fn normalized_statement(statement: &Statement) -> serde_json::Value {
 pub(crate) fn source_revisions(
     program: &Program,
 ) -> Result<Vec<weave_contract::SourceRevision>, Diagnostic> {
+    let mut schemas = graph_types::State::default();
     program
         .statements
         .iter()
         .filter_map(|statement| {
+            if matches!(statement, Statement::Schema { .. }) {
+                return schemas.observe(statement).err().map(Err);
+            }
             if let Statement::Rules {
                 name,
                 name_span,
@@ -924,11 +1026,22 @@ pub(crate) fn source_revisions(
                 name,
                 name_span,
                 revision,
+                parameters,
+                output_schema,
                 ..
             } = statement
             {
+                let input_schemas = parameters.iter().filter_map(|p| p.schema.as_ref().map(|schema| (p.name.clone(), schema)))
+                    .map(|(name, constraint)| schemas.resolve(constraint).map(|schema| (name, schema.as_ref().clone())))
+                    .collect::<Result<BTreeMap<_, _>, _>>();
+                let input_schemas = match input_schemas { Ok(s) => s, Err(e) => return Some(Err(e)) };
+                let output_schema = match output_schema.as_ref().map(|s| schemas.resolve(s)).transpose() { Ok(s) => s, Err(e) => return Some(Err(e)) };
+                let mut normalized = normalized_statement(statement);
+                if !input_schemas.is_empty() || output_schema.is_some() {
+                    normalized = serde_json::json!({"definition":normalized,"input_schemas":input_schemas,"output_schema":output_schema.as_deref()});
+                }
                 Some(
-                    weave_contract::identity::source_fingerprint(&normalized_statement(statement))
+                    weave_contract::identity::source_fingerprint(&normalized)
                         .map(|digest| weave_contract::SourceRevision {
                             name: name.clone(),
                             revision: revision.clone(),

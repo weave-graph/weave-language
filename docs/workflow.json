@@ -68,7 +68,10 @@
         "../scripts/check_typed_contexts.py",
         "LIVE_REFERENCES.md",
         "../examples/live_handles.weave",
-        "../scripts/check_live_handles.py"
+        "../scripts/check_live_handles.py",
+        "SCHEMA_FUNCTIONS.md",
+        "../examples/schema_functions.weave",
+        "../scripts/check_schema_functions.py"
       ],
       "provisional": true
     },
@@ -110,7 +113,10 @@
         "STATUS.md#typed-total-contexts-v014-verification",
         "TYPED_CONTEXTS.md",
         "../examples/typed_contexts.weave",
-        "../scripts/check_typed_contexts.py"
+        "../scripts/check_typed_contexts.py",
+        "SCHEMA_FUNCTIONS.md",
+        "../examples/schema_functions.weave",
+        "../scripts/check_schema_functions.py"
       ],
       "provisional": true
     },

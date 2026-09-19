@@ -3,6 +3,7 @@
 pub mod context_axes;
 pub mod decimal;
 mod functions;
+mod graph_types;
 pub mod syntax;
 use std::collections::{BTreeMap, BTreeSet};
 use syntax::{AlgebraOperation, BindingValue, Item, Metadata, Statement, StringExpr, TimeExpr};
