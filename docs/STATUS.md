@@ -5,7 +5,7 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
 | L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.14 schema/metadata/algebra/assertion/rule/context/geometry implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 80 tests. Rich graph/vector/quantity types, effects and formatter remain. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 83 tests. Rich graph/vector/quantity types, effects and formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. Typed total contextual assignments now preserve exact descriptor witnesses; general higher-order lenses/joins and explicit context compatibility remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity resolution now executes with explicit policy/mapping pins; general alignment, stratified absence and richer scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
@@ -15,7 +15,7 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 ## Local verification
 
-- `cargo test --locked`: 80 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
+- `cargo test --locked`: 83 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
@@ -130,3 +130,9 @@ Actual `scripts/check_services.py` uses the engine's explicitly trusted `native_
 `python3 scripts/check_typed_contexts.py --engine /path/to/weave-engine` executes the actual compiler and runtime. It checks canonical Decimal axes, attributed descriptor commits, exact typed selection, support/unknown/explanation/function/union composition, private persisted scalar and empty values after record readers are cleared, generic descriptor denial/schema mismatch, old-protocol rejection and whole-program rollback. Source declarations remain public bootstrap data; the harness uses trusted setup to restrict the descriptor.
 
 The carrier deliberately gates the whole graph value with all retained descriptor witnesses. Mixed unions and empty projections can therefore deny more than a minimal per-record policy would; they cannot erase a private context by dropping records. This is a documented conservative first profile. No implicit compatibility, broadcast, authority installation, reference-valued axis, hypothetical-world or complete-scope absence behavior is claimed. See [typed contexts](TYPED_CONTEXTS.md).
+
+## Explicit live references on v0.14
+
+83 language tests pass (70 compiler conformance, eight axis and five Decimal tests). `scripts/check_live_handles.py` runs actual source plans against the unchanged 0.14 runtime: ordered pin-before/after-head replacement, immutable reuse, separate-execution repinning, advancing live metadata versus historical fixed metadata, explicit CAS full-snapshot attachment replacement, current-principal filtering, explicit half-open time and stale-write rollback all pass. Missing top-level heads fail generically.
+
+No shared contract bytes changed. Pinning captures one evaluation rather than installing a durable view; host registration, explicit refresh and tick policy remain separate native APIs. The source does not claim automatic push, incremental watch, policy revocation administration or per-field metadata patches. [Live references](LIVE_REFERENCES.md) records the complete supported boundary.

@@ -85,22 +85,18 @@ impl Lens {
     }
 }
 fn emit_snapshot(
-    name: String,
-    data: GraphData,
+    commit: SnapshotCommit,
     names: &mut BTreeMap<String, Lens>,
     commands: &mut Vec<Command>,
     active_batch: &mut Option<(String, usize, Vec<SnapshotCommit>)>,
 ) {
-    let mut lens = Lens::concrete(base_query(name.clone(), None));
-    lens.typed = Some(data.schema.is_some());
-    names.insert(name.clone(), lens);
+    let mut query = base_query(commit.graph_id.clone(), None);
+    query.branch_id = commit.branch_id.clone();
+    let mut lens = Lens::concrete(query);
+    lens.typed = Some(commit.data.schema.is_some());
+    names.insert(commit.graph_id.clone(), lens);
     if let Some((_, remaining, members)) = active_batch {
-        members.push(SnapshotCommit {
-            graph_id: name,
-            branch_id: "main".into(),
-            expected_head: None,
-            data,
-        });
+        members.push(commit);
         *remaining -= 1;
         if *remaining == 0 {
             let (batch_id, _, commits) = active_batch.take().unwrap();
@@ -108,10 +104,10 @@ fn emit_snapshot(
         }
     } else {
         commands.push(Command::Commit {
-            graph_id: name,
-            branch_id: "main".into(),
-            expected_head: None,
-            data,
+            graph_id: commit.graph_id,
+            branch_id: commit.branch_id,
+            expected_head: commit.expected_head,
+            data: commit.data,
         });
     }
 }
@@ -128,6 +124,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
     let mut schemas: BTreeMap<String, GraphSchema> = BTreeMap::new();
     let mut rule_sets = BTreeMap::new();
     let mut context_schemas = BTreeMap::new();
+    let mut handles = BTreeMap::new();
     let mut statements = Vec::new();
     let mut batches = BTreeMap::new();
     let mut batch_names = BTreeSet::new();
@@ -211,7 +208,13 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             continue;
         }
         let (name, name_span) = match &statement {
-            Statement::ContextValue {
+            Statement::LiveHandle {
+                name, name_span, ..
+            }
+            | Statement::Pin {
+                name, name_span, ..
+            }
+            | Statement::ContextValue {
                 name, name_span, ..
             }
             | Statement::TypedContext {
@@ -259,6 +262,39 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             ));
         }
         match statement {
+            Statement::LiveHandle {
+                name,
+                graph,
+                branch,
+                ..
+            } => {
+                let mut query = base_query(graph, None);
+                query.branch_id = branch;
+                handles.insert(name, query);
+            }
+            Statement::Pin {
+                name,
+                source,
+                source_span,
+                valid_at,
+                metadata_depth,
+                ..
+            } => {
+                let query = handles.get(&source).ok_or_else(|| {
+                    diagnostic(
+                        "E_HANDLE_TYPE",
+                        "Pin requires a declared live graph handle",
+                        source_span,
+                    )
+                })?;
+                let mut query = query.clone();
+                query.valid_at = valid_at;
+                query.include_metadata = metadata_depth.is_some();
+                query.max_depth = metadata_depth.unwrap_or(8);
+                let mut value = Lens::concrete(query);
+                value.emit(&name, &mut commands);
+                names.insert(name, value);
+            }
             Statement::ContextSchema { .. }
             | Statement::Schema { .. }
             | Statement::Transaction { .. }
@@ -313,7 +349,17 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                     "structural_edges":[{"id":"descriptor","from":"context","to":"context","predicate":"weave:context:definition"}],
                     "assertions":[{"id":"definition","edge_id":"descriptor","source":attribution,"valid_time":{"start":i64::MIN},"polarity":"positive","properties":{"weave.context":definition}}]
                 })).expect("compiler constructs valid descriptor shape");
-                emit_snapshot(name, data, &mut names, &mut commands, &mut active_batch);
+                emit_snapshot(
+                    SnapshotCommit {
+                        graph_id: name,
+                        branch_id: "main".into(),
+                        expected_head: None,
+                        data,
+                    },
+                    &mut names,
+                    &mut commands,
+                    &mut active_batch,
+                );
             }
             Statement::TypedContext {
                 name,
@@ -352,6 +398,8 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                 names.insert(name, lens);
             }
             Statement::Graph {
+                branch,
+                expected_head,
                 name,
                 name_span,
                 items,
@@ -633,7 +681,17 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                 if let Some(error) = weave_contract::validate_schema_graph(&data).first() {
                     return Err(diagnostic(&error.code, &error.message, name_span));
                 }
-                emit_snapshot(name, data, &mut names, &mut commands, &mut active_batch);
+                emit_snapshot(
+                    SnapshotCommit {
+                        graph_id: name,
+                        branch_id: branch,
+                        expected_head,
+                        data,
+                    },
+                    &mut names,
+                    &mut commands,
+                    &mut active_batch,
+                );
             }
             Statement::NativeService { name, service, .. } => {
                 let (expression, typed) = match service {

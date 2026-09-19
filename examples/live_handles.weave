@@ -1,0 +1,24 @@
+transaction live_seed {
+  graph Evidence {
+    node "a" entity "A" space "operations";
+    node "b" entity "B" space "operations";
+    edge "old" from "a" to "b" relation "observed" valid 0 until 10;
+  }
+  graph Catalog {
+    node "asset" entity "asset" space "operations";
+    edge "present" from "asset" to "asset" relation "catalog" valid 0 until infinity;
+    attachment "fixed" on node "asset" key "fixed"
+      graph "Evidence" revision "logical:live_seed:Evidence" valid 0 until 20;
+    attachment "following" on node "asset" key "following"
+      live graph "Evidence" branch "main" valid 0 until 20;
+  }
+}
+live_handle CatalogHead graph "Catalog" branch "main";
+pin Snapshot from CatalogHead at 5 metadata depth 2;
+metadata Fixed from Snapshot on node "asset" key "fixed";
+metadata Following from Snapshot on node "asset" key "following";
+function Preserve revision "1" (graph input) {
+  lens kept from input { at 5; }
+  return kept;
+}
+apply Reused from Preserve { graph input Snapshot; }

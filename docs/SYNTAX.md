@@ -270,3 +270,7 @@ See [native services](NATIVE_SERVICES.md) for runnable fixtures, authority bound
 ## Typed total context declarations
 
 Protocol 0.14 adds `context_schema`, attributed `context_value` snapshot declarations and `typed_context` exact descriptor reads. [The typed-context guide](TYPED_CONTEXTS.md) defines the grammar, strict scalar/enum/Decimal/Quantity types, persistence witnesses and privacy boundary. Run `examples/typed_contexts.weave` in a fresh database with explicit host write grants for `Estonia` and `Claims`. No schema or axis value grants authority or implies compatibility between different context pins.
+
+## Live handles, per-execution pins and full snapshot replacement
+
+Protocol 0.14 source now supports `live_handle H graph "G" branch "main";` and `pin Snapshot from H [at 5] [metadata depth 2];`. Named attachments accept `live graph "G" branch "main"`; graph declarations accept explicit branch and `replace revision "expected-head"` before their complete snapshot body. See [live references](LIVE_REFERENCES.md) for exact syntax, ordered evaluation, historical pins, current authorization and the separate host view boundary. These constructs do not register watches or read a clock.

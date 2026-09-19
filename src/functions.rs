@@ -38,7 +38,13 @@ fn error(code: &str, message: impl Into<String>, span: Span) -> Diagnostic {
 }
 fn declaration(statement: &Statement) -> (&str, Span) {
     match statement {
-        Statement::ContextSchema {
+        Statement::LiveHandle {
+            name, name_span, ..
+        }
+        | Statement::Pin {
+            name, name_span, ..
+        }
+        | Statement::ContextSchema {
             name, name_span, ..
         }
         | Statement::ContextValue {
@@ -204,6 +210,7 @@ impl Expander {
             Statement::Rules { .. }
                 | Statement::Schema { .. }
                 | Statement::ContextSchema { .. }
+                | Statement::LiveHandle { .. }
                 | Statement::Transaction { .. }
         ) {
             self.graphs.insert(name, pending);

@@ -1324,3 +1324,91 @@ fn context_quantities_validate_nominal_units_without_authorizing_conversion() {
         "E_CONTEXT_VALUE"
     );
 }
+
+#[test]
+fn live_handles_are_deferred_and_pin_emits_an_immutable_reference() {
+    let plan = compile(
+        r#"
+        live_handle H graph "Evidence" branch "local";
+        pin Snapshot from H at 5 metadata depth 2;
+        lens Reused from Snapshot { at 5; }
+    "#,
+    )
+    .unwrap();
+    assert_eq!(plan.commands.len(), 2);
+    let json = serde_json::to_value(plan).unwrap();
+    assert_eq!(json["version"], "0.14.0");
+    let query = &json["commands"][0]["value"]["query"];
+    assert_eq!(query["graph_id"], "Evidence");
+    assert_eq!(query["branch_id"], "local");
+    assert!(query["revision"].is_null());
+    assert_eq!(query["valid_at"], 5);
+    assert_eq!(query["include_metadata"], true);
+    assert_eq!(query["max_depth"], 2);
+    assert_eq!(json["commands"][1]["value"]["input"]["kind"], "reference");
+    assert_eq!(json["commands"][1]["value"]["input"]["name"], "Snapshot");
+    assert!(
+        compile(r#"live_handle H graph "Evidence" branch "main";"#)
+            .unwrap()
+            .commands
+            .is_empty()
+    );
+}
+
+#[test]
+fn live_handle_types_and_pure_function_read_boundaries_are_explicit() {
+    for source in [
+        r#"live_handle H graph "G" branch "main"; lens Bad from H {}"#,
+        r#"graph G {} pin Bad from G;"#,
+        r#"pin Bad from Missing;"#,
+        r#"live_handle H graph "G" branch "main"; function F revision "1" (graph x) { lens X from x {} return X; } apply Bad from F { graph x H; }"#,
+        r#"function F revision "1" (graph x) { live_handle H graph "G" branch "main"; return x; }"#,
+        r#"function F revision "1" (graph x) { pin Bad from x; return x; }"#,
+        r#"live_handle H graph "G";"#,
+        r#"live_handle H graph "G" branch "";"#,
+        r#"live_handle H graph "G" branch "main"; pin Bad from H at 1.5;"#,
+        r#"live_handle H graph "G" branch "main"; pin Bad from H metadata depth 33;"#,
+    ] {
+        assert!(compile(source).is_err(), "unexpectedly compiled {source}");
+    }
+    let source = "// H is not a materialized graph\nlive_handle H graph \"G\" branch \"main\"; pin V from Missing;";
+    let error = compile(source).unwrap_err();
+    assert_eq!(error.code, "E_HANDLE_TYPE");
+    assert_eq!(&source[error.start..error.end], "Missing");
+}
+
+#[test]
+fn explicit_snapshot_replacement_preserves_branch_cas_and_metadata_binding_kind() {
+    let plan = compile(r#"
+        transaction changed {
+            graph Catalog branch "local" replace revision "old-head" {
+                node "a" entity "A" space "s";
+                attachment "live" on node "a" key "live" live graph "Evidence" branch "remote-cache" valid 0 until 10;
+                attachment "fixed" on node "a" key "fixed" graph "Evidence" revision "r1" valid 0 until 10;
+            }
+        }
+        lens Current from Catalog {}
+    "#).unwrap();
+    let json = serde_json::to_value(plan).unwrap();
+    let commit = &json["commands"][0]["commits"][0];
+    assert_eq!(commit["expected_head"], "old-head");
+    assert_eq!(commit["branch_id"], "local");
+    assert_eq!(
+        commit["data"]["attachments"][0]["value"]["kind"],
+        "live_graph"
+    );
+    assert_eq!(
+        commit["data"]["attachments"][0]["value"]["branch_id"],
+        "remote-cache"
+    );
+    assert_eq!(commit["data"]["attachments"][1]["value"]["kind"], "graph");
+    assert_eq!(json["commands"][1]["value"]["query"]["branch_id"], "local");
+    for source in [
+        r#"graph G replace {}"#,
+        r#"graph G replace revision "" {}"#,
+        r#"graph G branch "" {}"#,
+        r#"graph G replace revision "r" replace revision "s" {}"#,
+    ] {
+        assert!(compile(source).is_err());
+    }
+}

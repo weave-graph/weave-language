@@ -30,6 +30,20 @@ pub type Span = (usize, usize);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
+    LiveHandle {
+        name: String,
+        name_span: Span,
+        graph: String,
+        branch: String,
+    },
+    Pin {
+        name: String,
+        name_span: Span,
+        source: String,
+        source_span: Span,
+        valid_at: Option<i64>,
+        metadata_depth: Option<u32>,
+    },
     ContextSchema {
         name: String,
         name_span: Span,
@@ -133,6 +147,8 @@ pub enum Statement {
         items: Vec<Item>,
         schema: Option<String>,
         profile: GraphProfile,
+        branch: String,
+        expected_head: Option<String>,
     },
     Use {
         name: String,
@@ -1135,6 +1151,8 @@ impl Parser {
                         | "typed_context"
                         | "context_schema"
                         | "context_value"
+                        | "live_handle"
+                        | "pin"
                 )
             {
                 return Err(Diagnostic::new(
@@ -1145,6 +1163,50 @@ impl Parser {
                 ));
             }
             match kind.as_str() {
+                "live_handle" => {
+                    self.word("graph")?;
+                    let graph = self.selector_string()?;
+                    self.word("branch")?;
+                    let branch = self.selector_string()?;
+                    self.symbol(';')?;
+                    statements.push(Statement::LiveHandle {
+                        name,
+                        name_span,
+                        graph,
+                        branch,
+                    });
+                }
+                "pin" => {
+                    self.word("from")?;
+                    let source_span = (self.peek().start, self.peek().end);
+                    let source = self.name()?;
+                    let valid_at = if self.peek().kind == Kind::Word("at".into()) {
+                        self.take();
+                        Some(self.number()?)
+                    } else {
+                        None
+                    };
+                    let metadata_depth = if self.peek().kind == Kind::Word("metadata".into()) {
+                        self.take();
+                        self.word("depth")?;
+                        let depth = self.number()?;
+                        if !(0..=32).contains(&depth) {
+                            return Err(self.error("Metadata depth must be between 0 and 32"));
+                        }
+                        Some(depth as u32)
+                    } else {
+                        None
+                    };
+                    self.symbol(';')?;
+                    statements.push(Statement::Pin {
+                        name,
+                        name_span,
+                        source,
+                        source_span,
+                        valid_at,
+                        metadata_depth,
+                    });
+                }
                 "context_schema" => {
                     self.word("revision")?;
                     let revision = self.selector_string()?;
@@ -1732,6 +1794,19 @@ impl Parser {
                     } else {
                         None
                     };
+                    let branch = if self.peek().kind == Kind::Word("branch".into()) {
+                        self.take();
+                        self.selector_string()?
+                    } else {
+                        "main".into()
+                    };
+                    let expected_head = if self.peek().kind == Kind::Word("replace".into()) {
+                        self.take();
+                        self.word("revision")?;
+                        Some(self.selector_string()?)
+                    } else {
+                        None
+                    };
                     self.symbol('{')?;
                     let mut items = Vec::new();
                     while self.peek().kind != Kind::Symbol('}') {
@@ -1828,10 +1903,26 @@ impl Parser {
                                 let host = self.metadata_host()?;
                                 self.word("key")?;
                                 let key = self.string()?;
+                                let live = self.peek().kind == Kind::Word("live".into());
+                                if live {
+                                    self.take();
+                                }
                                 self.word("graph")?;
-                                let graph_id = self.string()?;
-                                self.word("revision")?;
-                                let revision = self.string()?;
+                                let graph_id = self.selector_string()?;
+                                let value = if live {
+                                    self.word("branch")?;
+                                    let branch_id = self.selector_string()?;
+                                    MetadataValue::LiveGraph {
+                                        graph_id,
+                                        branch_id,
+                                    }
+                                } else {
+                                    self.word("revision")?;
+                                    let revision = self.selector_string()?;
+                                    MetadataValue::Graph {
+                                        reference: weave_contract::GraphRef { graph_id, revision },
+                                    }
+                                };
                                 self.word("valid")?;
                                 let valid_from = self.number()?;
                                 self.word("until")?;
@@ -1865,9 +1956,7 @@ impl Parser {
                                     id_span,
                                     host,
                                     key,
-                                    value: MetadataValue::Graph {
-                                        reference: weave_contract::GraphRef { graph_id, revision },
-                                    },
+                                    value,
                                     valid_from,
                                     valid_to,
                                     required,
@@ -1943,6 +2032,8 @@ impl Parser {
                     }
                     self.symbol('}')?;
                     statements.push(Statement::Graph {
+                        branch,
+                        expected_head,
                         profile,
                         schema,
                         name,
