@@ -125,4 +125,24 @@ apply Output from Specialized { graph input Evidence; }
 
 Bodies may compose input graphs and previously declared pure functions. They cannot read undeclared global graphs, declare sources or writes, recurse, or access host effects. Body variables are hygienically renamed. Function definitions are checked even when unused. Expansion is bounded to depth 32, 10,000 emitted statements and 4 MiB of serialized AST; exceeding a bound is an error rather than a partial executable plan.
 
-Function revisions are explicit, nonempty source labels. In this front-end milestone they are checked but not yet carried into runtime plan identity or explanation graphs. Stable source-aware fingerprints are tracked separately. Functions specialize to existing 0.5 expressions, so this syntax does not change the runtime protocol. See [the runnable example](../examples/functions.weave) and `scripts/check_functions.py` for exact equivalence across literal, direct and higher-order evaluation.
+Function revisions are explicit, nonempty source labels. Starting with protocol0.6, the compiler carries normalized source manifests into program/result identity. Function bodies specialize to the existing pure graph expressions. See [the runnable example](../examples/functions.weave) and `scripts/check_functions.py` for exact equivalence across literal, direct and higher-order evaluation.
+
+## Explicit structural relations and source claims (protocol 0.6)
+
+```weave
+graph Evidence explicit {
+  node "a" entity "device-17" space "operations";
+  node "b" entity "advisory-9" space "knowledge";
+  relation "relationship" from "a" to "b" predicate "affected";
+  claim "inspection" on "relationship" source "inspection-system"
+    polarity positive valid 10 until 20 property "method" "inspection";
+  claim "assessment" on "relationship" source "assessment-system"
+    polarity negative valid 10 until 30;
+}
+```
+
+Use `explicit schema S` to validate structural relation types and endpoint properties. A `relation` can carry `type`, scalar properties and pinned metadata. A `claim` names its structural relation and carries separate source attribution, polarity, validity and properties. `context graph "C" revision "r"` can appear after its source label. Context is preserved, but consuming it in support or joins currently requires an unimplemented explicit selection rule and fails with `E_CONTEXT_REQUIRED`.
+
+Named metadata uses `on edge "relationship"` for the structural relationship or `on assertion "inspection"` for one source claim. A structural-only graph yields no claim edges when queried. Legacy `edge` declarations remain supported in ordinary graphs; they cannot be mixed into an explicit graph. See [the example](../examples/assertions.weave) and `scripts/check_assertions.py`.
+
+Function revision labels now travel with their normalized source digests in program and result manifests. `weave fingerprint FILE.weave` includes those revisions and the ordered expanded plan. Whitespace and comments do not change the normalized source identity; changing a function revision or bound argument does. These labels identify supplied code, and do not authenticate its author.

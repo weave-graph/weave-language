@@ -535,7 +535,7 @@ fn known_mixed_typed_untyped_join_is_rejected_without_dropping_types() {
 #[test]
 fn graph_algebra_is_reusable_and_lowers_to_explicit_v05_expressions() {
     let plan = compile(include_str!("../examples/algebra.weave")).unwrap();
-    assert_eq!(plan.version, "0.5.0");
+    assert_eq!(plan.version, weave_contract::VERSION);
     assert!(
         matches!(&plan.commands[2],Command::Bind{value:GraphExpression::Project{edge_ids,..},..} if edge_ids==&["claim"])
     );
@@ -694,4 +694,120 @@ fn function_expansion_has_a_deterministic_budget() {
     }
     s.push_str("graph G{}apply TooMuch from F17{graph input G;}");
     assert_eq!(compile(&s).unwrap_err().code, "E_EXPANSION_BUDGET");
+}
+
+#[test]
+fn explicit_relations_and_attributed_claims_have_distinct_ids_and_properties() {
+    let plan = compile(include_str!("../examples/assertions.weave")).unwrap();
+    let Command::Commit { data, .. } = &plan.commands[0] else {
+        panic!()
+    };
+    assert_eq!(data.profile, weave_contract::GraphProfile::Explicit);
+    assert_eq!(data.structural_edges.len(), 1);
+    assert!(data.assertions.is_empty());
+    assert!(data.edges.is_empty());
+    let Command::Commit { data, .. } = &plan.commands[3] else {
+        panic!()
+    };
+    assert_eq!(data.structural_edges[0].properties["category"], "advisory");
+    assert_eq!(data.assertions.len(), 3);
+    assert_eq!(data.assertions[0].id, "source-positive");
+    assert_eq!(data.assertions[0].edge_id, "affected-relation");
+    assert_eq!(data.assertions[0].properties["method"], "inspection");
+    assert_eq!(data.assertions[2].context.as_ref().unwrap().revision, "r1");
+    assert_eq!(
+        data.assertions[1].polarity,
+        weave_contract::Polarity::Negative
+    );
+}
+#[test]
+fn explicit_claims_reject_ambiguous_ids_dangling_relations_and_profile_mixing() {
+    let prefix = "graph G explicit {node \"a\" entity \"a\" space \"s\";relation \"r\" from \"a\" to \"a\" predicate \"p\";";
+    assert_eq!(
+        compile(&format!(
+            "{prefix}claim \"c\" on \"missing\" source \"s\" polarity positive valid 0 until 1;}}"
+        ))
+        .unwrap_err()
+        .code,
+        "E_ASSERTION_EDGE"
+    );
+    assert_eq!(
+        compile(&format!(
+            "{prefix}claim \"r\" on \"r\" source \"s\" polarity positive valid 0 until 1;}}"
+        ))
+        .unwrap_err()
+        .code,
+        "E_DUPLICATE"
+    );
+    assert_eq!(
+        compile(&format!(
+            "{prefix}edge \"e\" from \"a\" to \"a\" relation \"p\" valid 0 until 1;}}"
+        ))
+        .unwrap_err()
+        .code,
+        "E_ASSERTION_PROFILE"
+    );
+    assert_eq!(compile("graph G {node \"a\" entity \"a\" space \"s\";relation \"r\" from \"a\" to \"a\" predicate \"p\";}").unwrap_err().code,"E_ASSERTION_PROFILE");
+    assert_eq!(
+        compile(&format!(
+            "{prefix}claim \"c\" on \"r\" source \"\" polarity positive valid 0 until 1;}}"
+        ))
+        .unwrap_err()
+        .code,
+        "E_ID"
+    );
+}
+#[test]
+fn typed_structural_relations_are_validated_without_inventing_claims() {
+    let s = "schema S revision \"1\"{node N{}edge E from N to N{property \"label\" string required;}}graph G explicit schema S{node \"n\" type N entity \"n\" space \"s\";relation \"e\" type E from \"n\" to \"n\" predicate \"p\" property \"label\" \"edge\";}";
+    assert!(compile(s).is_ok());
+    assert_eq!(
+        compile(&s.replace("property \"label\" \"edge\"", "property \"label\" 9"))
+            .unwrap_err()
+            .code,
+        "E_SCHEMA_PROPERTY_TYPE"
+    );
+}
+
+#[test]
+fn function_source_identity_ignores_locations_and_tracks_revision_and_parameters() {
+    let source = include_str!("../examples/functions.weave");
+    let shifted = format!("// extra comment\n\n{}", source.replace("  ", "    "));
+    let first = compile(source).unwrap();
+    let second = compile(&shifted).unwrap();
+    assert_eq!(first.source_revisions, second.source_revisions);
+    assert_eq!(first.source_revisions.len(), 2);
+    assert_eq!(
+        weave_language::fingerprint(source).unwrap(),
+        weave_language::fingerprint(&shifted).unwrap()
+    );
+    assert_ne!(
+        weave_language::fingerprint(source).unwrap(),
+        weave_language::fingerprint(&source.replacen("revision \"1\"", "revision \"2\"", 1))
+            .unwrap()
+    );
+    assert_ne!(
+        weave_language::fingerprint(source).unwrap(),
+        weave_language::fingerprint(&source.replacen("time instant 15", "time instant 16", 1))
+            .unwrap()
+    );
+}
+
+#[test]
+fn named_attachments_can_target_individual_source_assertions() {
+    let source = "graph G explicit {node \"n\" entity \"n\" space \"s\";relation \"r\" from \"n\" to \"n\" predicate \"p\";claim \"c\" on \"r\" source \"inspection\" polarity positive valid 0 until 10;attachment \"a\" on assertion \"c\" key \"proof\" graph \"Proof\" revision \"r1\" valid 0 until 10;}";
+    let p = compile(source).unwrap();
+    let Command::Commit { data, .. } = &p.commands[0] else {
+        panic!()
+    };
+    assert_eq!(
+        data.attachments[0].host,
+        weave_contract::MetadataHost::Assertion { id: "c".into() }
+    );
+    assert_eq!(
+        compile(&source.replace("on assertion \"c\"", "on assertion \"missing\""))
+            .unwrap_err()
+            .code,
+        "E_ATTACHMENT_HOST"
+    );
 }

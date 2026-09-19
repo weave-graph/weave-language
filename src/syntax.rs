@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use weave_contract::{
-    EdgeSchema, EntitySpace, GraphSchema, MetadataHost, MetadataValue, NodeSchema, PropertySchema,
-    ScalarType,
+    EdgeSchema, EntitySpace, GraphProfile, GraphSchema, MetadataHost, MetadataValue, NodeSchema,
+    PropertySchema, ScalarType,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -92,6 +92,7 @@ pub enum Statement {
         name_span: Span,
         items: Vec<Item>,
         schema: Option<String>,
+        profile: GraphProfile,
     },
     Use {
         name: String,
@@ -183,6 +184,28 @@ pub enum BindingValue {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Item {
+    Structural {
+        id: String,
+        id_span: Span,
+        type_id: Option<String>,
+        from: String,
+        to: String,
+        predicate: String,
+        metadata: Vec<Metadata>,
+        properties: BTreeMap<String, serde_json::Value>,
+    },
+    Claim {
+        id: String,
+        id_span: Span,
+        edge_id: String,
+        source: String,
+        context: Option<weave_contract::GraphRef>,
+        negative: bool,
+        valid_from: i64,
+        valid_to: Option<i64>,
+        metadata: Vec<Metadata>,
+        properties: BTreeMap<String, serde_json::Value>,
+    },
     Attachment {
         id: String,
         id_span: Span,
@@ -609,6 +632,7 @@ impl Parser {
         match self.name()?.as_str() {
             "node" => Ok(MetadataHost::Node { id: self.string()? }),
             "edge" => Ok(MetadataHost::Edge { id: self.string()? }),
+            "assertion" => Ok(MetadataHost::Assertion { id: self.string()? }),
             "entity" => Ok(MetadataHost::Entity { id: self.string()? }),
             "graph" => Ok(MetadataHost::Graph),
             _ => Err(self.error("Expected node, edge, entity or graph metadata host")),
@@ -837,6 +861,12 @@ impl Parser {
                     statements.push(self.schema(name, name_span)?);
                 }
                 "graph" => {
+                    let profile = if self.peek().kind == Kind::Word("explicit".into()) {
+                        self.take();
+                        GraphProfile::Explicit
+                    } else {
+                        GraphProfile::Legacy
+                    };
                     let schema = if self.peek().kind == Kind::Word("schema".into()) {
                         self.word("schema")?;
                         Some(self.name()?)
@@ -856,6 +886,79 @@ impl Parser {
                             None
                         };
                         let value = match item.as_str() {
+                            "relation" => {
+                                self.word("from")?;
+                                let from = self.string()?;
+                                self.word("to")?;
+                                let to = self.string()?;
+                                self.word("predicate")?;
+                                let predicate = self.string()?;
+                                let (metadata, properties) = self.metadata()?;
+                                Item::Structural {
+                                    id,
+                                    id_span,
+                                    type_id,
+                                    from,
+                                    to,
+                                    predicate,
+                                    metadata,
+                                    properties,
+                                }
+                            }
+                            "claim" => {
+                                if type_id.is_some() {
+                                    return Err(
+                                        self.error("Claim type belongs to its structural relation")
+                                    );
+                                }
+                                self.word("on")?;
+                                let edge_id = self.string()?;
+                                self.word("source")?;
+                                let source = self.string()?;
+                                let context = if self.peek().kind == Kind::Word("context".into()) {
+                                    self.take();
+                                    self.word("graph")?;
+                                    let graph_id = self.string()?;
+                                    self.word("revision")?;
+                                    let revision = self.string()?;
+                                    Some(weave_contract::GraphRef { graph_id, revision })
+                                } else {
+                                    None
+                                };
+                                self.word("polarity")?;
+                                let negative = match self.name()?.as_str() {
+                                    "positive" => false,
+                                    "negative" => true,
+                                    _ => {
+                                        return Err(
+                                            self.error("Expected positive or negative polarity")
+                                        );
+                                    }
+                                };
+                                self.word("valid")?;
+                                let valid_from = self.number()?;
+                                self.word("until")?;
+                                let valid_to = if self.peek().kind == Kind::Word("infinity".into())
+                                {
+                                    self.take();
+                                    None
+                                } else {
+                                    Some(self.number()?)
+                                };
+                                let (metadata, properties) = self.metadata()?;
+                                Item::Claim {
+                                    id,
+                                    id_span,
+                                    edge_id,
+                                    source,
+                                    context,
+                                    negative,
+                                    valid_from,
+                                    valid_to,
+                                    metadata,
+                                    properties,
+                                }
+                            }
                             "attachment" => {
                                 if type_id.is_some() {
                                     return Err(
@@ -970,6 +1073,7 @@ impl Parser {
                     }
                     self.symbol('}')?;
                     statements.push(Statement::Graph {
+                        profile,
                         schema,
                         name,
                         name_span,

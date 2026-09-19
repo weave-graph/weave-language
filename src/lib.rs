@@ -6,10 +6,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use syntax::{AlgebraOperation, BindingValue, Item, Metadata, Statement, StringExpr, TimeExpr};
 pub use syntax::{Diagnostic, parse};
 use weave_contract::{
+    Assertion, GraphProfile, MetadataAttachment, MetadataHost, SnapshotCommit, StructuralEdge,
+};
+use weave_contract::{
     Command, Edge, GraphData, GraphExpression, GraphRef, GraphSchema, Interval, JoinMatch, Node,
     Polarity, Program, QueryPlan, VERSION,
 };
-use weave_contract::{MetadataAttachment, MetadataHost, SnapshotCommit};
 
 fn diagnostic(code: &str, message: impl Into<String>, span: syntax::Span) -> Diagnostic {
     Diagnostic::new(code, message, span.0, span.1)
@@ -83,7 +85,9 @@ impl Lens {
 /// Declarations are sequential. A lens can compose earlier lenses by adding
 /// compatible filters. Graph declarations emit new-branch snapshot commits.
 pub fn compile(source: &str) -> Result<Program, Diagnostic> {
-    let ast = functions::expand(parse(source)?)?;
+    let parsed = parse(source)?;
+    let source_revisions = functions::source_revisions(&parsed)?;
+    let ast = functions::expand(parsed)?;
     let mut names: BTreeMap<String, Lens> = BTreeMap::new();
     let mut commands = Vec::new();
     let mut declared = BTreeSet::new();
@@ -184,12 +188,15 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                 name_span,
                 items,
                 schema,
+                profile,
             } => {
                 let mut ids = BTreeSet::new();
                 let mut node_ids = BTreeSet::new();
                 for item in &items {
                     let (id, id_span) = match item {
-                        Item::Node { id, id_span, .. }
+                        Item::Structural { id, id_span, .. }
+                        | Item::Claim { id, id_span, .. }
+                        | Item::Node { id, id_span, .. }
                         | Item::Edge { id, id_span, .. }
                         | Item::Attachment { id, id_span, .. } => (id, *id_span),
                     };
@@ -204,7 +211,10 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                         node_ids.insert(id.clone());
                     }
                 }
-                let mut data = GraphData::default();
+                let mut data = GraphData {
+                    profile,
+                    ..GraphData::default()
+                };
                 if let Some(schema_name) = schema {
                     data.schema = Some(schemas.get(&schema_name).cloned().ok_or_else(|| {
                         diagnostic(
@@ -216,6 +226,96 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                 }
                 for item in items {
                     match item {
+                        Item::Structural {
+                            id,
+                            id_span,
+                            type_id,
+                            from,
+                            to,
+                            predicate,
+                            metadata,
+                            properties,
+                        } => {
+                            if data.profile != GraphProfile::Explicit {
+                                return Err(diagnostic(
+                                    "E_ASSERTION_PROFILE",
+                                    "Structural relations require an explicit graph",
+                                    id_span,
+                                ));
+                            }
+                            if !node_ids.contains(&from) || !node_ids.contains(&to) {
+                                return Err(diagnostic(
+                                    "E_ENDPOINT",
+                                    "Structural relation requires both endpoint nodes",
+                                    id_span,
+                                ));
+                            }
+                            data.structural_edges.push(StructuralEdge {
+                                id,
+                                type_id,
+                                from,
+                                to,
+                                predicate,
+                                metadata: refs(&metadata),
+                                properties,
+                                readers: Vec::new(),
+                            });
+                        }
+                        Item::Claim {
+                            id,
+                            id_span,
+                            edge_id,
+                            source,
+                            context,
+                            negative,
+                            valid_from,
+                            valid_to,
+                            metadata,
+                            properties,
+                        } => {
+                            if data.profile != GraphProfile::Explicit {
+                                return Err(diagnostic(
+                                    "E_ASSERTION_PROFILE",
+                                    "Claims require an explicit graph",
+                                    id_span,
+                                ));
+                            }
+                            let valid_time = Interval {
+                                start: valid_from,
+                                end: valid_to,
+                            };
+                            if !valid_time.valid() {
+                                return Err(diagnostic(
+                                    "E_INTERVAL",
+                                    "Claim interval must be nonempty and half-open",
+                                    id_span,
+                                ));
+                            }
+                            if source.is_empty() {
+                                return Err(diagnostic(
+                                    "E_ASSERTION_SOURCE",
+                                    "Claim requires a nonempty source label",
+                                    id_span,
+                                ));
+                            }
+                            data.assertions.push(Assertion {
+                                id,
+                                edge_id,
+                                source,
+                                context,
+                                valid_time,
+                                polarity: if negative {
+                                    Polarity::Negative
+                                } else {
+                                    Polarity::Positive
+                                },
+                                properties,
+                                metadata: refs(&metadata),
+                                readers: vec![],
+                                derived_from: vec![],
+                                derivations: vec![],
+                            });
+                        }
                         Item::Attachment {
                             id,
                             id_span,
@@ -299,7 +399,18 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                                     id_span,
                                 ));
                             }
+                            if data.profile == GraphProfile::Explicit {
+                                return Err(diagnostic(
+                                    "E_ASSERTION_PROFILE",
+                                    "Explicit graph requires separate structural relation and claim declarations",
+                                    id_span,
+                                ));
+                            }
                             data.edges.push(Edge {
+                                structural_ref: None,
+                                assertion_properties: BTreeMap::new(),
+                                assertion_source: None,
+                                assertion_context: None,
                                 id,
                                 type_id,
                                 predicate,
@@ -323,7 +434,13 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                 for attachment in &data.attachments {
                     let exists = match &attachment.host {
                         MetadataHost::Node { id } => data.nodes.iter().any(|n| &n.id == id),
-                        MetadataHost::Edge { id } => data.edges.iter().any(|e| &e.id == id),
+                        MetadataHost::Edge { id } => {
+                            data.edges.iter().any(|e| &e.id == id)
+                                || data.structural_edges.iter().any(|e| &e.id == id)
+                        }
+                        MetadataHost::Assertion { id } => {
+                            data.assertions.iter().any(|a| &a.id == id)
+                        }
                         MetadataHost::Entity { id } => {
                             data.nodes.iter().any(|n| &n.entity_id == id)
                         }
@@ -670,6 +787,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
         }
     }
     Ok(Program {
+        source_revisions,
         version: VERSION.into(),
         commands,
     })
@@ -689,4 +807,20 @@ pub fn describe(source: &str) -> Result<Vec<GraphSchema>, Diagnostic> {
             }
         })
         .collect())
+}
+
+/// Canonical structural plan identity, including checked source function revisions.
+/// It preserves command order and does not assert general algebraic equivalence.
+pub fn fingerprint(source: &str) -> Result<String, Diagnostic> {
+    let plan = compile(source)?;
+    let schemas = parse(source)?
+        .statements
+        .into_iter()
+        .filter_map(|s| match s {
+            Statement::Schema { definition, .. } => Some(definition),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    weave_contract::identity::program_fingerprint(&plan, &schemas)
+        .map_err(|d| diagnostic(&d.code, d.message, (0, source.len())))
 }

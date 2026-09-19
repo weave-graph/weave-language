@@ -1,19 +1,21 @@
 {
   "source_repository": "https://github.com/weave-graph/weave-engine",
   "source_path": "crates/weave-contract",
-  "contract_version": "0.5.0",
+  "contract_version": "0.6.0",
   "files": {
-    "Cargo.toml": "d72dd5a037c98a8b1b7fcb35f40e57b299695d02c1d99d2974350b27787a6bce",
+    "Cargo.toml": "8fc3ffd17337c4f61bc82929cf1f8b07f26bea74244281526b2a687194bdefde",
     "LICENSE": "9e24b3303156fce3c77e21da9d3e3b4cc864291987721d55286415a22ea5cfb7",
-    "src/lib.rs": "ca3dc3fa215ee464bed449d1618ff83e0e3ea35f52c5863bfc2ac74bcd30e3b4",
-    "src/schema.rs": "959ae66f317cb8bfbff0afcbb0770b14b1efb06c11aea3938ef01b7d08fdc9b4",
-    "src/algebra.rs": "14b87e694a13b1938de8331a78d7f28a2789614a09f96a0d59b4d05b8b21e651",
-    "src/algebra_types.rs": "15362810f685b74a2c69db1ebdd8ddf926eb1f6e186856220af81e4f0a3f1c3a"
+    "src/lib.rs": "bbb05d9816c423e92c0dc2d85a6f1f633d5a5fbb4f1393db049847e389f64963",
+    "src/schema.rs": "4f11aea159aa7ad92f3b62ce54681a3fa9d233ce7fb2e96d2e9694c610b0f085",
+    "src/algebra.rs": "972a2060540a01e5ba7c3d03493d11ec78c85c9f8b4479be85bab605a9d3d68f",
+    "src/algebra_types.rs": "15362810f685b74a2c69db1ebdd8ddf926eb1f6e186856220af81e4f0a3f1c3a",
+    "src/assertions.rs": "b24243be54aa40cb623b5ee89aa326dfe5712eef0c7758a466f786a47ab845ed",
+    "src/identity.rs": "2c198a057d1d76b0eb19b2ea84a6ccfeee836e6cdca27406bc36558b16b8ec4b"
   },
-  "source_revision": "61c467350c37c36c49048d8ca3ee79709fde3657",
+  "source_revision": "0da99fcd01f067bde56f79b37e7f2b0fd46d291e",
   "license_source_path": "LICENSE",
   "documentation": {
-    "path": "docs/contract/v0.5/README.md",
-    "sha256": "7d5af07d6c5d04f7915f4463be20086f29756ec18b17bc6d1a482f982e955855"
+    "path": "docs/contract/v0.6/README.md",
+    "sha256": "14ae71e03e617333666152a2c0a2b6b943566b42574dd4c5c9c9e8218c83f2e8"
   }
 }

@@ -1,0 +1,29 @@
+// Structural relationships exist separately from claims about them.
+graph Empty explicit {
+  node "a" entity "device-17" space "operations";
+  node "b" entity "advisory-9" space "knowledge";
+  relation "affected-relation" from "a" to "b" predicate "affected";
+}
+lens NoClaims from Empty {}
+support NoEvidence from NoClaims relation "affected"
+  from entity "device-17" space "operations"
+  to entity "advisory-9" space "knowledge" at 15;
+graph Claims explicit {
+  node "a" entity "device-17" space "operations";
+  node "b" entity "advisory-9" space "knowledge";
+  relation "affected-relation" from "a" to "b" predicate "affected" property "category" "advisory";
+  claim "source-positive" on "affected-relation" source "inspection-17"
+    polarity positive valid 10 until 20 property "method" "inspection";
+  claim "source-negative" on "affected-relation" source "assessment-9"
+    polarity negative valid 10 until 30 property "method" "assessment";
+  relation "conditional-relation" from "a" to "b" predicate "conditional";
+  claim "contextual" on "conditional-relation" source "scenario-analysis"
+    context graph "Context" revision "r1"
+    polarity positive valid 10 until 30;
+}
+lens Evidence from Claims {}
+project OneClaim from Evidence {edge "source-positive";}
+support Conflict from Evidence relation "affected"
+  from entity "device-17" space "operations"
+  to entity "advisory-9" space "knowledge" at 15;
+project Scoped from Evidence {edge "contextual";}

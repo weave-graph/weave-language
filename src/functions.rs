@@ -761,3 +761,91 @@ pub(crate) fn expand(program: Program) -> Result<Program, Diagnostic> {
         statements: expander.output,
     })
 }
+
+/// Remove source locations only at known AST metadata positions. User literals,
+/// schema fields and properties (including keys named `span`) remain semantic.
+fn normalized_statement(statement: &Statement) -> serde_json::Value {
+    fn normalize(value: &mut serde_json::Value) {
+        let Some(map) = value.as_object_mut() else {
+            return;
+        };
+        for key in [
+            "name_span",
+            "source_span",
+            "left_span",
+            "right_span",
+            "function_span",
+            "output_span",
+        ] {
+            map.remove(key);
+        }
+        if let Some(body) = map
+            .get_mut("body")
+            .and_then(serde_json::Value::as_array_mut)
+        {
+            for s in body {
+                normalize(s);
+            }
+        }
+        for collection in ["parameters", "arguments", "bindings"] {
+            if let Some(values) = map
+                .get_mut(collection)
+                .and_then(serde_json::Value::as_array_mut)
+            {
+                for value in values {
+                    if let Some(fields) = value.as_object_mut() {
+                        fields.remove("span");
+                    }
+                }
+            }
+        }
+        if let Some(items) = map
+            .get_mut("items")
+            .and_then(serde_json::Value::as_array_mut)
+        {
+            for item in items {
+                if let Some(fields) = item.as_object_mut() {
+                    fields.remove("id_span");
+                }
+            }
+        }
+        if let Some(op) = map
+            .get_mut("operation")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            op.remove("right_span");
+        }
+    }
+    let mut value = serde_json::to_value(statement).expect("AST serializes");
+    normalize(&mut value);
+    value
+}
+pub(crate) fn source_revisions(
+    program: &Program,
+) -> Result<Vec<weave_contract::SourceRevision>, Diagnostic> {
+    program
+        .statements
+        .iter()
+        .filter_map(|statement| {
+            if let Statement::Function {
+                name,
+                name_span,
+                revision,
+                ..
+            } = statement
+            {
+                Some(
+                    weave_contract::identity::source_fingerprint(&normalized_statement(statement))
+                        .map(|digest| weave_contract::SourceRevision {
+                            name: name.clone(),
+                            revision: revision.clone(),
+                            digest,
+                        })
+                        .map_err(|e| error(&e.code, e.message, *name_span)),
+                )
+            } else {
+                None
+            }
+        })
+        .collect()
+}

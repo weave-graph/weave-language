@@ -46,7 +46,10 @@
       "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
       "evidence": [
         "STATUS.md#local-verification",
-        "../tests/conformance.rs"
+        "../tests/conformance.rs",
+        "STATUS.md#explicit-assertions-and-identity-v06-verification",
+        "../examples/assertions.weave",
+        "../scripts/check_assertions.py"
       ],
       "provisional": true
     },
@@ -76,7 +79,10 @@
         "../tests/conformance.rs",
         "STATUS.md#graph-algebra-v05-verification",
         "../examples/algebra.weave",
-        "../scripts/check_algebra.py"
+        "../scripts/check_algebra.py",
+        "STATUS.md#explicit-assertions-and-identity-v06-verification",
+        "../examples/assertions.weave",
+        "../scripts/check_assertions.py"
       ],
       "provisional": true
     },
@@ -106,7 +112,10 @@
         "../tests/conformance.rs",
         "STATUS.md#graph-algebra-v05-verification",
         "../examples/algebra.weave",
-        "../scripts/check_algebra.py"
+        "../scripts/check_algebra.py",
+        "STATUS.md#explicit-assertions-and-identity-v06-verification",
+        "../examples/assertions.weave",
+        "../scripts/check_assertions.py"
       ],
       "provisional": true
     },

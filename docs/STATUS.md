@@ -4,10 +4,10 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.5 schema/metadata/algebra implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 40 tests. Rich graph/vector/quantity types, effects and formatter remain. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.6 schema/metadata/algebra/assertion implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 45 tests. Rich graph/vector/quantity types, effects and formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. General higher-order lenses/joins and context remain. |
-| L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. General identity alignment, rule evaluation, general explanation APIs and scenarios remain. |
+| L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. General identity alignment, rule evaluation, source-level explanation syntax and scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
 | L5 Spatial and multiscale language | proposed | No geometry, embedding or clustering language yet. |
 | L6 Distributed offline governance | proposed | Portable source structure only; no mobile, networking or governance conformance claim. |
@@ -15,11 +15,11 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 ## Local verification
 
-- `cargo test --locked`: 40 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
+- `cargo test --locked`: 45 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
-- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.5.0 protocol plan.
+- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.6.0 protocol plan.
 
 The checks above were run locally on macOS with Rust 1.94.0. A CI definition is not evidence of remote CI success. `cargo check --locked --lib --target wasm32-unknown-unknown` passed; browser-host execution and mobile integration remain unverified. Exact cross-project integration is recorded separately by the orchestrator.
 
@@ -61,4 +61,10 @@ Diff currently annotates node/edge membership, not attachment-only changes or in
 
 40 frontend tests pass. `scripts/check_functions.py` runs the compiled higher-order example against the engine and verifies exact equality of graph data, schemas, snapshots, coverage and provenance against directly specialized and literal lenses. Exactly one source commit is emitted. Graph captures are immutable; function bodies cannot hide reads or writes, and invalid parameter kinds, graph/function return mismatches, recursion and bounded expansion are tested. The existing 0.5 protocol is unchanged.
 
-Schema-constrained signatures, general value types, modules, source-aware runtime identity and explanation APIs remain separate acceptance gaps. Explicit source function revisions are not yet runtime fingerprint dependencies.
+Schema-constrained signatures, general value types, modules, source-aware runtime identity and explanation APIs remain separate acceptance gaps. Protocol0.6 now carries explicit source function revisions and normalized digests into runtime fingerprint dependencies.
+
+## Explicit assertions and identity v0.6 verification
+
+45 frontend tests and 19 portable contract tests cover explicit structure/claim separation, claimed source/context/property preservation, structural-only unknown evidence, assertion-host metadata, profile rejection, source manifests and deterministic identities. Actual CLI acceptance passes `scripts/check_assertions.py` and `scripts/check_functions.py`, including fail-closed contextual support and exact source manifest propagation. Strict Clippy, formatting, locked dependencies, WASM library and vendor/source verifiers pass.
+
+The portable explanation helper is graph-valued, current-principal-scoped and composable with union. Construction budgets are charged before cloning derivation groups; origin-map changes affect full-result identity. Source normalization removes only known AST spans. Context applicability remains required future work, as do source-level explain, complete policy-aware view registration, schema-constrained function arguments and terminating general rules.

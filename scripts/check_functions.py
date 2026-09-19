@@ -18,6 +18,8 @@ with tempfile.TemporaryDirectory(prefix="weave-functions-") as directory:
     result = json.loads(subprocess.check_output([str(args.engine.resolve()), "run", "--db", str(work / "db"), "--actor", "reader", "--write", "Evidence", str(path)]))
     values = {c["name"]: r["result"] for c, r in zip(plan["commands"], result) if c["op"] == "bind"}
     direct, higher, literal = [values[n] for n in ("Direct", "HigherOrder", "Reference")]
+    assert len(higher["source_revisions"]) == 2
+    assert higher["source_revisions"] == plan["source_revisions"]
     assert direct == higher == literal
     assert len(higher["graph"]["edges"]) == 1
     assert higher["graph"]["edges"][0]["id"] == "claim"
