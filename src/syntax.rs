@@ -25,6 +25,22 @@ pub type Span = (usize, usize);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
+    Join {
+        name: String,
+        name_span: Span,
+        left: String,
+        left_span: Span,
+        right: String,
+        right_span: Span,
+        predicate: String,
+    },
+    Bind {
+        name: String,
+        name_span: Span,
+        source: String,
+        source_span: Span,
+        bindings: Vec<Binding>,
+    },
     Graph {
         name: String,
         name_span: Span,
@@ -41,11 +57,32 @@ pub enum Statement {
         name_span: Span,
         source: String,
         source_span: Span,
-        predicate: Option<String>,
-        valid_at: Option<i64>,
+        predicate: Option<StringExpr>,
+        valid_at: Option<TimeExpr>,
         include_metadata: bool,
         max_depth: u32,
     },
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum StringExpr {
+    Literal(String),
+    Parameter(String),
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum TimeExpr {
+    Literal(i64),
+    Parameter(String),
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Binding {
+    pub name: String,
+    pub span: Span,
+    pub value: BindingValue,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum BindingValue {
+    String(String),
+    Time(i64),
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -361,6 +398,53 @@ impl Parser {
                         revision,
                     });
                 }
+                "join" => {
+                    self.word("from")?;
+                    let left_span = (self.peek().start, self.peek().end);
+                    let left = self.name()?;
+                    self.word("to")?;
+                    let right_span = (self.peek().start, self.peek().end);
+                    let right = self.name()?;
+                    self.word("relation")?;
+                    let predicate = self.string()?;
+                    self.symbol(';')?;
+                    statements.push(Statement::Join {
+                        name,
+                        name_span,
+                        left,
+                        left_span,
+                        right,
+                        right_span,
+                        predicate,
+                    });
+                }
+                "bind" => {
+                    self.word("from")?;
+                    let source_span = (self.peek().start, self.peek().end);
+                    let source = self.name()?;
+                    self.symbol('{')?;
+                    let mut bindings = Vec::new();
+                    while self.peek().kind != Kind::Symbol('}') {
+                        let kind = self.name()?;
+                        let span = (self.peek().start, self.peek().end);
+                        let name = self.name()?;
+                        let value = match kind.as_str() {
+                            "string" => BindingValue::String(self.string()?),
+                            "time" => BindingValue::Time(self.number()?),
+                            _ => return Err(self.error("Binding must declare string or time")),
+                        };
+                        self.symbol(';')?;
+                        bindings.push(Binding { name, span, value });
+                    }
+                    self.symbol('}')?;
+                    statements.push(Statement::Bind {
+                        name,
+                        name_span,
+                        source,
+                        source_span,
+                        bindings,
+                    });
+                }
                 "lens" => {
                     self.word("from")?;
                     let source_span = (self.peek().start, self.peek().end);
@@ -377,7 +461,13 @@ impl Parser {
                                     return Err(self.error("Duplicate match filter"));
                                 }
                                 self.word("relation")?;
-                                predicate = Some(self.string()?);
+                                predicate =
+                                    Some(if self.peek().kind == Kind::Word("param".into()) {
+                                        self.word("param")?;
+                                        StringExpr::Parameter(self.name()?)
+                                    } else {
+                                        StringExpr::Literal(self.string()?)
+                                    });
                             }
                             "metadata" => {
                                 if include_metadata {
@@ -397,7 +487,13 @@ impl Parser {
                                 if valid_at.is_some() {
                                     return Err(self.error("Duplicate valid-time filter"));
                                 }
-                                valid_at = Some(self.number()?);
+                                valid_at =
+                                    Some(if self.peek().kind == Kind::Word("param".into()) {
+                                        self.word("param")?;
+                                        TimeExpr::Parameter(self.name()?)
+                                    } else {
+                                        TimeExpr::Literal(self.number()?)
+                                    });
                             }
                             _ => {
                                 return Err(self.error(

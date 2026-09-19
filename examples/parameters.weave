@@ -1,0 +1,14 @@
+use Fleet graph "Fleet";
+lens Exposure from Fleet {
+  match relation param relation;
+  at param instant;
+  metadata depth 4;
+}
+// Partial application retains the unbound time parameter and emits no query.
+bind Installed from Exposure {
+  string relation "installed";
+}
+// Fully binding a lens produces a graph query.
+bind CurrentInstalled from Installed {
+  time instant 150;
+}

@@ -175,3 +175,83 @@ fn duplicate_diagnostics_point_to_actual_declaration_after_comment_and_unicode()
     assert_eq!((error.start, error.end), (actual, actual + "\"é\"".len()));
     assert_eq!(&input[error.start..error.end], "\"é\"");
 }
+
+#[test]
+fn typed_parameter_partial_application_matches_concrete_query() {
+    let parameterized = compile(include_str!("../examples/parameters.weave")).unwrap();
+    let concrete=compile("use Fleet graph \"Fleet\"; lens A from Fleet {match relation \"installed\";at 150;metadata depth 4;}").unwrap();
+    assert_eq!(parameterized, concrete);
+}
+#[test]
+fn parameter_types_unknown_names_and_duplicate_bindings_are_checked() {
+    let base = "use G graph \"g\"; lens P from G {match relation param p;at param t;} ";
+    assert_eq!(
+        compile(&format!("{base} bind B from P {{time p 3;}}"))
+            .unwrap_err()
+            .code,
+        "E_PARAMETER_TYPE"
+    );
+    assert_eq!(
+        compile(&format!("{base} bind B from P {{string missing \"x\";}}"))
+            .unwrap_err()
+            .code,
+        "E_UNKNOWN_PARAMETER"
+    );
+    assert_eq!(
+        compile(&format!(
+            "{base} bind B from P {{string p \"x\"; string p \"x\";}}"
+        ))
+        .unwrap_err()
+        .code,
+        "E_DUPLICATE"
+    );
+    assert_eq!(
+        compile("use G graph \"g\"; lens P from G {match relation param p; at param p;}")
+            .unwrap_err()
+            .code,
+        "E_PARAMETER_TYPE"
+    );
+}
+#[test]
+fn unbound_templates_do_not_execute_incomplete_queries() {
+    let p = compile("use G graph \"g\"; lens P from G {match relation param p;} ").unwrap();
+    assert!(p.commands.is_empty());
+}
+
+#[test]
+fn join_plan_uses_explicit_identity_space_contract() {
+    let p = compile(include_str!("../examples/join.weave")).unwrap();
+    assert_eq!(p.version, "0.2.0");
+    let Command::Join {
+        left,
+        right,
+        output_predicate,
+        match_on,
+    } = p.commands.last().unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(left.graph_id, "Operations");
+    assert_eq!(right.graph_id, "Advisories");
+    assert_eq!(left.predicate.as_deref(), Some("model_of"));
+    assert_eq!(output_predicate, "exposed_to");
+    assert_eq!(*match_on, weave_contract::JoinMatch::EntitySpaceToFrom);
+}
+#[test]
+fn join_rejects_unbound_and_unknown_inputs_and_duplicate_names() {
+    assert_eq!(
+        compile(
+            "use G graph \"g\"; lens P from G {at param t;} join J from P to G relation \"r\";"
+        )
+        .unwrap_err()
+        .code,
+        "E_UNBOUND_PARAMETER"
+    );
+    assert_eq!(
+        compile("use G graph \"g\"; join J from G to Missing relation \"r\";")
+            .unwrap_err()
+            .code,
+        "E_UNKNOWN_GRAPH"
+    );
+    assert_eq!(compile("use G graph \"g\"; join J from G to G relation \"r\"; join J from G to G relation \"r\";").unwrap_err().code,"E_DUPLICATE");
+}

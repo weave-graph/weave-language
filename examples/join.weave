@@ -1,0 +1,15 @@
+graph Operations {
+  node "device" entity "device-17" space "operational";
+  node "model-local" entity "model-4" space "catalog";
+  edge "uses-model" from "device" to "model-local" relation "model_of" valid 100 until 200;
+}
+graph Advisories {
+  node "model-vendor" entity "model-4" space "catalog";
+  node "issue" entity "issue-31" space "advisory";
+  edge "affected-model" from "model-vendor" to "issue" relation "affected_by" valid 150 until 250;
+}
+lens ModelOf from Operations {match relation "model_of";}
+lens AffectedBy from Advisories {match relation "affected_by";}
+// Join exact stable entity+space identities, not local node ID spellings.
+// Result interval is [150,200); both premises remain in provenance.
+join Exposure from ModelOf to AffectedBy relation "exposed_to";

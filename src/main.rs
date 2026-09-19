@@ -1,4 +1,4 @@
-use std::{env, fs, process};
+use std::{env, fs, io::Read, process};
 fn main() {
     let args: Vec<_> = env::args().skip(1).collect();
     if args.len() != 2 || !["check", "plan", "ast"].contains(&args[0].as_str()) {
@@ -7,7 +7,7 @@ fn main() {
         );
         process::exit(2);
     }
-    let source = fs::read_to_string(&args[1]).unwrap_or_else(|e| {
+    let source = read_source(&args[1]).unwrap_or_else(|e| {
         eprintln!(
             "{}",
             serde_json::json!({"code":"E_IO","message":e.to_string()})
@@ -38,4 +38,12 @@ fn main() {
 fn fail(error: weave_language::Diagnostic) -> ! {
     eprintln!("{}", serde_json::to_string(&error).unwrap());
     process::exit(1)
+}
+
+fn read_source(path: &str) -> std::io::Result<String> {
+    let mut source = String::new();
+    fs::File::open(path)?
+        .take(1_048_577)
+        .read_to_string(&mut source)?;
+    Ok(source)
 }
