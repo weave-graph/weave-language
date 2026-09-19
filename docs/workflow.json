@@ -136,7 +136,9 @@
         "../scripts/check_contexts.py",
         "../examples/geometry.weave",
         "../scripts/check_geometry.py",
-        "STATUS.md#geometry-and-source-explanation-v09-verification"
+        "STATUS.md#geometry-and-source-explanation-v09-verification",
+        "../examples/counterparts.weave",
+        "../scripts/check_counterparts.py"
       ],
       "provisional": true
     },

@@ -999,3 +999,50 @@ fn geometry_axes_and_graph_bindings_have_static_diagnostics() {
     );
     assert!(compile("use G graph \"G\"; lens T from G {at param t;} transform D from G assertion \"a\" using T assertion \"b\" at 1;").is_err());
 }
+
+#[test]
+fn declared_counterparts_lower_to_reusable_typed_graph_expression() {
+    let plan = compile(include_str!("../examples/counterparts.weave")).unwrap();
+    let Command::Bind {
+        value: GraphExpression::Counterparts { input, selection },
+        ..
+    } = plan
+        .commands
+        .iter()
+        .find(|c| matches!(c, Command::Bind { name, .. } if name == "Bridge"))
+        .unwrap()
+    else {
+        panic!("counterpart expression missing")
+    };
+    assert!(matches!(input.as_ref(), GraphExpression::Reference { name } if name == "Evidence"));
+    assert_eq!(selection.predicate, "counterpart");
+    assert_eq!(selection.entity_id, "device-17");
+    assert_eq!(selection.valid_at, 7);
+    assert_ne!(selection.from_space_id, selection.to_space_id);
+    let roundtrip: Program = serde_json::from_str(&serde_json::to_string(&plan).unwrap()).unwrap();
+    assert_eq!(roundtrip, plan);
+}
+
+#[test]
+fn counterpart_selection_requires_explicit_distinct_bounded_spaces_and_integer_time() {
+    let source = "use G graph \"G\"; counterparts C from G relation \"bridge\" entity \"e\" from space \"same\" to space \"same\" at 7;";
+    assert_eq!(compile(source).unwrap_err().code, "E_SPACE");
+    assert_eq!(
+        compile(
+            &source
+                .replace("entity \"e\"", "entity \"\"")
+                .replace("to space \"same\"", "to space \"other\"")
+        )
+        .unwrap_err()
+        .code,
+        "E_ID"
+    );
+    assert!(compile(&source.replace("at 7", "at 7.0")).is_err());
+    let errors = compile(
+        &source
+            .replace("from G relation", "from Missing relation")
+            .replace("to space \"same\"", "to space \"other\""),
+    )
+    .unwrap_err();
+    assert_eq!(errors.code, "E_UNKNOWN_GRAPH");
+}

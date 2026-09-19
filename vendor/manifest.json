@@ -1,26 +1,27 @@
 {
   "source_repository": "https://github.com/weave-graph/weave-engine",
   "source_path": "crates/weave-contract",
-  "contract_version": "0.9.0",
+  "contract_version": "0.10.0",
   "files": {
-    "Cargo.toml": "08721d148661525d87d9b0394edcb5298960ae702dca2da26563cb64cef5a89f",
+    "Cargo.toml": "bfe59f0981e16f95eb0c10df29f56eb2b715c07671b9d5bc0f5e3bec343786f6",
     "src/algebra.rs": "4e38a4532184d6a003467ba9df13bc6f21a91eb485165144abe0d8f2e064b470",
     "src/algebra_types.rs": "15362810f685b74a2c69db1ebdd8ddf926eb1f6e186856220af81e4f0a3f1c3a",
     "src/assertions.rs": "b24243be54aa40cb623b5ee89aa326dfe5712eef0c7758a466f786a47ab845ed",
     "src/context.rs": "57b6929a1fbe631c11d0dd842a1e7c7017b06417a6aedd8b132a00a9d0a92cbf",
     "src/context_types.rs": "80ea1ca4172c40bcecd942e7982a53710f8e519a10f6f4d5233eb6fe3167effc",
+    "src/counterpart.rs": "0b02c4d5e7a28828bc06b48a0fd6e36e2451f8002e408ebfe3a9efe6a1c2f674",
     "src/geometry_types.rs": "bef5a89f80d21aa2bb4b8aec74d3da5ae96a5495200fe63e0f675c05a73bba00",
     "src/identity.rs": "0375ec87a7df6489efb118b439a9e161061849e8b6b1f1e89e8c20cbb21c15dc",
-    "src/lib.rs": "c9eaff1ddcfcc7b77117a51c7f1d142aa6b544087778ea73dd23694e5fde4671",
+    "src/lib.rs": "6fa188fec8aa1866e2ca35abdb0d9b5c6f6caf2d2e43a7ce57a43b9f47f4963a",
     "src/rules.rs": "12b738be89d6e657744fb60f2a082d7d39bb7fc7ed35f305e3ad4c94d1584d7e",
     "src/rules_types.rs": "0ebc0be4e190de8e4bf37198307ba6bcfc6873aa08db9d0630146d7b76952b26",
     "src/schema.rs": "8c61c382671de7b33e2ff5d3e845412e5cce9d376733c7a8022c534ab9061499",
     "LICENSE": "9e24b3303156fce3c77e21da9d3e3b4cc864291987721d55286415a22ea5cfb7"
   },
-  "source_revision": "d6c53c7df88022f0fa4152fab44b541c84702171",
+  "source_revision": "39bcc3fd6afef16ff93f1199c6b96184f452350a",
   "license_source_path": "LICENSE",
   "documentation": {
-    "path": "docs/contract/v0.9/README.md",
-    "sha256": "eabd3a454d96f3dfa97e6dd61153f0bd60635976ee647f73f6b7dcd619f8cbff"
+    "path": "docs/contract/v0.10/README.md",
+    "sha256": "ce3d353cc0f0fff6647582d3c918baac925d9c1337f0430264576a65703c4bd6"
   }
 }

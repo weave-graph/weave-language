@@ -4,10 +4,10 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.9 schema/metadata/algebra/assertion/rule/context/geometry implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 54 tests. Rich graph/vector/quantity types, effects and formatter remain. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.10 schema/metadata/algebra/assertion/rule/context/geometry implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 56 tests. Rich graph/vector/quantity types, effects and formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. General higher-order lenses/joins and typed contextual axes remain. |
-| L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. General identity alignment, stratified absence, source-level explanation syntax and scenarios remain. |
+| L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity alignment, stratified absence and richer scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
 | L5 Spatial and multiscale language | in_progress, provisional | Assertion-backed distance, transforms and display projections now lower to engine services. General vector types, learned mappings and clustering syntax remain. |
 | L6 Distributed offline governance | proposed | Portable source structure only; no mobile, networking or governance conformance claim. |
@@ -15,11 +15,11 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 ## Local verification
 
-- `cargo test --locked`: 54 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
+- `cargo test --locked`: 56 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
-- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.9.0 protocol plan.
+- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.10.0 protocol plan.
 
 The checks above were run locally on macOS with Rust 1.94.0. A CI definition is not evidence of remote CI success. `cargo check --locked --lib --target wasm32-unknown-unknown` passed; browser-host execution and mobile integration remain unverified. Exact cross-project integration is recorded separately by the orchestrator.
 
@@ -92,3 +92,9 @@ Actual `scripts/check_geometry.py` execution verifies a 5-metre physical distanc
 Geometry payloads are selected from positive, authorized assertion properties. Their descriptor, role, endpoint-space anchors, context, time and permissions are runtime validation obligations. Compile-time validation covers literal structure/finiteness and operator syntax, not full static geometry typing. General vector/quantity schemas, spatial source declarations, learned bridges, complete identity/counterpart semantics, clustering syntax and platform execution conformance remain open.
 
 The 0.9 node-proof closure adds conservative recorded dependencies to geometry, support and explanation nodes. Portable tests verify unknown status dependencies, per-group explanation dependencies and rejection of altered proof records under the same node origin. This prevents treating an isolated scalar node as provenance-free; runtime visibility and capsule enforcement are engine-owned. Conservative conjunction may produce false denial when alternatives are independently visible.
+
+## Declared counterpart v0.10 verification
+
+56 frontend tests include source syntax, distinct bounded space selectors, strict integer time, undefined graph diagnostics, protocol round trips and function composition. `scripts/check_counterparts.py` executes the typed explicit-assertion example: source assertion and structural identity remain intact, manifestation state stays distinct, a normal join retains both leaf claims and their time intersection, and reverse/out-of-window selection is empty. The portable selector preserves partial coverage, exact selected contexts and endpoint proof dependencies.
+
+This profile selects positive directed bridge claims whose endpoints already declare the same entity identifier in different spaces. It does not establish mapping acceptance, uniqueness or contradiction resolution. Governed mapping snapshots, independently assigned identifiers, supersession/splits and privacy-preserving pairwise identity remain open requirements.

@@ -666,6 +666,9 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                             valid_at,
                         }
                     }
+                    AlgebraOperation::Counterparts { selection } => {
+                        GraphExpression::Counterparts { input, selection }
+                    }
                     AlgebraOperation::Explain => {
                         typed = Some(true);
                         GraphExpression::Explain { input }

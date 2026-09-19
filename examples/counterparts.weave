@@ -1,0 +1,29 @@
+// A declared positive bridge is evidence; this profile does not accept an identity policy.
+schema Manifestations revision "1" {
+  node Representation { property "state" string optional; }
+  edge Relationship from Representation to Representation cross_space {}
+}
+graph Mappings explicit schema Manifestations {
+  node "physical-device" type Representation entity "device-17" space "physical" property "state" "observed";
+  node "operations-device" type Representation entity "device-17" space "operations" property "state" "registered";
+  node "advisory" type Representation entity "advisory-9" space "knowledge";
+  relation "bridge" type Relationship from "physical-device" to "operations-device" predicate "counterpart";
+  claim "declared-bridge" on "bridge" source "mapping-proposal-1" polarity positive valid 0 until 10;
+  relation "condition" type Relationship from "operations-device" to "advisory" predicate "affected";
+  claim "advisory-claim" on "condition" source "operations-inspection" polarity positive valid 5 until 20;
+}
+lens Evidence from Mappings {}
+counterparts Bridge from Evidence relation "counterpart" entity "device-17"
+  from space "physical" to space "operations" at 7;
+lens Conditions from Evidence { match relation "affected"; at 7; }
+join Traversal from Bridge to Conditions relation "physical_affected";
+counterparts AtBoundary from Evidence relation "counterpart" entity "device-17"
+  from space "physical" to space "operations" at 10;
+counterparts Reverse from Evidence relation "counterpart" entity "device-17"
+  from space "operations" to space "physical" at 7;
+function SelectBridge revision "1" (graph input) {
+  counterparts Selected from input relation "counterpart" entity "device-17"
+    from space "physical" to space "operations" at 7;
+  return Selected;
+}
+apply ThroughFunction from SelectBridge { graph input Evidence; }

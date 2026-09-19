@@ -175,6 +175,9 @@ pub enum AlgebraOperation {
         valid_at: i64,
     },
     Explain,
+    Counterparts {
+        selection: weave_contract::CounterpartSelection,
+    },
     Context {
         selection: weave_contract::ContextSelection,
     },
@@ -1067,7 +1070,7 @@ impl Parser {
                     });
                 }
                 "union" | "diff" | "project" | "support" | "context" | "explain" | "distance"
-                | "transform" | "project_axes" => {
+                | "transform" | "project_axes" | "counterparts" => {
                     self.word("from")?;
                     let source_span = (self.peek().start, self.peek().end);
                     let source = self.name()?;
@@ -1152,6 +1155,39 @@ impl Parser {
                                 projection_revision,
                                 valid_at,
                             }
+                        }
+                        "counterparts" => {
+                            self.word("relation")?;
+                            let predicate = self.string()?;
+                            self.word("entity")?;
+                            let entity_id = self.string()?;
+                            self.word("from")?;
+                            self.word("space")?;
+                            let from_space_id = self.string()?;
+                            self.word("to")?;
+                            self.word("space")?;
+                            let to_space_id = self.string()?;
+                            self.word("at")?;
+                            let valid_at = self.number()?;
+                            self.symbol(';')?;
+                            let selection = weave_contract::CounterpartSelection {
+                                predicate,
+                                entity_id,
+                                from_space_id,
+                                to_space_id,
+                                valid_at,
+                            };
+                            if let Err(d) =
+                                weave_contract::counterpart::validate_selection(&selection)
+                            {
+                                return Err(Diagnostic::new(
+                                    &d.code,
+                                    d.message,
+                                    name_span.0,
+                                    name_span.1,
+                                ));
+                            }
+                            AlgebraOperation::Counterparts { selection }
                         }
                         "explain" => {
                             self.symbol(';')?;

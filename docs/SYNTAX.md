@@ -203,3 +203,15 @@ Distance outputs `measurement`; transform outputs reusable `coordinates`; projec
 Compile-time checks cover literal finiteness/nesting, graph binding, integer time and three distinct nonnegative projection axes. Runtime checks additionally validate complete geometry descriptors, payload roles/dimensions, frames, units, transforms, context, temporal applicability and current visibility. General vector/quantity schema types, typed spatial source declarations and learned mappings remain gaps.
 
 Derived scalar and explanation nodes carry `derived_from` proof references as well as reader restrictions. Runtime persistence and query checks retain these dependencies, so clearing a result node's readers does not discard its recorded restrictions. Support summaries conservatively require all recorded input dependencies; a shared explanation conclusion requires all its alternatives, while individual explanation groups retain their own conjunction. This can deny a result even when one alternative remains available. A more permissive release policy is not implemented.
+
+## Declared counterpart bridges (protocol 0.10)
+
+```weave
+counterparts Bridge from Evidence relation "counterpart" entity "device-17"
+  from space "physical" to space "operations" at 7;
+join Traversal from Bridge to Conditions relation "physical_affected";
+```
+
+The source graph must already contain visible positive directed bridge assertions at the selected instant. Both endpoints must declare the exact selected entity identity in distinct requested spaces; a matching bridge to a different identity is `E_IDENTITY`. The result retains its schema, endpoint state, assertion attribution, context, snapshot pins and proofs, and can feed ordinary graph functions and joins. Selection never retargets or synchronizes state. Reverse direction is a different query; intervals are half-open. Contextual evidence requires an exact prior context selection. Scoped derived endpoints cannot cross that selection.
+
+Empty results and partial coverage retain their existing meaning without an external identity catalog lookup or hidden-match counts. A positive bridge remains positive evidence even if negative evidence also exists: this operator does not infer unique membership or policy acceptance. Accepted mappings between independently assigned identifiers, supersession/splits and private pairwise identities require the subsequent identity resolver. See [the runnable example](../examples/counterparts.weave).
