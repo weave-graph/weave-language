@@ -91,3 +91,16 @@ Legacy anonymous `metadata graph ... revision ...` remains available for compati
 `weave describe FILE` validates the file and emits its source schema descriptors as JSON without executing a plan. This is source-level discovery, not a privileged inventory of remote graphs. The engine's graph results carry their own schema descriptor; runtime authorization still governs access.
 
 Both compiler and direct runtime clients use the same portable validator. Supported scalar schema types are string, signed 64-bit integer and boolean; nullable values are explicit. Exact decimal, vector/quantity, graph-valued metadata field schemas, variance and disconnected migrations remain open. The grammar's schema revision is an explicit identity, not a claim that a field rename or unit change is safe.
+
+## Graph algebra (protocol 0.5)
+
+```weave
+union Combined from Left with Right;
+diff Changes from Before to After;
+project Selected from Combined { node "current-value-id"; edge "current-edge-id"; }
+support State from Combined relation "affected"
+  from entity "device-17" space "operations"
+  to entity "advisory-9" space "knowledge" at 150;
+```
+
+Each declaration binds a reusable immutable graph value; inputs must already be declared and fully bound. Projection IDs refer to the current value (union namespaces IDs using pinned origins). Empty projection is valid. Union/diff preserve schemas or reject incompatible typed/untyped composition. Diff attaches added/removed membership labels without turning removal into negative evidence. Support uses explicit entity/space identities and a required valid-time instant. It yields a typed status graph with evidence derivations for supported/refuted/conflicted states; unknown has no evidence assertion. Coverage remains explicit, and absent evidence never implies falsity. See [the protocol semantics](contract/v0.5/README.md) and [the runnable example](../examples/algebra.weave).

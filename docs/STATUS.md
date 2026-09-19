@@ -4,22 +4,22 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.4 schema/metadata implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 32 tests. Rich graph/vector/quantity types, effects and formatter remain. |
-| L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. General higher-order lenses/joins, context and four-valued support remain. |
-| L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. General identity alignment, rule evaluation, provenance derivation/scenarios remain. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.5 schema/metadata/algebra implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 35 tests. Rich graph/vector/quantity types, effects and formatter remain. |
+| L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. General higher-order lenses/joins and context remain. |
+| L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. General identity alignment, rule evaluation, general explanation APIs and scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
 | L5 Spatial and multiscale language | proposed | No geometry, embedding or clustering language yet. |
 | L6 Distributed offline governance | proposed | Portable source structure only; no mobile, networking or governance conformance claim. |
-| L7 Tooling and release | in_progress, provisional | MIT license, independent crate, README and three-platform/WASM CI definition exist. No CI run or public release verified here. LSP is optional proposed editor tooling, not a user-scope completion gate. |
+| L7 Tooling and release | in_progress, provisional | MIT license, independent crate, README and three-platform/WASM CI definition exist. The orchestrator verified public v0.4 CI on Ubuntu/macOS/Windows and the WASM target; current v0.5 publication remains separately tracked. LSP is optional proposed editor tooling, not a user-scope completion gate. |
 
 ## Local verification
 
-- `cargo test --locked`: 32 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
+- `cargo test --locked`: 35 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
-- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.4.0 protocol plan.
+- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.5.0 protocol plan.
 
 The checks above were run locally on macOS with Rust 1.94.0. A CI definition is not evidence of remote CI success. `cargo check --locked --lib --target wasm32-unknown-unknown` passed; browser-host execution and mobile integration remain unverified. Exact cross-project integration is recorded separately by the orchestrator.
 
@@ -50,3 +50,9 @@ Actual CLI runs of `schema.weave` retain the graph schema. `metadata_cycle.weave
 Full schema types/migrations, live-handle source syntax, arbitrary attachment policies, source-level rebinding and the remaining full-design gates are still incomplete. Current docs and source artifacts do not imply those capabilities.
 
 The typed cross-schema join example deliberately reuses type names with different definitions. Its actual runtime result retains two distinct resolvable node types, a declared derived edge type and valid interval `[150, 200)`. The compiler rejects statically known mixed typed/untyped joins; dynamic inputs remain subject to the same runtime check.
+
+## Graph algebra v0.5 verification
+
+35 frontend tests, strict Clippy and the WASM library target check pass. The vendored portable contract has 13 tests (nine algebra and four schema). Actual compiler/runtime execution of `examples/algebra.weave` passes `scripts/check_algebra.py`: endpoint-preserving projection, membership removal with unchanged positive polarity, repeated union deduplication, supported/conflicted/refuted/unknown at distinct instants, joint conflict provenance and principal-scoped output. Typed union retains nominal types across nested composition. Derivation alternatives preserve parent operator parameters and group-specific premise snapshots.
+
+Diff currently annotates node/edge membership, not attachment-only changes or inferred mutation correspondence. Four-valued support does not provide closed-world certificates or confidence arithmetic. General rules, higher-order graph functions and explicit explanation/view identity APIs remain open.

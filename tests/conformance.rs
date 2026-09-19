@@ -248,7 +248,7 @@ fn unbound_templates_do_not_execute_incomplete_queries() {
 #[test]
 fn join_plan_uses_explicit_identity_space_contract() {
     let p = compile(include_str!("../examples/join.weave")).unwrap();
-    assert_eq!(p.version, "0.4.0");
+    assert_eq!(p.version, weave_contract::VERSION);
     let Command::Bind {
         value:
             GraphExpression::Join {
@@ -530,4 +530,65 @@ fn known_mixed_typed_untyped_join_is_rejected_without_dropping_types() {
     );
     assert_eq!(compile(&source).unwrap_err().code, "E_SCHEMA_JOIN");
     assert!(compile(include_str!("../examples/typed_join.weave")).is_ok());
+}
+
+#[test]
+fn graph_algebra_is_reusable_and_lowers_to_explicit_v05_expressions() {
+    let plan = compile(include_str!("../examples/algebra.weave")).unwrap();
+    assert_eq!(plan.version, "0.5.0");
+    assert!(
+        matches!(&plan.commands[2],Command::Bind{value:GraphExpression::Project{edge_ids,..},..} if edge_ids==&["claim"])
+    );
+    assert!(matches!(
+        &plan.commands[4],
+        Command::Bind {
+            value: GraphExpression::Diff { .. },
+            ..
+        }
+    ));
+    assert!(matches!(
+        &plan.commands[5],
+        Command::Bind {
+            value: GraphExpression::Union { .. },
+            ..
+        }
+    ));
+    let Command::Bind {
+        value: GraphExpression::Support {
+            from, to, valid_at, ..
+        },
+        ..
+    } = &plan.commands[8]
+    else {
+        panic!()
+    };
+    assert_eq!(from.entity_id, "device-17");
+    assert_eq!(to.space_id, "knowledge");
+    assert_eq!(*valid_at, 15);
+}
+#[test]
+fn algebra_unknown_and_unbound_inputs_have_exact_source_diagnostics() {
+    let source =
+        "// Missing is mentioned here first.\nuse A graph \"a\";union U from A with Missing;";
+    let d = compile(source).unwrap_err();
+    assert_eq!(d.code, "E_UNKNOWN_GRAPH");
+    assert_eq!(&source[d.start..d.end], "Missing");
+    assert_eq!(d.start, source.rfind("Missing").unwrap());
+    assert_eq!(
+        compile("use A graph \"a\";lens T from A {at param t;}project P from T {}")
+            .unwrap_err()
+            .code,
+        "E_UNBOUND_PARAMETER"
+    );
+    assert!(compile("use A graph \"a\";support S from A relation \"p\" from entity \"a\" space \"s\" to entity \"b\" space \"s\";").is_err());
+}
+#[test]
+fn algebra_cannot_silently_drop_known_schema_meaning() {
+    let source = format!(
+        "{} graph U{{}} union Invalid from Network with U;",
+        include_str!("../examples/schema.weave")
+    );
+    assert_eq!(compile(&source).unwrap_err().code, "E_SCHEMA_ALGEBRA");
+    let source = "graph G{} support S from G relation \"p\" from entity \"a\" space \"s\" to entity \"b\" space \"s\" at 0; union Invalid from S with G;";
+    assert_eq!(compile(source).unwrap_err().code, "E_SCHEMA_ALGEBRA");
 }

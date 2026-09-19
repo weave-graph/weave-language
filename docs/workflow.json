@@ -73,7 +73,10 @@
       "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
       "evidence": [
         "STATUS.md#local-verification",
-        "../tests/conformance.rs"
+        "../tests/conformance.rs",
+        "STATUS.md#graph-algebra-v05-verification",
+        "../examples/algebra.weave",
+        "../scripts/check_algebra.py"
       ],
       "provisional": true
     },
@@ -100,7 +103,10 @@
       "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
       "evidence": [
         "STATUS.md#local-verification",
-        "../tests/conformance.rs"
+        "../tests/conformance.rs",
+        "STATUS.md#graph-algebra-v05-verification",
+        "../examples/algebra.weave",
+        "../scripts/check_algebra.py"
       ],
       "provisional": true
     },

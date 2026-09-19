@@ -2,7 +2,7 @@
 //! No source program can invoke host effects: compilation only emits a plan.
 pub mod syntax;
 use std::collections::{BTreeMap, BTreeSet};
-use syntax::{BindingValue, Item, Metadata, Statement, StringExpr, TimeExpr};
+use syntax::{AlgebraOperation, BindingValue, Item, Metadata, Statement, StringExpr, TimeExpr};
 pub use syntax::{Diagnostic, parse};
 use weave_contract::{
     Command, Edge, GraphData, GraphExpression, GraphRef, GraphSchema, Interval, JoinMatch, Node,
@@ -140,7 +140,10 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             continue;
         }
         let (name, name_span) = match &statement {
-            Statement::Graph {
+            Statement::Algebra {
+                name, name_span, ..
+            }
+            | Statement::Graph {
                 name, name_span, ..
             }
             | Statement::Use {
@@ -305,6 +308,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                                 metadata: refs(&metadata),
                                 readers: Vec::new(),
                                 derived_from: Vec::new(),
+                                derivations: Vec::new(),
                             });
                         }
                     }
@@ -355,6 +359,90 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                         data,
                     });
                 }
+            }
+            Statement::Algebra {
+                name,
+                name_span: _,
+                source,
+                source_span,
+                operation,
+            } => {
+                let get = |name: &str, span| -> Result<&Lens, Diagnostic> {
+                    let lens = names.get(name).ok_or_else(|| {
+                        diagnostic(
+                            "E_UNKNOWN_GRAPH",
+                            format!("Unknown graph/lens '{name}'"),
+                            span,
+                        )
+                    })?;
+                    if lens.relation.is_some() || lens.time.is_some() {
+                        return Err(diagnostic(
+                            "E_UNBOUND_PARAMETER",
+                            "Algebra inputs must be fully bound",
+                            span,
+                        ));
+                    }
+                    Ok(lens)
+                };
+                let source_lens = get(&source, source_span)?;
+                let mut typed = source_lens.typed;
+                let input = Box::new(source_lens.expression());
+                let is_union = matches!(&operation, AlgebraOperation::Union { .. });
+                let expression = match operation {
+                    AlgebraOperation::Union { right, right_span }
+                    | AlgebraOperation::Diff { right, right_span } => {
+                        let right_lens = get(&right, right_span)?;
+                        if typed.is_some()
+                            && right_lens.typed.is_some()
+                            && typed != right_lens.typed
+                        {
+                            return Err(diagnostic(
+                                "E_SCHEMA_ALGEBRA",
+                                "Typed and untyped graph values require an explicit mapping",
+                                right_span,
+                            ));
+                        }
+                        typed = if typed == right_lens.typed {
+                            typed
+                        } else {
+                            None
+                        };
+                        let right = Box::new(right_lens.expression());
+                        if is_union {
+                            GraphExpression::Union { left: input, right }
+                        } else {
+                            GraphExpression::Diff {
+                                before: input,
+                                after: right,
+                            }
+                        }
+                    }
+                    AlgebraOperation::Project { node_ids, edge_ids } => GraphExpression::Project {
+                        input,
+                        node_ids,
+                        edge_ids,
+                    },
+                    AlgebraOperation::Support {
+                        predicate,
+                        from,
+                        to,
+                        valid_at,
+                    } => {
+                        typed = Some(true);
+                        GraphExpression::Support {
+                            input,
+                            predicate,
+                            from,
+                            to,
+                            valid_at,
+                        }
+                    }
+                };
+                let mut lens = Lens::concrete(base_query(String::new(), None));
+                lens.input = Some(expression);
+                lens.typed = typed;
+                lens.emit(&name, &mut commands);
+                names.insert(name, lens);
             }
             Statement::Use {
                 name,

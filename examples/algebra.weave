@@ -1,0 +1,28 @@
+// Evidence states are evaluated at an explicit instant, never inferred from absence.
+graph Positive {
+  node "a" entity "device-17" space "operations";
+  node "b" entity "advisory-9" space "knowledge";
+  edge "claim" from "a" to "b" relation "affected" valid 0 until 20;
+}
+graph Negative {
+  node "a" entity "device-17" space "operations";
+  node "b" entity "advisory-9" space "knowledge";
+  edge "claim" from "a" to "b" relation "affected" polarity negative valid 10 until 30;
+}
+project One from Positive {edge "claim";}
+project Empty from Positive {}
+diff Removed from One to Empty;
+union Evidence from Positive with Negative;
+union Reused from Evidence with Positive;
+support Before from Evidence relation "affected"
+  from entity "device-17" space "operations"
+  to entity "advisory-9" space "knowledge" at 5;
+support Conflict from Evidence relation "affected"
+  from entity "device-17" space "operations"
+  to entity "advisory-9" space "knowledge" at 15;
+support Refuted from Evidence relation "affected"
+  from entity "device-17" space "operations"
+  to entity "advisory-9" space "knowledge" at 25;
+support Unknown from Evidence relation "affected"
+  from entity "device-17" space "operations"
+  to entity "advisory-9" space "knowledge" at 35;

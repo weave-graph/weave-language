@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use weave_contract::{
-    EdgeSchema, GraphSchema, MetadataHost, MetadataValue, NodeSchema, PropertySchema, ScalarType,
+    EdgeSchema, EntitySpace, GraphSchema, MetadataHost, MetadataValue, NodeSchema, PropertySchema,
+    ScalarType,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,6 +30,13 @@ pub type Span = (usize, usize);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
+    Algebra {
+        name: String,
+        name_span: Span,
+        source: String,
+        source_span: Span,
+        operation: AlgebraOperation,
+    },
     Transaction {
         name: String,
         name_span: Span,
@@ -84,6 +92,28 @@ pub enum Statement {
         valid_at: Option<TimeExpr>,
         include_metadata: bool,
         max_depth: u32,
+    },
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "operator", rename_all = "snake_case")]
+pub enum AlgebraOperation {
+    Union {
+        right: String,
+        right_span: Span,
+    },
+    Diff {
+        right: String,
+        right_span: Span,
+    },
+    Project {
+        node_ids: Vec<String>,
+        edge_ids: Vec<String>,
+    },
+    Support {
+        predicate: String,
+        from: EntitySpace,
+        to: EntitySpace,
+        valid_at: i64,
     },
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -569,6 +599,80 @@ impl Parser {
                         name,
                         name_span,
                         body,
+                    });
+                }
+                "union" | "diff" | "project" | "support" => {
+                    self.word("from")?;
+                    let source_span = (self.peek().start, self.peek().end);
+                    let source = self.name()?;
+                    let operation = match kind.as_str() {
+                        "union" | "diff" => {
+                            self.word(if kind == "union" { "with" } else { "to" })?;
+                            let right_span = (self.peek().start, self.peek().end);
+                            let right = self.name()?;
+                            self.symbol(';')?;
+                            if kind == "union" {
+                                AlgebraOperation::Union { right, right_span }
+                            } else {
+                                AlgebraOperation::Diff { right, right_span }
+                            }
+                        }
+                        "project" => {
+                            self.symbol('{')?;
+                            let mut node_ids = Vec::new();
+                            let mut edge_ids = Vec::new();
+                            while self.peek().kind != Kind::Symbol('}') {
+                                let member = self.name()?;
+                                let id = self.string()?;
+                                match member.as_str() {
+                                    "node" => node_ids.push(id),
+                                    "edge" => edge_ids.push(id),
+                                    _ => return Err(self.error("Projection expects node or edge")),
+                                };
+                                self.symbol(';')?;
+                            }
+                            self.symbol('}')?;
+                            AlgebraOperation::Project { node_ids, edge_ids }
+                        }
+                        "support" => {
+                            self.word("relation")?;
+                            let predicate = self.string()?;
+                            self.word("from")?;
+                            self.word("entity")?;
+                            let entity_id = self.string()?;
+                            self.word("space")?;
+                            let space_id = self.string()?;
+                            let from = EntitySpace {
+                                entity_id,
+                                space_id,
+                            };
+                            self.word("to")?;
+                            self.word("entity")?;
+                            let entity_id = self.string()?;
+                            self.word("space")?;
+                            let space_id = self.string()?;
+                            let to = EntitySpace {
+                                entity_id,
+                                space_id,
+                            };
+                            self.word("at")?;
+                            let valid_at = self.number()?;
+                            self.symbol(';')?;
+                            AlgebraOperation::Support {
+                                predicate,
+                                from,
+                                to,
+                                valid_at,
+                            }
+                        }
+                        _ => unreachable!(),
+                    };
+                    statements.push(Statement::Algebra {
+                        name,
+                        name_span,
+                        source,
+                        source_span,
+                        operation,
                     });
                 }
                 "metadata" => {
