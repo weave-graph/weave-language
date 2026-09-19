@@ -25,7 +25,9 @@
       "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
       "evidence": [
         "SOURCE_RECONCILIATION.md",
-        "source/provenance.json"
+        "source/provenance.json",
+        "PROTOCOL_015.md",
+        "contract/v0.15/README.md"
       ],
       "source_reconciliation": "verified"
     },
@@ -201,7 +203,10 @@
         "L27"
       ],
       "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
-      "evidence": []
+      "evidence": [
+        "PROTOCOL_015.md",
+        "contract/v0.15/README.md"
+      ]
     },
     {
       "id": "L5",

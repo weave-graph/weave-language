@@ -1,6 +1,6 @@
 # Pinned pure source modules
 
-The compiler can link caller-supplied pure source units under protocol 0.14. No runtime schema, authority, registry, network access or hidden effect is introduced. This is a bounded implementation of reusable source code, not a complete package ecosystem.
+The compiler can link caller-supplied pure source units under the current protocol 0.15 (introduced as a source-only addition on 0.14). No runtime schema, authority, registry, network access or hidden effect is introduced. This is a bounded implementation of reusable source code, not a complete package ecosystem.
 
 Run the transitive example:
 

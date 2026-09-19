@@ -4,8 +4,8 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.14 schema/metadata/algebra/assertion/rule/context/geometry implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 88 tests. Rich graph/vector/quantity types, effects and formatter remain. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.15 schema/metadata/algebra/assertion/rule/context/geometry and graph-influence implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 102 tests. Rich graph/vector/quantity types, effects and formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. Typed total contextual assignments now preserve exact descriptor witnesses; general higher-order lenses/joins and explicit context compatibility remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity resolution now executes with explicit policy/mapping pins; general alignment, stratified absence and richer scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
@@ -15,11 +15,11 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 ## Local verification
 
-- `cargo test --locked`: 88 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
+- `cargo test --locked`: 102 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
-- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.14.0 protocol plan.
+- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.15.0 protocol plan.
 
 The checks above were run locally on macOS with Rust 1.94.0. A CI definition is not evidence of remote CI success. `cargo check --locked --lib --target wasm32-unknown-unknown` passed; browser-host execution and mobile integration remain unverified. Exact cross-project integration is recorded separately by the orchestrator.
 
@@ -148,3 +148,9 @@ No shared contract bytes changed. Pinning captures one evaluation rather than in
 Implemented explicit content-pinned pure source linking, canonical module namespaces, dependency manifests, original-file diagnostics and a bounded local CLI module map. All imported effects remain forbidden; exact schema-constrained transitive functions, rules and context schemas compose without descriptor erasure. Modules do not install runtime authority. Full L01–L03/L26/L27 gates remain open.
 
 Local verification: 102 tests pass (75 conformance, 8 context-axis, 5 Decimal, 10 linker, 2 CLI loader, 2 independently authored linker regressions); strict all-target Clippy, rustfmt, WASM library check, exact 22-file v0.14 vendor and three original paper hashes pass. The real `check_modules.py` compiler→engine run passes transitive capture, diamond manifest deduplication, direct-operation/result equivalence after intentional nominal schema ID alignment, and empty typed output preservation. Root publication/hosted verification remains separate. [Source module guide](MODULES.md) records supported behavior and bounds.
+
+## Protocol 0.15 influence and selector pairing
+
+The compiler emits `0.15.0` and vendors the complete 24-file canonical contract from engine `506729278cf3ee42a30eb9ac71336480e386fe89`, including `influence.rs`, its portable tests and MIT license, plus exact versioned documentation. Source bootstrap node/edge/claim values keep dependency fields empty; identically named ordinary properties remain data. The pinned-module implementation and all existing source operators remain intact.
+
+Local checks pass: all 102 language tests, strict all-target lint, formatting, WASM library compilation, exact vendor verification and the three paper hashes. All fourteen actual source/runtime workflow suites pass: modules, schema functions, live handles, typed contexts, contexts, assertions, geometry, counterparts, quantities, finite rules, algebra, functions, composed values and native services. Independent engine metadata scripts also pass unchanged nested source selectors, all five metadata-host kinds, distinct/idempotent wrappers, cyclic paths, node-only privacy and projection error rollback. Original-node projection after metadata uses the documented current-result-ID rule; it does not gain a proof-based alias or silently return empty. See [pairing and compatibility](PROTOCOL_015.md). Full-design gates and remote publication remain separate.

@@ -75,7 +75,7 @@ Join outputs can feed later lenses, parameter binding and joins. Each concrete r
 
 ## Claim polarity and scalar properties
 
-Edges default to positive support; `polarity negative` records explicit negative support without deleting positive evidence. The current path join derives from positive premises only. A source graph can retain both. A full four-valued proposition query/resolution API remains planned.
+Edges default to positive support; `polarity negative` records explicit negative support without deleting positive evidence. The current path join derives from positive premises only. A source graph can retain both. The `support` operator below exposes the implemented four-valued temporal profile; richer proposition resolution remains open.
 
 Nodes, edges and explicit assertions accept repeated `property "key" value` clauses. Values are strings, signed integers, finite floating-point numbers, booleans, null, arrays or structured objects; property keys must be unique and nonempty. Graph-valued metadata continues using `metadata graph ... revision ...`. Literal strings and objects are data, not executable code.
 
@@ -83,7 +83,7 @@ Nodes, edges and explicit assertions accept repeated `property "key" value` clau
 
 [metadata_cycle.weave](../examples/metadata_cycle.weave) creates two graph snapshots inside one explicit `transaction boot { ... }`. An `attachment` has its own identity, host kind/identity, key, pinned graph value and valid interval. `required` demands that the runtime validate the referenced snapshot's availability. The source profile currently emits public attachments without custom origin/schema-revision fields; those richer runtime fields remain future source syntax.
 
-The transaction lowers to one atomic `CommitBatch`. A same-batch graph revision is written as `logical:batch-id:graph-id`; the runtime resolves those identities through one snapshot manifest and validates required references after inserting all members. This allows real cyclic references without recursive hashes. The batch ID is an ASCII identifier at most 64 bytes. Nested transactions, empty batches and non-graph statements inside a batch are rejected. Graph declarations currently create new snapshots; source-level expected-head updates/rebinding remain later work.
+The transaction lowers to one atomic `CommitBatch`. A same-batch graph revision is written as `logical:batch-id:graph-id`; the runtime resolves those identities through one snapshot manifest and validates required references after inserting all members. This allows real cyclic references without recursive hashes. The batch ID is an ASCII identifier at most 64 bytes. Nested transactions, empty batches and non-graph statements inside a batch are rejected. Graph declarations create complete snapshots; explicit `replace revision` updates use the expected head as documented in [live references](LIVE_REFERENCES.md).
 
 A query resolves named metadata with `metadata depth N;`. `metadata Proof from Result on edge "connection" key "evidence";` selects the resolved graph as another immutable graph value. It preserves attachment-path provenance and visibility. Missing, ambiguous or unmaterialized metadata yields explicit incomplete coverage from the engine, not fabricated emptiness. It performs no hidden live read. That value can feed ordinary lenses and joins.
 
@@ -126,7 +126,7 @@ apply Specialized from Transform { function transform AtFifteen; }
 apply Output from Specialized { graph input Evidence; }
 ```
 
-`apply` binds named arguments once. Incomplete application yields an immutable function value; complete application yields a graph value. Graph arguments are captured as immutable program-local graph bindings when supplied, including during partial application. Scalar arguments currently support strings and signed Unix-millisecond time values. Function arguments have one remaining graph parameter named `input` and return a graph. Graph parameter schemas are retained through evaluation; explicit schema-constrained signatures and runtime schema guards remain future work.
+`apply` binds named arguments once. Incomplete application yields an immutable function value; complete application yields a graph value. Graph arguments are captured as immutable program-local graph bindings when supplied, including during partial application. Scalar arguments currently support strings and signed Unix-millisecond time values. Function arguments have one remaining graph parameter named `input` and return a graph. Graph parameter schemas are retained through evaluation; exact static schema-constrained signatures are documented in [schema functions](SCHEMA_FUNCTIONS.md); dynamic schema assertions remain future work.
 
 Bodies may compose input graphs and previously declared pure functions. They cannot read undeclared global graphs, declare sources or writes, recurse, or access host effects. Body variables are hygienically renamed. Function definitions are checked even when unused. Expansion is bounded to depth 32, 10,000 emitted statements and 4 MiB of serialized AST; exceeding a bound is an error rather than a partial executable plan.
 
@@ -282,3 +282,7 @@ Graph parameters optionally add `schema Name`, and signatures may add `returns g
 ## Explicit pinned source modules
 
 `module "id" revision "r";` headers identify imported pure units. Entry and dependency imports use `import alias module "id" revision "r" sha256 "<64 lowercase hex>";`, with direct `alias::Export` references to schemas, context schemas, finite rules and pure functions. Use an explicitly supplied module bundle or CLI `--modules MAP.json`; plain `compile(source)` reports `E_MODULE_RESOLUTION` for unresolved source units. See [module boundaries, source identities and examples](MODULES.md).
+
+## Protocol 0.15 result identity and restrictions
+
+The compiler emits 0.15 plans. Metadata navigation now returns path-qualified node wrappers while retaining original source dependencies. Nested original-node metadata selectors have a narrow exact-snapshot/attachment-provenance shorthand; projection continues to require current result IDs and rejects missing members atomically. See [the 0.15 pairing guide](PROTOCOL_015.md) for examples, compatibility boundaries and persisted whole-value influences.

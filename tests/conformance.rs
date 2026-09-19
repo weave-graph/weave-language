@@ -1057,6 +1057,37 @@ fn bootstrap_nodes_do_not_claim_runtime_node_origin_authority() {
     assert_eq!(data.nodes[0].properties["derived_nodes"], "untrusted data");
     let wire = serde_json::to_value(&data.nodes[0]).unwrap();
     assert!(wire.get("derived_nodes").is_none());
+    let plan = compile(r#"graph Legacy { node "n" entity "n" space "s";
+        edge "e" from "n" to "n" relation "p" valid 0 until 10 property "node_premises" "data"; }
+        graph Explicit explicit {node "n" entity "n" space "s";
+        relation "e" from "n" to "n" predicate "p";
+        claim "c" on "e" source "author" polarity positive valid 0 until 10 property "influence" "data";}"#).unwrap();
+    for command in plan.commands {
+        let Command::Commit { data, .. } = command else {
+            panic!("commit expected")
+        };
+        assert!(data.influence.is_none());
+        assert!(data.edges.iter().all(|edge| edge.derived_nodes.is_empty()));
+        assert!(
+            data.assertions
+                .iter()
+                .all(|claim| claim.derived_nodes.is_empty())
+        );
+        let wire = serde_json::to_value(&data).unwrap();
+        assert!(wire.get("influence").is_none());
+        for record in data
+            .edges
+            .iter()
+            .map(|e| serde_json::to_value(e).unwrap())
+            .chain(
+                data.assertions
+                    .iter()
+                    .map(|a| serde_json::to_value(a).unwrap()),
+            )
+        {
+            assert!(record.get("derived_nodes").is_none());
+        }
+    }
 }
 
 #[test]
@@ -1225,7 +1256,7 @@ fn service_bindings_do_not_smuggle_policy_authority_or_schema_compatibility() {
 fn typed_context_source_declarations_lower_canonical_descriptor_and_exact_read() {
     let source = include_str!("../examples/typed_contexts.weave");
     let program = weave_language::compile(source).unwrap();
-    assert_eq!(program.version, "0.14.0");
+    assert_eq!(program.version, "0.15.0");
     let json = serde_json::to_value(program).unwrap();
     assert_eq!(json["commands"][0]["op"], "commit_batch");
     let descriptor = &json["commands"][0]["commits"][0]["data"];
@@ -1337,7 +1368,7 @@ fn live_handles_are_deferred_and_pin_emits_an_immutable_reference() {
     .unwrap();
     assert_eq!(plan.commands.len(), 2);
     let json = serde_json::to_value(plan).unwrap();
-    assert_eq!(json["version"], "0.14.0");
+    assert_eq!(json["version"], "0.15.0");
     let query = &json["commands"][0]["value"]["query"];
     assert_eq!(query["graph_id"], "Evidence");
     assert_eq!(query["branch_id"], "local");
@@ -1416,7 +1447,7 @@ fn explicit_snapshot_replacement_preserves_branch_cas_and_metadata_binding_kind(
 #[test]
 fn schema_constrained_functions_support_partial_higher_order_and_captured_calls() {
     let plan = compile(include_str!("../examples/schema_functions.weave")).unwrap();
-    assert_eq!(plan.version, "0.14.0");
+    assert_eq!(plan.version, "0.15.0");
     assert_eq!(
         plan.commands
             .iter()

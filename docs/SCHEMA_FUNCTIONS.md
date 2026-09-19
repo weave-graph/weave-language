@@ -1,6 +1,6 @@
 # Schema-constrained pure graph functions
 
-This source-only extension uses the existing protocol 0.14 graph schema contract. It implements a bounded part of paper §§4–5: the compiler checks visible exact schema compatibility, while the runtime retains its independent validation, identity, visibility, context and budget checks.
+This source-only extension uses the graph schema contract introduced before protocol 0.15; the current compiler emits 0.15. It implements a bounded part of paper §§4–5: the compiler checks visible exact schema compatibility, while the runtime retains its independent validation, identity, visibility, context and budget checks.
 
 ```weave
 schema Fleet revision "1" {

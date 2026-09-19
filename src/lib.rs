@@ -549,6 +549,7 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
                                 metadata: refs(&metadata),
                                 readers: vec![],
                                 derived_from: vec![],
+                                derived_nodes: vec![],
                                 derivations: vec![],
                             });
                         }
@@ -667,6 +668,7 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
                                 metadata: refs(&metadata),
                                 readers: Vec::new(),
                                 derived_from: Vec::new(),
+                                derived_nodes: Vec::new(),
                                 derivations: Vec::new(),
                             });
                         }

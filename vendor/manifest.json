@@ -1,13 +1,13 @@
 {
   "source_repository": "https://github.com/weave-graph/weave-engine",
   "source_path": "crates/weave-contract",
-  "contract_version": "0.14.0",
+  "contract_version": "0.15.0",
   "files": {
-    "Cargo.toml": "f07ee846210b355f79a180db175dece042215490a322dc4d44c32ef6757d4752",
+    "Cargo.toml": "9d93c8d1dcf6cb81aab55d9abf27ff0cce5979c8c9f54fa2be7a0b5faf145b70",
     "LICENSE": "9e24b3303156fce3c77e21da9d3e3b4cc864291987721d55286415a22ea5cfb7",
-    "src/algebra.rs": "e6c58673a8f27878d47add1aa23becb3e4544302656806dc762b0f3a2d2411f7",
-    "src/algebra_types.rs": "15362810f685b74a2c69db1ebdd8ddf926eb1f6e186856220af81e4f0a3f1c3a",
-    "src/assertions.rs": "b24243be54aa40cb623b5ee89aa326dfe5712eef0c7758a466f786a47ab845ed",
+    "src/algebra.rs": "2f104fae397e6368482c1ab32b32008143f2b84985bd91b77357cd19909663e4",
+    "src/algebra_types.rs": "afef6569624c0bda88fe1688889137f41e95932edf0fe29af12bda1420e7051d",
+    "src/assertions.rs": "d84fd0d7fb2255a3fe38e5ebdc7230a2705f8e373d77bf70148ae21fea7661fc",
     "src/context.rs": "31460498a6865358395b1f5a606dbcf704d167c2b8da0aba0caaef9f31e9e210",
     "src/context_axes.rs": "31692266963fa308d7b80f04ad2c2184899ac685d275deac9c2473e04d70c057",
     "src/context_types.rs": "80ea1ca4172c40bcecd942e7982a53710f8e519a10f6f4d5233eb6fe3167effc",
@@ -16,20 +16,22 @@
     "src/decimal.rs": "854e6374fea139c4ec9223196ff76cd59eb99ca81898c0487b6ea89cf00ed0c2",
     "src/geometry_types.rs": "bef5a89f80d21aa2bb4b8aec74d3da5ae96a5495200fe63e0f675c05a73bba00",
     "src/host_types.rs": "f8151861155e53511594a66691f4fac5eb62b3cd59c4df518d527aaedb61db48",
-    "src/identity.rs": "2be5c090c7f9309f4082ac9bf13a7e279f8091161a695ecc6fbc50d1af141931",
-    "src/lib.rs": "8ff422ca96c9dad5450cb9cfef4e57336a7c28826786c9113656a87b92c75575",
+    "src/identity.rs": "a09a8f831b3de41aac2f16e5b75a58c43300ca63df0171c4a992ccb16637bc82",
+    "src/influence.rs": "dcd9b44896a407633962276a1c5d6fd42d2aba58efc1e9c947138ca6735968f4",
+    "src/lib.rs": "2e5c2c0bebb00773c1e59a8eba0bbcc3c59b68825e8765cf7764ddea338db21c",
     "src/quantity.rs": "cb8aeea828450edb4b6dd6317c761df385b497b5cf5b38a9a9ae2ffedd60791c",
-    "src/rules.rs": "ae4c06e854009554c51052b46a8e5a4f1807f1b4db09bb68613d020c2f552383",
+    "src/rules.rs": "ffe04f6db0c2df633c7049477aa1864f2d0a3a6dc5a933e5c003424bc7279576",
     "src/rules_types.rs": "0ebc0be4e190de8e4bf37198307ba6bcfc6873aa08db9d0630146d7b76952b26",
-    "src/schema.rs": "1f8dc2158df851ed0a38b5622b66835985ea851a87935037eebbb4ee1b39d101",
+    "src/schema.rs": "e909e8c22575168397d1a0c040764c7fdb475713fb62131369828bb809a27c0f",
     "tests/context_axes.rs": "7fbaf4f64b5b6521c2424204ba18c4ff2de454dca749ca44130926cbc92ca8ba",
     "tests/context_typing.rs": "23c1a7da367a7b9328933e1b5985ebfd51049416a77081128bbc1ba0b7dc752f",
+    "tests/influence.rs": "c32c9dcaa3b2b14e15b08886819c445809e1d27f51a11e65027be1be9a37a403",
     "tests/numeric.rs": "6695eb2dfb2b24122d531cb26b8708b09206ddec9baed95c5fad446bdd1fd050"
   },
-  "source_revision": "52a8f35d5b53ba477d957e59c753aa443cc39a05",
+  "source_revision": "506729278cf3ee42a30eb9ac71336480e386fe89",
   "license_source_path": "LICENSE",
   "documentation": {
-    "path": "docs/contract/v0.14/README.md",
-    "sha256": "ad436dd834ddfb52cb344ff45bd1025c4e0fe06134bed1a727afaeaa2b37a7ad"
+    "path": "docs/contract/v0.15/README.md",
+    "sha256": "55a19bf101c56745f0e83f376910fc112dcbfd034b7a831c2f42a593c5a5f0e5"
   }
 }
