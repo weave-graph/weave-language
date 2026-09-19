@@ -1,0 +1,9 @@
+module "example.core" revision "1";
+schema Network revision "1" {
+  node Device space "network" {}
+  edge Link from Device to Device {}
+}
+function Keep revision "1" (graph input schema Network)
+  returns graph schema Network {
+  return input;
+}

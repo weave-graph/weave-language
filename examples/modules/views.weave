@@ -1,0 +1,8 @@
+module "example.views" revision "1";
+import core module "example.core" revision "1" sha256 "331e2007b5c9581371686dc94388c26138f61e802bc8cf7cf697920a6d4504a1";
+function Window revision "1" (graph input schema core::Network)
+ returns graph schema core::Network {
+ apply kept from core::Keep { graph input input; }
+ lens active from kept { at 5; }
+ return active;
+}

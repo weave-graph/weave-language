@@ -71,7 +71,12 @@
         "../scripts/check_live_handles.py",
         "SCHEMA_FUNCTIONS.md",
         "../examples/schema_functions.weave",
-        "../scripts/check_schema_functions.py"
+        "../scripts/check_schema_functions.py",
+        "MODULES.md",
+        "../tests/modules.rs",
+        "../tests/root_modules.rs",
+        "../tests/module_cli.rs",
+        "../scripts/check_modules.py"
       ],
       "provisional": true
     },
@@ -116,7 +121,12 @@
         "../scripts/check_typed_contexts.py",
         "SCHEMA_FUNCTIONS.md",
         "../examples/schema_functions.weave",
-        "../scripts/check_schema_functions.py"
+        "../scripts/check_schema_functions.py",
+        "MODULES.md",
+        "../tests/modules.rs",
+        "../tests/root_modules.rs",
+        "../tests/module_cli.rs",
+        "../scripts/check_modules.py"
       ],
       "provisional": true
     },

@@ -278,3 +278,7 @@ Protocol 0.14 source now supports `live_handle H graph "G" branch "main";` and `
 ## Schema-constrained pure functions
 
 Graph parameters optionally add `schema Name`, and signatures may add `returns graph schema Name` before the body. Constraints compare complete earlier-declared descriptors and must be statically proven; dynamic reads and descriptor-changing operators are not silently cast. See [schema functions](SCHEMA_FUNCTIONS.md) and [the executable example](../examples/schema_functions.weave). No protocol variant or host effect is introduced.
+
+## Explicit pinned source modules
+
+`module "id" revision "r";` headers identify imported pure units. Entry and dependency imports use `import alias module "id" revision "r" sha256 "<64 lowercase hex>";`, with direct `alias::Export` references to schemas, context schemas, finite rules and pure functions. Use an explicitly supplied module bundle or CLI `--modules MAP.json`; plain `compile(source)` reports `E_MODULE_RESOLUTION` for unresolved source units. See [module boundaries, source identities and examples](MODULES.md).

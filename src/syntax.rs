@@ -30,6 +30,19 @@ pub type Span = (usize, usize);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
+    ModuleHeader {
+        name: String,
+        name_span: Span,
+        revision: String,
+    },
+    Import {
+        name: String,
+        name_span: Span,
+        module_id: String,
+        revision: String,
+        digest: String,
+        digest_span: Span,
+    },
     LiveHandle {
         name: String,
         name_span: Span,
@@ -148,6 +161,8 @@ pub enum Statement {
         name_span: Span,
         items: Vec<Item>,
         schema: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        schema_span: Option<Span>,
         profile: GraphProfile,
         branch: String,
         expected_head: Option<String>,
@@ -476,10 +491,19 @@ fn lex(source: &str) -> Result<Vec<Token>, Diagnostic> {
             }
         } else if c.is_ascii_alphabetic() || c == '_' {
             i += 1;
-            while i < source.len()
-                && (source.as_bytes()[i].is_ascii_alphanumeric() || source.as_bytes()[i] == b'_')
-            {
-                i += 1;
+            while i < source.len() {
+                if source.as_bytes()[i].is_ascii_alphanumeric() || source.as_bytes()[i] == b'_' {
+                    i += 1;
+                } else if source[i..].starts_with("::")
+                    && source
+                        .as_bytes()
+                        .get(i + 2)
+                        .is_some_and(|c| c.is_ascii_alphabetic() || *c == b'_')
+                {
+                    i += 2;
+                } else {
+                    break;
+                }
             }
             Kind::Word(source[start..i].into())
         } else if "{}[];(),:".contains(c) {
@@ -1137,7 +1161,32 @@ impl Parser {
             }
             let kind = self.name()?;
             let name_span = (self.peek().start, self.peek().end);
+            if kind == "module" {
+                if context != 0 {
+                    return Err(
+                        self.error("Module headers are only allowed at source-unit top level")
+                    );
+                }
+                let name = self.selector_string()?;
+                self.word("revision")?;
+                let revision = self.selector_string()?;
+                self.symbol(';')?;
+                statements.push(Statement::ModuleHeader {
+                    name,
+                    name_span,
+                    revision,
+                });
+                continue;
+            }
             let name = self.name()?;
+            if name.contains("::") {
+                return Err(Diagnostic::new(
+                    "E_NAME",
+                    "Declaration names cannot be qualified",
+                    name_span.0,
+                    name_span.1,
+                ));
+            }
             if context == 1 && !matches!(kind.as_str(), "graph" | "context_value") {
                 return Err(
                     self.error("A local transaction contains only graph snapshot declarations")
@@ -1163,6 +1212,7 @@ impl Parser {
                         | "context_value"
                         | "live_handle"
                         | "pin"
+                        | "import"
                 )
             {
                 return Err(Diagnostic::new(
@@ -1173,6 +1223,24 @@ impl Parser {
                 ));
             }
             match kind.as_str() {
+                "import" => {
+                    self.word("module")?;
+                    let module_id = self.selector_string()?;
+                    self.word("revision")?;
+                    let revision = self.selector_string()?;
+                    self.word("sha256")?;
+                    let digest_span = (self.peek().start, self.peek().end);
+                    let digest = self.selector_string()?;
+                    self.symbol(';')?;
+                    statements.push(Statement::Import {
+                        name,
+                        name_span,
+                        module_id,
+                        revision,
+                        digest,
+                        digest_span,
+                    });
+                }
                 "live_handle" => {
                     self.word("graph")?;
                     let graph = self.selector_string()?;
@@ -1842,8 +1910,10 @@ impl Parser {
                     } else {
                         GraphProfile::Legacy
                     };
+                    let mut schema_span = None;
                     let schema = if self.peek().kind == Kind::Word("schema".into()) {
                         self.word("schema")?;
+                        schema_span = Some((self.peek().start, self.peek().end));
                         Some(self.name()?)
                     } else {
                         None
@@ -2090,6 +2160,7 @@ impl Parser {
                         expected_head,
                         profile,
                         schema,
+                        schema_span,
                         name,
                         name_span,
                         items,

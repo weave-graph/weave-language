@@ -17,13 +17,13 @@ graph G schema tools::Fleet {}
 apply Result from tools::Keep { graph input G; }
 ```
 
-Imports form an acyclic dependency graph. Every imported unit has a matching module header and raw UTF-8 SHA-256 content digest; bytes are checked before parsing. One module ID has one revision and byte sequence in a linked bundle. Different revisions of one ID, duplicate supplied module IDs, mismatched pins, cycles and missing units fail explicitly. Diamonds load/link a shared exact module once. Import aliases must be unique in their unit. Imports precede declarations and may name only direct exported members via `alias::Name`; nested namespace traversal and reexports are deferred.
+Imports form an acyclic dependency graph. Every imported unit has a matching module header and raw UTF-8 SHA-256 content digest; new unit bytes are checked before parsing. A back-edge to an active module ID is rejected before checking that edge's digest; mutually raw-hash-pinned authored cycles would otherwise require a hash fixed point. One module ID has one revision and byte sequence in a linked bundle. Different revisions of one ID, duplicate supplied module IDs, mismatched pins, cycles and missing units fail explicitly. Diamonds load/link a shared exact module once. Import aliases must be unique in their unit. Imports precede declarations and may name only direct exported members via `alias::Name`; nested namespace traversal and reexports are deferred.
 
 All module-level schema, context-schema, finite rule and pure function declarations are exported in this first profile. Export names are unique across kinds. Imported modules cannot declare graph snapshots, runtime reads, live handles, pins, top-level applications, transactions or other effects. Function bodies retain existing purity checks. An import is neither module installation into a runtime nor permission to execute external effects. Source text found in arbitrary graph properties remains data.
 
 ## Library and CLI boundary
 
-Proposed pure API:
+Implemented pure API:
 
 ```rust
 struct SourceModule<'a> { id: &'a str, revision: &'a str, source: &'a str }
@@ -47,7 +47,7 @@ Each dependency module contributes its exact raw digest and header revision to `
 
 Diagnostics retain a source-unit ID, original UTF-8 byte span and bounded import trace. AST rewriting preserves original per-unit spans through a bounded virtual source map; errors in imported bodies do not point into generated names or the entry file. Location normalization remains type-directed and does not remove user fields named `span`.
 
-Initial limits: at most 64 imported units, 1 MiB per unit, 4 MiB aggregate entry/module bytes, depth 16, 256 import edges, 10,000 linked declarations and 16 MiB retained linked AST. Header IDs/revisions and export/alias identifiers have explicit pre-qualification bounds (module IDs/export names at most 128 UTF-8 bytes; canonical runtime names at most 512). The existing lexer, compiler expansion, rule and runtime budgets remain independent limits. Map bytes and file reads are bounded before retaining untrusted content. Missing/hash/cycle failures happen before emitting a plan.
+Initial limits: at most 64 imported units, 1 MiB per unit, 4 MiB aggregate entry/module bytes, longest dependency path 16 (including cached shared subtrees), 256 import edges, 10,000 linked declarations including function bodies and 16 MiB retained linked AST. Module IDs use only ASCII letters, digits, dot, underscore and hyphen (no colon or Unicode), keeping raw-module and declaration manifest namespaces disjoint. Revisions are nonempty printable labels. Header IDs/revisions and export/alias identifiers have explicit pre-qualification bounds (module IDs/export names at most 128 UTF-8 bytes; canonical runtime names at most 512). The existing lexer, compiler expansion, rule and runtime budgets remain independent limits. Map bytes and file reads are bounded before retaining untrusted content. Missing/hash/cycle failures happen before emitting a plan.
 
 ## Acceptance
 

@@ -1,0 +1,9 @@
+import views module "example.views" revision "1" sha256 "1b0675f0ef3c3e76140d67a5f36a34aee14d814844e5ab4ddaa8eaa6fcbdf1d0";
+import core module "example.core" revision "1" sha256 "331e2007b5c9581371686dc94388c26138f61e802bc8cf7cf697920a6d4504a1";
+graph Network schema core::Network {
+ node "a" type Device entity "a" space "network";
+ node "b" type Device entity "b" space "network";
+ edge "ab" type Link from "a" to "b" relation "link" valid 0 until 10;
+}
+apply Active from views::Window { graph input Network; }
+lens Empty from Active { match relation "missing"; }

@@ -21,8 +21,16 @@ fn root_cannot_address_transitive_exports_by_forging_internal_symbols() {
         import("b", "bridge", &bridge)
     );
     let modules = [
-        SourceModule { id: "base", revision: "1", source: base },
-        SourceModule { id: "bridge", revision: "1", source: &bridge },
+        SourceModule {
+            id: "base",
+            revision: "1",
+            source: base,
+        },
+        SourceModule {
+            id: "bridge",
+            revision: "1",
+            source: &bridge,
+        },
     ];
     let error = compile_with_modules("entry", &entry, &modules).unwrap_err();
     assert_eq!(error.source_id, "entry");
@@ -57,11 +65,18 @@ fn cached_diamond_subtrees_still_count_toward_longest_import_depth() {
     }
     let (z_id, z_source) = next.unwrap();
     let entry = import("early", &a_id, &a_source) + &import("late", &z_id, &z_source);
-    let modules: Vec<_> = units.iter().map(|(id, source)| SourceModule {
-        id, revision: "1", source,
-    }).collect();
+    let modules: Vec<_> = units
+        .iter()
+        .map(|(id, source)| SourceModule {
+            id,
+            revision: "1",
+            source,
+        })
+        .collect();
     assert_eq!(
-        compile_with_modules("entry", &entry, &modules).unwrap_err().code,
+        compile_with_modules("entry", &entry, &modules)
+            .unwrap_err()
+            .code,
         "E_MODULE_BUDGET"
     );
 }

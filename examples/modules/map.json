@@ -1,0 +1,12 @@
+[
+  {
+    "id": "example.core",
+    "revision": "1",
+    "path": "core.weave"
+  },
+  {
+    "id": "example.views",
+    "revision": "1",
+    "path": "views.weave"
+  }
+]

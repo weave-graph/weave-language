@@ -4,6 +4,7 @@ pub mod context_axes;
 pub mod decimal;
 mod functions;
 mod graph_types;
+pub mod modules;
 pub mod syntax;
 use std::collections::{BTreeMap, BTreeSet};
 use syntax::{AlgebraOperation, BindingValue, Item, Metadata, Statement, StringExpr, TimeExpr};
@@ -116,7 +117,20 @@ fn emit_snapshot(
 /// Declarations are sequential. A lens can compose earlier lenses by adding
 /// compatible filters. Graph declarations emit new-branch snapshot commits.
 pub fn compile(source: &str) -> Result<Program, Diagnostic> {
-    let parsed = parse(source)?;
+    compile_parsed(parse(source)?)
+}
+pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnostic> {
+    for statement in &parsed.statements {
+        if let Statement::Import { name_span, .. } | Statement::ModuleHeader { name_span, .. } =
+            statement
+        {
+            return Err(diagnostic(
+                "E_MODULE_RESOLUTION",
+                "Module units require the explicit supplied-source linking API",
+                *name_span,
+            ));
+        }
+    }
     let source_revisions = functions::source_revisions(&parsed)?;
     let ast = functions::expand(parsed)?;
     let mut names: BTreeMap<String, Lens> = BTreeMap::new();
@@ -248,7 +262,9 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             | Statement::Metadata {
                 name, name_span, ..
             } => (name, *name_span),
-            Statement::ContextSchema { .. }
+            Statement::ModuleHeader { .. }
+            | Statement::Import { .. }
+            | Statement::ContextSchema { .. }
             | Statement::Schema { .. }
             | Statement::Transaction { .. }
             | Statement::Function { .. }
@@ -296,7 +312,9 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                 value.emit(&name, &mut commands);
                 names.insert(name, value);
             }
-            Statement::ContextSchema { .. }
+            Statement::ModuleHeader { .. }
+            | Statement::Import { .. }
+            | Statement::ContextSchema { .. }
             | Statement::Schema { .. }
             | Statement::Transaction { .. }
             | Statement::Function { .. }
@@ -405,6 +423,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                 name_span,
                 items,
                 schema,
+                schema_span,
                 profile,
             } => {
                 let mut ids = BTreeSet::new();
@@ -437,7 +456,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                         diagnostic(
                             "E_UNKNOWN_SCHEMA",
                             format!("Unknown schema '{schema_name}'"),
-                            name_span,
+                            schema_span.unwrap_or(name_span),
                         )
                     })?);
                 }

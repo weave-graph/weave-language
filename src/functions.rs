@@ -40,9 +40,15 @@ impl Value {
 fn error(code: &str, message: impl Into<String>, span: Span) -> Diagnostic {
     Diagnostic::new(code, message, span.0, span.1)
 }
-fn declaration(statement: &Statement) -> (&str, Span) {
+pub(crate) fn declaration(statement: &Statement) -> (&str, Span) {
     match statement {
-        Statement::LiveHandle {
+        Statement::ModuleHeader {
+            name, name_span, ..
+        }
+        | Statement::Import {
+            name, name_span, ..
+        }
+        | Statement::LiveHandle {
             name, name_span, ..
         }
         | Statement::Pin {
