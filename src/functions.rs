@@ -540,7 +540,13 @@ fn specialize(
             *n = name.into();
             *source = renamed(source, scope, *source_span)?;
             if let AlgebraOperation::Union { right, right_span }
-            | AlgebraOperation::Diff { right, right_span } = operation
+            | AlgebraOperation::Diff { right, right_span }
+            | AlgebraOperation::Distance {
+                right, right_span, ..
+            }
+            | AlgebraOperation::Transform {
+                right, right_span, ..
+            } = operation
             {
                 *right = renamed(right, scope, *right_span)?;
             }
@@ -738,7 +744,13 @@ fn validate_definition(definition: &Definition) -> Result<(), Diagnostic> {
             } => {
                 require_graph(source, *source_span)?;
                 if let AlgebraOperation::Union { right, right_span }
-                | AlgebraOperation::Diff { right, right_span } = operation
+                | AlgebraOperation::Diff { right, right_span }
+                | AlgebraOperation::Distance {
+                    right, right_span, ..
+                }
+                | AlgebraOperation::Transform {
+                    right, right_span, ..
+                } = operation
                 {
                     require_graph(right, *right_span)?;
                 }
@@ -816,6 +828,12 @@ fn normalized_statement(statement: &Statement) -> serde_json::Value {
             "output_span",
         ] {
             map.remove(key);
+        }
+        if let Some(operation) = map
+            .get_mut("operation")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            operation.remove("right_span");
         }
         if let Some(body) = map
             .get_mut("body")

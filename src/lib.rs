@@ -381,6 +381,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                             metadata,
                             properties,
                         } => data.nodes.push(Node {
+                            derived_from: Vec::new(),
                             context_scope: None,
                             id,
                             type_id,
@@ -574,6 +575,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                 let mut typed = source_lens.typed;
                 let input = Box::new(source_lens.expression());
                 let is_union = matches!(&operation, AlgebraOperation::Union { .. });
+                let is_distance = matches!(&operation, AlgebraOperation::Distance { .. });
                 let expression = match operation {
                     AlgebraOperation::Union { right, right_span }
                     | AlgebraOperation::Diff { right, right_span } => {
@@ -602,6 +604,71 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                                 after: right,
                             }
                         }
+                    }
+                    AlgebraOperation::Distance {
+                        left_assertion,
+                        right,
+                        right_span,
+                        right_assertion,
+                        valid_at,
+                    }
+                    | AlgebraOperation::Transform {
+                        left_assertion,
+                        right,
+                        right_span,
+                        right_assertion,
+                        valid_at,
+                    } => {
+                        typed = Some(true);
+                        let left = weave_contract::GeometryOperand {
+                            input,
+                            assertion_id: left_assertion,
+                        };
+                        let right = weave_contract::GeometryOperand {
+                            input: Box::new(get(&right, right_span)?.expression()),
+                            assertion_id: right_assertion,
+                        };
+                        let operation = if is_distance {
+                            weave_contract::GeometryOperation::Distance { left, right }
+                        } else {
+                            weave_contract::GeometryOperation::Transform {
+                                input: left,
+                                mapping: right,
+                            }
+                        };
+                        GraphExpression::Geometry {
+                            operation,
+                            valid_at,
+                        }
+                    }
+                    AlgebraOperation::ProjectAxes {
+                        assertion_id,
+                        axes,
+                        projection_revision,
+                        valid_at,
+                    } => {
+                        typed = Some(true);
+                        GraphExpression::Geometry {
+                            operation: weave_contract::GeometryOperation::ProjectAxes {
+                                input: weave_contract::GeometryOperand {
+                                    input,
+                                    assertion_id,
+                                },
+                                axes: axes.try_into().map_err(|_| {
+                                    diagnostic(
+                                        "E_GEOMETRY_AXIS",
+                                        "Projection requires exactly three axes",
+                                        source_span,
+                                    )
+                                })?,
+                                projection_revision,
+                            },
+                            valid_at,
+                        }
+                    }
+                    AlgebraOperation::Explain => {
+                        typed = Some(true);
+                        GraphExpression::Explain { input }
                     }
                     AlgebraOperation::Context { selection } => {
                         GraphExpression::Context { input, selection }

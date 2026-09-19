@@ -921,3 +921,81 @@ fn context_selectors_require_exact_bounded_revisions() {
             .is_err()
     );
 }
+
+#[test]
+fn geometry_and_explanations_lower_to_reusable_authorized_graph_operands() {
+    let source = include_str!("../examples/geometry.weave");
+    let plan = compile(source).unwrap();
+    assert!(plan.commands.iter().any(|c|matches!(c,Command::Bind {name,value:GraphExpression::Geometry {operation:weave_contract::GeometryOperation::Distance {left,right},valid_at:7}} if name=="Range" && left.assertion_id=="coordinate-a" && right.assertion_id=="coordinate-b")));
+    assert!(plan.commands.iter().any(
+        |c| matches!(c,Command::Bind {name,value:GraphExpression::Explain {..}} if name=="Proof")
+    ));
+    assert_eq!(
+        weave_language::fingerprint(source).unwrap(),
+        weave_language::fingerprint(&format!("// shifted\n{source}")).unwrap()
+    );
+    let Command::Commit { data, .. } = &plan.commands[0] else {
+        panic!("source commit")
+    };
+    assert_eq!(
+        data.assertions[0].properties["weave.geometry"]["values"],
+        serde_json::json!([0.0, 0.0, 0.0])
+    );
+}
+#[test]
+fn finite_float_literals_and_structured_properties_keep_strict_time_types() {
+    let source = "schema S revision \"1\" {node N {property \"x\" float required;}} graph G schema S {node \"n\" type N entity \"N\" space \"s\" property \"x\" 1.25e-2;}";
+    let plan = compile(source).unwrap();
+    let Command::Commit { data, .. } = &plan.commands[0] else {
+        panic!("commit")
+    };
+    assert_eq!(data.nodes[0].properties["x"], serde_json::json!(0.0125));
+    assert!(compile(&source.replace("1.25e-2", "1e400")).is_err());
+    assert!(compile(&source.replace("1.25e-2", "NaN")).is_err());
+    assert!(compile("use G graph \"G\"; lens L from G {at 1.0;}").is_err());
+    assert!(
+        compile(
+            "use G graph \"G\"; distance D from G assertion \"a\" to G assertion \"b\" at 1e0;"
+        )
+        .is_err()
+    );
+    assert!(compile(&source.replace("float required", "integer required")).is_err());
+}
+#[test]
+fn structured_literals_reject_duplicate_keys_and_bound_nesting() {
+    let source = "graph G {node \"n\" entity \"N\" space \"s\" property \"data\" {\"span\": [1.5, true, null, {\"x\":\"ok\"}]};}";
+    let plan = compile(source).unwrap();
+    let Command::Commit { data, .. } = &plan.commands[0] else {
+        panic!("commit")
+    };
+    assert_eq!(data.nodes[0].properties["data"]["span"][3]["x"], "ok");
+    let duplicate = source.replace("{\"x\":\"ok\"}", "{\"x\":1,\"x\":2}");
+    let error = compile(&duplicate).unwrap_err();
+    assert_eq!(error.code, "E_DUPLICATE");
+    assert_eq!(&duplicate[error.start..error.end], "\"x\"");
+    let deep = format!(
+        "graph G {{node \"n\" entity \"N\" space \"s\" property \"data\" {}0{};}}",
+        "[".repeat(40),
+        "]".repeat(40)
+    );
+    assert_eq!(compile(&deep).unwrap_err().code, "E_BUDGET");
+    assert_ne!(
+        weave_language::fingerprint(source).unwrap(),
+        weave_language::fingerprint(&source.replace("\"ok\"", "\"changed\"")).unwrap()
+    );
+}
+#[test]
+fn geometry_axes_and_graph_bindings_have_static_diagnostics() {
+    let source = "use G graph \"G\"; project_axes P from G assertion \"e\" axes (0,1,1) revision \"r\" at 1;";
+    let error = compile(source).unwrap_err();
+    assert_eq!(error.code, "E_GEOMETRY_AXIS");
+    assert_eq!(&source[error.start..error.end], "1");
+    assert!(compile(&source.replace("(0,1,1)", "(0,-1,2)")).is_err());
+    assert!(
+        compile(
+            "use G graph \"G\"; distance D from G assertion \"a\" to Missing assertion \"b\" at 1;"
+        )
+        .is_err()
+    );
+    assert!(compile("use G graph \"G\"; lens T from G {at param t;} transform D from G assertion \"a\" using T assertion \"b\" at 1;").is_err());
+}

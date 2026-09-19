@@ -4,22 +4,22 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.8 schema/metadata/algebra/assertion/rule/context implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 50 tests. Rich graph/vector/quantity types, effects and formatter remain. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.9 schema/metadata/algebra/assertion/rule/context/geometry implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 54 tests. Rich graph/vector/quantity types, effects and formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. General higher-order lenses/joins and typed contextual axes remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. General identity alignment, stratified absence, source-level explanation syntax and scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
-| L5 Spatial and multiscale language | proposed | No geometry, embedding or clustering language yet. |
+| L5 Spatial and multiscale language | in_progress, provisional | Assertion-backed distance, transforms and display projections now lower to engine services. General vector types, learned mappings and clustering syntax remain. |
 | L6 Distributed offline governance | proposed | Portable source structure only; no mobile, networking or governance conformance claim. |
 | L7 Tooling and release | in_progress, provisional | MIT license, independent crate, README and three-platform/WASM CI definition exist. The orchestrator verified public v0.4 CI on Ubuntu/macOS/Windows and the WASM target; later milestone publication remains tracked in PUBLICATION.md. LSP is optional proposed editor tooling, not a user-scope completion gate. |
 
 ## Local verification
 
-- `cargo test --locked`: 50 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
+- `cargo test --locked`: 54 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
-- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.8.0 protocol plan.
+- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.9.0 protocol plan.
 
 The checks above were run locally on macOS with Rust 1.94.0. A CI definition is not evidence of remote CI success. `cargo check --locked --lib --target wasm32-unknown-unknown` passed; browser-host execution and mobile integration remain unverified. Exact cross-project integration is recorded separately by the orchestrator.
 
@@ -82,3 +82,13 @@ The rule evaluator accepts only host-authorized materialized values. Trace label
 Actual `scripts/check_contexts.py` executes a transaction containing world, evidence and source-claim graphs. Default support is refuted, the selected world is supported, and an absent world is unknown with its pin retained. Contextual metadata feeds a join carrying the source claim, attachment and evidence claim as exact premises. A graph function and direct context selection agree; a rule conclusion retains the world pin. The rule fixture also still passes against the updated runtime.
 
 No context compatibility is inferred from names, missing fields or coordinates. Typed axes, explicit broadcast/conversion policies and governed world crossing remain open. Root-owned runtime admission, capsules and remote CI evidence are tracked separately.
+
+## Geometry and source explanation v0.9 verification
+
+54 frontend tests cover finite float schemas, bounded structured literals, duplicate JSON keys, strict integer time, graph argument binding, projection axes and graph-function specialization. The portable schema validator accepts finite binary64 fields without weakening integer fields. Native strict Clippy, formatting and WASM library checks pass.
+
+Actual `scripts/check_geometry.py` execution verifies a 5-metre physical distance; an explicit transform whose reusable coordinate result yields 500 centimetres to another point; exact coordinate/calibration/target premise lineage; cosine distance 1 for orthogonal embeddings; projection revision and approximate status; and rejection of a display projection as a distance input. Source-level explanation produces another graph that composes with union, and direct versus function-wrapped distance produces identical graph data. The source performs one explicit bootstrap commit and no hidden intermediate writes.
+
+Geometry payloads are selected from positive, authorized assertion properties. Their descriptor, role, endpoint-space anchors, context, time and permissions are runtime validation obligations. Compile-time validation covers literal structure/finiteness and operator syntax, not full static geometry typing. General vector/quantity schemas, spatial source declarations, learned bridges, complete identity/counterpart semantics, clustering syntax and platform execution conformance remain open.
+
+The 0.9 node-proof closure adds conservative recorded dependencies to geometry, support and explanation nodes. Portable tests verify unknown status dependencies, per-group explanation dependencies and rejection of altered proof records under the same node origin. This prevents treating an isolated scalar node as provenance-free; runtime visibility and capsule enforcement are engine-owned. Conservative conjunction may produce false denial when alternatives are independently visible.

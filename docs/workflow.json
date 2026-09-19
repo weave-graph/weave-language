@@ -55,7 +55,10 @@
         "../scripts/check_rules.py",
         "STATUS.md#exact-context-v08-verification",
         "../examples/contexts.weave",
-        "../scripts/check_contexts.py"
+        "../scripts/check_contexts.py",
+        "../examples/geometry.weave",
+        "../scripts/check_geometry.py",
+        "STATUS.md#geometry-and-source-explanation-v09-verification"
       ],
       "provisional": true
     },
@@ -130,7 +133,10 @@
         "../scripts/check_rules.py",
         "STATUS.md#exact-context-v08-verification",
         "../examples/contexts.weave",
-        "../scripts/check_contexts.py"
+        "../scripts/check_contexts.py",
+        "../examples/geometry.weave",
+        "../scripts/check_geometry.py",
+        "STATUS.md#geometry-and-source-explanation-v09-verification"
       ],
       "provisional": true
     },
@@ -157,7 +163,7 @@
     {
       "id": "L5",
       "title": "Spatial and multiscale language",
-      "status": "proposed",
+      "status": "in_progress",
       "owner": "language-agent",
       "depends_on": [
         "L3"
@@ -172,7 +178,11 @@
         "L28"
       ],
       "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
-      "evidence": []
+      "evidence": [
+        "../examples/geometry.weave",
+        "../scripts/check_geometry.py",
+        "STATUS.md#geometry-and-source-explanation-v09-verification"
+      ]
     },
     {
       "id": "L6",

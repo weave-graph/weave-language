@@ -2,16 +2,18 @@
 
 This is implemented experimental syntax, **not recovered white-paper syntax**. The compiler has no I/O authority beyond reading the source file in its CLI; output is a plan for the engine to validate and execute. Epoch values are signed Unix milliseconds. Intervals are half-open `[start, end)`.
 
+The core declaration grammar below is an excerpt; later sections define explicit assertions, functions, algebra, rules, contexts and geometry.
+
 ```ebnf
 program = { schema | transaction | graph | use | lens | bind | join | metadata_query } ;
 transaction = "transaction", identifier, "{", graph, { graph }, "}" ;
 metadata_query = "metadata", identifier, "from", identifier, "on", host, "key", string, ";" ;
-host = ("node" | "edge" | "entity"), string | "graph" ;
+host = ("node" | "edge" | "assertion" | "entity"), string | "graph" ;
 schema = "schema", identifier, "revision", string, "{", { node_schema | edge_schema }, "}" ;
 node_schema = "node", identifier, [ "space", string ], shape ;
 edge_schema = "edge", identifier, "from", identifier, "to", identifier, [ "cross_space" ], shape ;
 shape = "{", { "property", string, scalar_type, ("required" | "optional"), ["nullable"], ";" | "open", ";" }, "}" ;
-scalar_type = "string" | "integer" | "boolean" ;
+scalar_type = "string" | "integer" | "float" | "boolean" ;
 graph = "graph", identifier, [ "schema", identifier ], "{", { node | edge | attachment }, "}" ;
 node = "node", string, [ "type", identifier ], "entity", string, "space", string, { metadata | property }, ";" ;
 edge = "edge", string, [ "type", identifier ], "from", string, "to", string,
@@ -19,8 +21,11 @@ edge = "edge", string, [ "type", identifier ], "from", string, "to", string,
        { metadata | property }, ";" ;
 metadata = "metadata", "graph", string, "revision", string ;
 attachment = "attachment", string, "on", host, "key", string, "graph", string,
-             "revision", string, "valid", integer, "until", (integer | "infinity"), [ "required" ], ";" ;
-property = "property", string, (string | integer | "true" | "false" | "null") ;
+             "revision", string, "valid", integer, "until", (integer | "infinity"), [ "required" ], [ "context", "graph", string, "revision", string ], ";" ;
+property = "property", string, literal ;
+literal = string | integer | float | "true" | "false" | "null" | array | object ;
+array = "[", [ literal, { ",", literal } ], "]" ;
+object = "{", [ string, ":", literal, { ",", string, ":", literal } ], "}" ;
 use = "use", identifier, "graph", string, [ "revision", string ], ";" ;
 lens = "lens", identifier, "from", identifier, "{", { filter }, "}" ;
 filter = "match", "relation", (string | "param", identifier), ";"
@@ -72,7 +77,7 @@ Join outputs can feed later lenses, parameter binding and joins. Each concrete r
 
 Edges default to positive support; `polarity negative` records explicit negative support without deleting positive evidence. The current path join derives from positive premises only. A source graph can retain both. A full four-valued proposition query/resolution API remains planned.
 
-Nodes and edges accept repeated `property "key" value` clauses for scalar metadata. Values are strings, signed integers, booleans or null; property keys must be unique and nonempty. Graph-valued metadata continues using `metadata graph ... revision ...`. Scalar strings are data, not executable code. Floats, arrays and structured scalar objects are not in this grammar yet.
+Nodes, edges and explicit assertions accept repeated `property "key" value` clauses. Values are strings, signed integers, finite floating-point numbers, booleans, null, arrays or structured objects; property keys must be unique and nonempty. Graph-valued metadata continues using `metadata graph ... revision ...`. Literal strings and objects are data, not executable code.
 
 ## Named metadata and cyclic local transactions
 
@@ -90,7 +95,7 @@ Legacy anonymous `metadata graph ... revision ...` remains available for compati
 
 `weave describe FILE` validates the file and emits its source schema descriptors as JSON without executing a plan. This is source-level discovery, not a privileged inventory of remote graphs. The engine's graph results carry their own schema descriptor; runtime authorization still governs access.
 
-Both compiler and direct runtime clients use the same portable validator. Supported scalar schema types are string, signed 64-bit integer and boolean; nullable values are explicit. Exact decimal, vector/quantity, graph-valued metadata field schemas, variance and disconnected migrations remain open. The grammar's schema revision is an explicit identity, not a claim that a field rename or unit change is safe.
+Both compiler and direct runtime clients use the same portable validator. Supported scalar schema types are string, signed 64-bit integer, finite binary64 float and boolean; nullable values are explicit. Exact decimal, vector/quantity, graph-valued metadata field schemas, variance and disconnected migrations remain open. The grammar's schema revision is an explicit identity, not a claim that a field rename or unit change is safe.
 
 ## Graph algebra (protocol 0.5)
 
@@ -177,3 +182,24 @@ Named attachments may end with `context graph "World" revision "r1"`, after an o
 Selected support, joins and rules preserve the context on conclusions. A join cannot mix pinned and default scopes. Union retains individual qualifiers and clears its selected scope when inputs disagree; diff rejects mismatched selected scopes. Support status nodes—including unknown results—and explanation nodes retain generic `context_scope` qualifiers, so mixed unions remain filterable even without evidence edges. Ordinary structural nodes remain unqualified representations; selection retains them and filters only qualified derived nodes and claims.
 
 This is exact context selection, not typed scenario axes, automatic compatibility, broadcasts, world conversion or governance. Those remain explicit design and implementation gates. [Context example](../examples/contexts.weave) and [executable acceptance](../scripts/check_contexts.py) exercise the current boundary.
+
+## Geometry, structured literals and explanations (protocol 0.9)
+
+```weave
+distance Range from Positions assertion "a" to Positions assertion "b" at 7;
+transform Moved from Positions assertion "a" using Mappings assertion "calibration" at 7;
+project_axes Display from Embeddings assertion "sample" axes (0,1,2) revision "view-1" at 7;
+explain Proof from Range;
+```
+
+Operands select positive asserted evidence already present in authorized graph values. Its `weave.geometry` assertion property is a structured object with a domain-validated `coordinates` or `rigid_transform` payload. Coordinates declare a complete space descriptor, vector role and finite numeric values. Their space ID must match the assertion's source manifestation space. A transform's source and target descriptors must match both endpoint spaces. Matching vector length alone is insufficient compatibility. See the complete [geometry example](../examples/geometry.weave).
+
+Structured property literals support JSON-style objects and arrays, strings, booleans, null, signed integers and finite decimal/exponent numeric literals. Object keys are quoted and unique. Nesting is bounded to 32 levels, within existing source/token budgets. Schema `float` means finite IEEE 754 binary64, including its rounding behavior; it does not mean exact decimal arithmetic. Time selectors and interval boundaries still require signed 64-bit integer literals.
+
+Distance outputs `measurement`; transform outputs reusable `coordinates`; projection outputs `navigation_projection` with original space and projection revision. Each result is an ordinary typed graph with assertion ID `value`, context, temporal interval and exact source premises. Display projections and measurements are rejected as coordinate inputs. A transformation produces a synthetic result identity and does not assert that two manifestations identify the same entity.
+
+`explain` calls the portable graph-valued explanation operator. Its nodes and edges retain each conclusion's context and isolated alternative provenance; it reads no hidden graph or policy. It can appear in graph functions and feed normal graph operators. Its record proves derivation from recorded premises, not truth or authenticated remote execution.
+
+Compile-time checks cover literal finiteness/nesting, graph binding, integer time and three distinct nonnegative projection axes. Runtime checks additionally validate complete geometry descriptors, payload roles/dimensions, frames, units, transforms, context, temporal applicability and current visibility. General vector/quantity schema types, typed spatial source declarations and learned mappings remain gaps.
+
+Derived scalar and explanation nodes carry `derived_from` proof references as well as reader restrictions. Runtime persistence and query checks retain these dependencies, so clearing a result node's readers does not discard its recorded restrictions. Support summaries conservatively require all recorded input dependencies; a shared explanation conclusion requires all its alternatives, while individual explanation groups retain their own conjunction. This can deny a result even when one alternative remains available. A more permissive release policy is not implemented.

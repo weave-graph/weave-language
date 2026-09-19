@@ -154,6 +154,27 @@ pub enum ArgumentValue {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "operator", rename_all = "snake_case")]
 pub enum AlgebraOperation {
+    Distance {
+        left_assertion: String,
+        right: String,
+        right_span: Span,
+        right_assertion: String,
+        valid_at: i64,
+    },
+    Transform {
+        left_assertion: String,
+        right: String,
+        right_span: Span,
+        right_assertion: String,
+        valid_at: i64,
+    },
+    ProjectAxes {
+        assertion_id: String,
+        axes: Vec<usize>,
+        projection_revision: String,
+        valid_at: i64,
+    },
+    Explain,
     Context {
         selection: weave_contract::ContextSelection,
     },
@@ -266,6 +287,7 @@ enum Kind {
     Word(String),
     String(String),
     Number(i64),
+    Float(f64),
     Symbol(char),
     End,
 }
@@ -325,9 +347,60 @@ fn lex(source: &str) -> Result<Vec<Token>, Diagnostic> {
             while i < source.len() && source.as_bytes()[i].is_ascii_digit() {
                 i += 1;
             }
-            Kind::Number(source[start..i].parse().map_err(|_| {
-                Diagnostic::new("E_NUMBER", "Expected a signed 64-bit integer", start, i)
-            })?)
+            let mut floating = false;
+            if i < source.len() && source.as_bytes()[i] == b'.' {
+                floating = true;
+                i += 1;
+                let digits = i;
+                while i < source.len() && source.as_bytes()[i].is_ascii_digit() {
+                    i += 1;
+                }
+                if i == digits {
+                    return Err(Diagnostic::new(
+                        "E_NUMBER",
+                        "Fraction requires digits",
+                        start,
+                        i,
+                    ));
+                }
+            }
+            if i < source.len() && matches!(source.as_bytes()[i], b'e' | b'E') {
+                floating = true;
+                i += 1;
+                if i < source.len() && matches!(source.as_bytes()[i], b'+' | b'-') {
+                    i += 1;
+                }
+                let digits = i;
+                while i < source.len() && source.as_bytes()[i].is_ascii_digit() {
+                    i += 1;
+                }
+                if i == digits {
+                    return Err(Diagnostic::new(
+                        "E_NUMBER",
+                        "Exponent requires digits",
+                        start,
+                        i,
+                    ));
+                }
+            }
+            if floating {
+                let number: f64 = source[start..i].parse().map_err(|_| {
+                    Diagnostic::new("E_NUMBER", "Expected finite binary64 number", start, i)
+                })?;
+                if !number.is_finite() {
+                    return Err(Diagnostic::new(
+                        "E_NUMBER",
+                        "Number exceeds finite binary64 range",
+                        start,
+                        i,
+                    ));
+                }
+                Kind::Float(number)
+            } else {
+                Kind::Number(source[start..i].parse().map_err(|_| {
+                    Diagnostic::new("E_NUMBER", "Expected a signed 64-bit integer", start, i)
+                })?)
+            }
         } else if c.is_ascii_alphabetic() || c == '_' {
             i += 1;
             while i < source.len()
@@ -336,7 +409,7 @@ fn lex(source: &str) -> Result<Vec<Token>, Diagnostic> {
                 i += 1;
             }
             Kind::Word(source[start..i].into())
-        } else if "{};(),".contains(c) {
+        } else if "{}[];(),:".contains(c) {
             i += 1;
             Kind::Symbol(c)
         } else {
@@ -450,6 +523,79 @@ impl Parser {
             ))
         }
     }
+    fn literal(&mut self, depth: usize) -> Result<serde_json::Value, Diagnostic> {
+        let token = self.take();
+        if depth > 32 {
+            return Err(Diagnostic::new(
+                "E_BUDGET",
+                "Structured literal nesting exceeds 32",
+                token.start,
+                token.end,
+            ));
+        }
+        Ok(match token.kind {
+            Kind::String(v) => serde_json::Value::String(v),
+            Kind::Number(v) => serde_json::json!(v),
+            Kind::Float(v) => serde_json::json!(v),
+            Kind::Word(v) if v == "true" => serde_json::Value::Bool(true),
+            Kind::Word(v) if v == "false" => serde_json::Value::Bool(false),
+            Kind::Word(v) if v == "null" => serde_json::Value::Null,
+            Kind::Symbol('[') => {
+                let mut values = Vec::new();
+                if self.peek().kind != Kind::Symbol(']') {
+                    loop {
+                        values.push(self.literal(depth + 1)?);
+                        if self.peek().kind != Kind::Symbol(',') {
+                            break;
+                        }
+                        self.take();
+                    }
+                }
+                self.symbol(']')?;
+                serde_json::Value::Array(values)
+            }
+            Kind::Symbol('{') => {
+                let mut values = serde_json::Map::new();
+                if self.peek().kind != Kind::Symbol('}') {
+                    loop {
+                        let key = self.take();
+                        let Kind::String(name) = key.kind else {
+                            return Err(Diagnostic::new(
+                                "E_PROPERTY_TYPE",
+                                "Object keys must be quoted strings",
+                                key.start,
+                                key.end,
+                            ));
+                        };
+                        self.symbol(':')?;
+                        let value = self.literal(depth + 1)?;
+                        if values.insert(name, value).is_some() {
+                            return Err(Diagnostic::new(
+                                "E_DUPLICATE",
+                                "Duplicate object key",
+                                key.start,
+                                key.end,
+                            ));
+                        }
+                        if self.peek().kind != Kind::Symbol(',') {
+                            break;
+                        }
+                        self.take();
+                    }
+                }
+                self.symbol('}')?;
+                serde_json::Value::Object(values)
+            }
+            _ => {
+                return Err(Diagnostic::new(
+                    "E_PROPERTY_TYPE",
+                    "Expected a structured literal or finite scalar",
+                    token.start,
+                    token.end,
+                ));
+            }
+        })
+    }
     fn metadata(
         &mut self,
     ) -> Result<(Vec<Metadata>, BTreeMap<String, serde_json::Value>), Diagnostic> {
@@ -467,26 +613,11 @@ impl Parser {
                 self.word("property")?;
                 let key_token = self.peek().clone();
                 let key = self.string()?;
-                let token = self.take();
-                let value = match token.kind {
-                    Kind::String(v) => serde_json::Value::String(v),
-                    Kind::Number(v) => serde_json::json!(v),
-                    Kind::Word(v) if v == "true" => serde_json::Value::Bool(true),
-                    Kind::Word(v) if v == "false" => serde_json::Value::Bool(false),
-                    Kind::Word(v) if v == "null" => serde_json::Value::Null,
-                    _ => {
-                        return Err(Diagnostic::new(
-                            "E_PROPERTY_TYPE",
-                            "Property value must be string, integer, boolean or null",
-                            token.start,
-                            token.end,
-                        ));
-                    }
-                };
+                let value = self.literal(0)?;
                 if properties.insert(key, value).is_some() {
                     return Err(Diagnostic::new(
                         "E_DUPLICATE",
-                        "Duplicate scalar property",
+                        "Duplicate property",
                         key_token.start,
                         key_token.end,
                     ));
@@ -520,8 +651,11 @@ impl Parser {
                 "string" => ScalarType::String,
                 "integer" => ScalarType::Integer,
                 "boolean" => ScalarType::Boolean,
+                "float" => ScalarType::Float,
                 _ => {
-                    return Err(self.error("Schema scalar type must be string, integer or boolean"));
+                    return Err(
+                        self.error("Schema scalar type must be string, integer, float or boolean")
+                    );
                 }
             };
             let required = match self.name()?.as_str() {
@@ -932,11 +1066,97 @@ impl Parser {
                         body,
                     });
                 }
-                "union" | "diff" | "project" | "support" | "context" => {
+                "union" | "diff" | "project" | "support" | "context" | "explain" | "distance"
+                | "transform" | "project_axes" => {
                     self.word("from")?;
                     let source_span = (self.peek().start, self.peek().end);
                     let source = self.name()?;
                     let operation = match kind.as_str() {
+                        "distance" | "transform" => {
+                            self.word("assertion")?;
+                            let left_assertion = self.string()?;
+                            self.word(if kind == "distance" { "to" } else { "using" })?;
+                            let right_span = (self.peek().start, self.peek().end);
+                            let right = self.name()?;
+                            self.word("assertion")?;
+                            let right_assertion = self.string()?;
+                            self.word("at")?;
+                            let valid_at = self.number()?;
+                            self.symbol(';')?;
+                            if kind == "distance" {
+                                AlgebraOperation::Distance {
+                                    left_assertion,
+                                    right,
+                                    right_span,
+                                    right_assertion,
+                                    valid_at,
+                                }
+                            } else {
+                                AlgebraOperation::Transform {
+                                    left_assertion,
+                                    right,
+                                    right_span,
+                                    right_assertion,
+                                    valid_at,
+                                }
+                            }
+                        }
+                        "project_axes" => {
+                            self.word("assertion")?;
+                            let assertion_id = self.string()?;
+                            self.word("axes")?;
+                            self.symbol('(')?;
+                            let mut axes = Vec::new();
+                            for index in 0..3 {
+                                if index > 0 {
+                                    self.symbol(',')?;
+                                }
+                                let token = self.peek().clone();
+                                let axis = self.number()?;
+                                if !(0..4096).contains(&axis) {
+                                    return Err(Diagnostic::new(
+                                        "E_GEOMETRY_AXIS",
+                                        "Axis index must be between 0 and 4095",
+                                        token.start,
+                                        token.end,
+                                    ));
+                                }
+                                if axes.contains(&(axis as usize)) {
+                                    return Err(Diagnostic::new(
+                                        "E_GEOMETRY_AXIS",
+                                        "Projection axes must be distinct",
+                                        token.start,
+                                        token.end,
+                                    ));
+                                }
+                                axes.push(axis as usize);
+                            }
+                            self.symbol(')')?;
+                            self.word("revision")?;
+                            let revision_span = (self.peek().start, self.peek().end);
+                            let projection_revision = self.string()?;
+                            if projection_revision.len() > 1024 {
+                                return Err(Diagnostic::new(
+                                    "E_GEOMETRY_REVISION",
+                                    "Projection revision exceeds 1024 bytes",
+                                    revision_span.0,
+                                    revision_span.1,
+                                ));
+                            }
+                            self.word("at")?;
+                            let valid_at = self.number()?;
+                            self.symbol(';')?;
+                            AlgebraOperation::ProjectAxes {
+                                assertion_id,
+                                axes,
+                                projection_revision,
+                                valid_at,
+                            }
+                        }
+                        "explain" => {
+                            self.symbol(';')?;
+                            AlgebraOperation::Explain
+                        }
                         "context" => {
                             let selection = if self.peek().kind == Kind::Word("default".into()) {
                                 self.take();
