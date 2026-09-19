@@ -1,6 +1,6 @@
 # Source reconciliation: architecture papers v0.1
 
-The user supplied the original paired papers on 19 September 2026. The [language paper](source/Weave_Language_White_Paper_v0.1.md) is preserved byte-for-byte, with SHA256 provenance in [the source manifest](source/provenance.json). Both papers are dated 11 September 2026 and describe proposed conformance requirements, implementation choices and research questions. Their code is illustrative syntax, not a formal grammar to claim we already implement.
+The user supplied the original paired papers on 19 September 2026. The [language paper](source/Weave_Language_White_Paper_v0.1.md) is preserved byte-for-byte alongside the original [PDF](source/Weave_Language_White_Paper_v0.1.pdf) and [DOCX](source/Weave_Language_White_Paper_v0.1.docx), with SHA256 provenance in [the source manifest](source/provenance.json). Both papers are dated 11 September 2026 and describe proposed conformance requirements, implementation choices and research questions. Their code is illustrative syntax, not a formal grammar to claim we already implement.
 
 The language and companion engine papers have been read against the current code and all 30 plan rows. Source retrieval is complete. Full semantic conformance is not. References below use language-paper sections prefixed **L** and companion engine-paper sections prefixed **E**.
 

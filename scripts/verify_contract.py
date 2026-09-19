@@ -8,7 +8,7 @@ import re
 root = Path(__file__).resolve().parents[1]
 manifest = json.loads((root / "vendor/manifest.json").read_text())
 vendor = root / "vendor/weave-contract"
-actual_files = {str(path.relative_to(vendor)) for path in vendor.rglob("*") if path.is_file()}
+actual_files = {path.relative_to(vendor).as_posix() for path in vendor.rglob("*") if path.is_file()}
 expected_files = set(manifest["files"])
 if actual_files != expected_files:
     raise SystemExit(f"Contract file set differs: missing {expected_files - actual_files}, unexpected {actual_files - expected_files}")
