@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use weave_contract::{
+    EdgeSchema, GraphSchema, MetadataHost, MetadataValue, NodeSchema, PropertySchema, ScalarType,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Diagnostic {
@@ -26,6 +29,24 @@ pub type Span = (usize, usize);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
+    Transaction {
+        name: String,
+        name_span: Span,
+        body: Vec<Statement>,
+    },
+    Metadata {
+        name: String,
+        name_span: Span,
+        source: String,
+        source_span: Span,
+        host: MetadataHost,
+        key: String,
+    },
+    Schema {
+        name: String,
+        name_span: Span,
+        definition: GraphSchema,
+    },
     Join {
         name: String,
         name_span: Span,
@@ -46,6 +67,7 @@ pub enum Statement {
         name: String,
         name_span: Span,
         items: Vec<Item>,
+        schema: Option<String>,
     },
     Use {
         name: String,
@@ -88,9 +110,20 @@ pub enum BindingValue {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Item {
+    Attachment {
+        id: String,
+        id_span: Span,
+        host: MetadataHost,
+        key: String,
+        value: MetadataValue,
+        valid_from: i64,
+        valid_to: Option<i64>,
+        required: bool,
+    },
     Node {
         id: String,
         id_span: Span,
+        type_id: Option<String>,
         entity: String,
         space: String,
         metadata: Vec<Metadata>,
@@ -99,6 +132,7 @@ pub enum Item {
     Edge {
         id: String,
         id_span: Span,
+        type_id: Option<String>,
         from: String,
         to: String,
         predicate: String,
@@ -350,21 +384,278 @@ impl Parser {
         }
         Ok((result, properties))
     }
-    fn program(&mut self) -> Result<Program, Diagnostic> {
+    fn schema_properties(
+        &mut self,
+    ) -> Result<(BTreeMap<String, PropertySchema>, bool), Diagnostic> {
+        self.symbol('{')?;
+        let mut properties = BTreeMap::new();
+        let mut open = false;
+        while self.peek().kind != Kind::Symbol('}') {
+            if self.peek().kind == Kind::Word("open".into()) {
+                self.word("open")?;
+                if open {
+                    return Err(self.error("Duplicate open declaration"));
+                }
+                open = true;
+                self.symbol(';')?;
+                continue;
+            }
+            self.word("property")?;
+            let token = self.peek().clone();
+            let key = self.string()?;
+            let value_type = match self.name()?.as_str() {
+                "string" => ScalarType::String,
+                "integer" => ScalarType::Integer,
+                "boolean" => ScalarType::Boolean,
+                _ => {
+                    return Err(self.error("Schema scalar type must be string, integer or boolean"));
+                }
+            };
+            let required = match self.name()?.as_str() {
+                "required" => true,
+                "optional" => false,
+                _ => return Err(self.error("Schema property must be required or optional")),
+            };
+            let nullable = if self.peek().kind == Kind::Word("nullable".into()) {
+                self.word("nullable")?;
+                true
+            } else {
+                false
+            };
+            self.symbol(';')?;
+            if properties
+                .insert(
+                    key,
+                    PropertySchema {
+                        value_type,
+                        required,
+                        nullable,
+                    },
+                )
+                .is_some()
+            {
+                return Err(Diagnostic::new(
+                    "E_DUPLICATE",
+                    "Duplicate schema property",
+                    token.start,
+                    token.end,
+                ));
+            }
+        }
+        self.symbol('}')?;
+        Ok((properties, open))
+    }
+    fn schema(&mut self, name: String, name_span: Span) -> Result<Statement, Diagnostic> {
+        self.word("revision")?;
+        let revision = self.string()?;
+        self.symbol('{')?;
+        let mut nodes = BTreeMap::new();
+        let mut edges = BTreeMap::new();
+        while self.peek().kind != Kind::Symbol('}') {
+            let kind = self.name()?;
+            let token = self.peek().clone();
+            let type_name = self.name()?;
+            match kind.as_str() {
+                "node" => {
+                    let space_id = if self.peek().kind == Kind::Word("space".into()) {
+                        self.word("space")?;
+                        Some(self.string()?)
+                    } else {
+                        None
+                    };
+                    let (properties, allow_extra_properties) = self.schema_properties()?;
+                    if nodes
+                        .insert(
+                            type_name,
+                            NodeSchema {
+                                properties,
+                                space_id,
+                                allow_extra_properties,
+                            },
+                        )
+                        .is_some()
+                    {
+                        return Err(Diagnostic::new(
+                            "E_DUPLICATE",
+                            "Duplicate node schema",
+                            token.start,
+                            token.end,
+                        ));
+                    }
+                }
+                "edge" => {
+                    self.word("from")?;
+                    let from_type = self.name()?;
+                    self.word("to")?;
+                    let to_type = self.name()?;
+                    let allow_cross_space = if self.peek().kind == Kind::Word("cross_space".into())
+                    {
+                        self.word("cross_space")?;
+                        true
+                    } else {
+                        false
+                    };
+                    let (properties, allow_extra_properties) = self.schema_properties()?;
+                    if edges
+                        .insert(
+                            type_name,
+                            EdgeSchema {
+                                from_type,
+                                to_type,
+                                properties,
+                                allow_cross_space,
+                                allow_extra_properties,
+                            },
+                        )
+                        .is_some()
+                    {
+                        return Err(Diagnostic::new(
+                            "E_DUPLICATE",
+                            "Duplicate edge schema",
+                            token.start,
+                            token.end,
+                        ));
+                    }
+                }
+                _ => return Err(self.error("Schema must declare node or edge types")),
+            }
+        }
+        self.symbol('}')?;
+        Ok(Statement::Schema {
+            name: name.clone(),
+            name_span,
+            definition: GraphSchema {
+                id: name,
+                revision,
+                nodes,
+                edges,
+            },
+        })
+    }
+    fn metadata_host(&mut self) -> Result<MetadataHost, Diagnostic> {
+        match self.name()?.as_str() {
+            "node" => Ok(MetadataHost::Node { id: self.string()? }),
+            "edge" => Ok(MetadataHost::Edge { id: self.string()? }),
+            "entity" => Ok(MetadataHost::Entity { id: self.string()? }),
+            "graph" => Ok(MetadataHost::Graph),
+            _ => Err(self.error("Expected node, edge, entity or graph metadata host")),
+        }
+    }
+    fn program(&mut self, in_transaction: bool) -> Result<Program, Diagnostic> {
         let mut statements = Vec::new();
-        while self.peek().kind != Kind::End {
+        while self.peek().kind != Kind::End
+            && !(in_transaction && self.peek().kind == Kind::Symbol('}'))
+        {
             let kind = self.name()?;
             let name_span = (self.peek().start, self.peek().end);
             let name = self.name()?;
+            if in_transaction && kind != "graph" {
+                return Err(
+                    self.error("A local transaction contains only graph snapshot declarations")
+                );
+            }
             match kind.as_str() {
+                "transaction" => {
+                    if name.len() > 64 {
+                        return Err(self.error("Transaction ID exceeds 64 bytes"));
+                    }
+                    self.symbol('{')?;
+                    let body = self.program(true)?.statements;
+                    self.symbol('}')?;
+                    if body.is_empty() {
+                        return Err(self.error("Transaction must contain at least one graph"));
+                    }
+                    statements.push(Statement::Transaction {
+                        name,
+                        name_span,
+                        body,
+                    });
+                }
+                "metadata" => {
+                    self.word("from")?;
+                    let source_span = (self.peek().start, self.peek().end);
+                    let source = self.name()?;
+                    self.word("on")?;
+                    let host = self.metadata_host()?;
+                    self.word("key")?;
+                    let key = self.string()?;
+                    self.symbol(';')?;
+                    statements.push(Statement::Metadata {
+                        name,
+                        name_span,
+                        source,
+                        source_span,
+                        host,
+                        key,
+                    });
+                }
+                "schema" => {
+                    statements.push(self.schema(name, name_span)?);
+                }
                 "graph" => {
+                    let schema = if self.peek().kind == Kind::Word("schema".into()) {
+                        self.word("schema")?;
+                        Some(self.name()?)
+                    } else {
+                        None
+                    };
                     self.symbol('{')?;
                     let mut items = Vec::new();
                     while self.peek().kind != Kind::Symbol('}') {
                         let item = self.name()?;
                         let id_span = (self.peek().start, self.peek().end);
                         let id = self.string()?;
+                        let type_id = if self.peek().kind == Kind::Word("type".into()) {
+                            self.word("type")?;
+                            Some(self.name()?)
+                        } else {
+                            None
+                        };
                         let value = match item.as_str() {
+                            "attachment" => {
+                                if type_id.is_some() {
+                                    return Err(
+                                        self.error("Attachments cannot carry an object type")
+                                    );
+                                }
+                                self.word("on")?;
+                                let host = self.metadata_host()?;
+                                self.word("key")?;
+                                let key = self.string()?;
+                                self.word("graph")?;
+                                let graph_id = self.string()?;
+                                self.word("revision")?;
+                                let revision = self.string()?;
+                                self.word("valid")?;
+                                let valid_from = self.number()?;
+                                self.word("until")?;
+                                let valid_to = if self.peek().kind == Kind::Word("infinity".into())
+                                {
+                                    self.take();
+                                    None
+                                } else {
+                                    Some(self.number()?)
+                                };
+                                let required = if self.peek().kind == Kind::Word("required".into())
+                                {
+                                    self.take();
+                                    true
+                                } else {
+                                    false
+                                };
+                                Item::Attachment {
+                                    id,
+                                    id_span,
+                                    host,
+                                    key,
+                                    value: MetadataValue::Graph {
+                                        reference: weave_contract::GraphRef { graph_id, revision },
+                                    },
+                                    valid_from,
+                                    valid_to,
+                                    required,
+                                }
+                            }
                             "node" => {
                                 self.word("entity")?;
                                 let entity = self.string()?;
@@ -374,6 +665,7 @@ impl Parser {
                                 Item::Node {
                                     id,
                                     id_span,
+                                    type_id,
                                     entity,
                                     space,
                                     metadata,
@@ -416,6 +708,7 @@ impl Parser {
                                 Item::Edge {
                                     id,
                                     id_span,
+                                    type_id,
                                     from,
                                     to,
                                     predicate,
@@ -433,6 +726,7 @@ impl Parser {
                     }
                     self.symbol('}')?;
                     statements.push(Statement::Graph {
+                        schema,
                         name,
                         name_span,
                         items,
@@ -583,5 +877,5 @@ pub fn parse(source: &str) -> Result<Program, Diagnostic> {
         tokens: lex(source)?,
         cursor: 0,
     }
-    .program()
+    .program(false)
 }

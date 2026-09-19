@@ -248,7 +248,7 @@ fn unbound_templates_do_not_execute_incomplete_queries() {
 #[test]
 fn join_plan_uses_explicit_identity_space_contract() {
     let p = compile(include_str!("../examples/join.weave")).unwrap();
-    assert_eq!(p.version, "0.3.0");
+    assert_eq!(p.version, "0.4.0");
     let Command::Bind {
         value:
             GraphExpression::Join {
@@ -366,4 +366,168 @@ fn negative_claims_and_scalar_metadata_preserve_existing_protocol_fields() {
             .code,
         "E_PROPERTY_TYPE"
     );
+}
+
+#[test]
+fn typed_schema_graph_lowering_and_discovery_agree() {
+    let source = include_str!("../examples/schema.weave");
+    let plan = compile(source).unwrap();
+    let schemas = weave_language::describe(source).unwrap();
+    assert_eq!(schemas.len(), 1);
+    assert_eq!(schemas[0].id, "Infrastructure");
+    assert_eq!(schemas[0].revision, "1");
+    let Command::Commit { data, .. } = &plan.commands[0] else {
+        panic!()
+    };
+    assert_eq!(data.schema.as_ref(), Some(&schemas[0]));
+    assert_eq!(data.nodes[0].type_id.as_deref(), Some("Device"));
+    assert_eq!(data.edges[0].type_id.as_deref(), Some("Connected"));
+    assert!(weave_contract::validate_schema_graph(data).is_empty());
+}
+#[test]
+fn schema_required_property_type_extra_fields_and_missing_type_are_rejected() {
+    let source = include_str!("../examples/schema.weave");
+    for (modified, code) in [
+        (
+            source.replace("property \"label\" \"Device 17\"", ""),
+            "E_SCHEMA_REQUIRED",
+        ),
+        (
+            source.replace("property \"label\" \"Device 17\"", "property \"label\" 17"),
+            "E_SCHEMA_PROPERTY_TYPE",
+        ),
+        (
+            source.replace(
+                "property \"active\" true",
+                "property \"active\" true property \"secret\" true",
+            ),
+            "E_SCHEMA_PROPERTY",
+        ),
+        (
+            source.replace("\"device\" type Device", "\"device\""),
+            "E_SCHEMA_NODE_TYPE",
+        ),
+    ] {
+        assert_eq!(compile(&modified).unwrap_err().code, code);
+    }
+}
+#[test]
+fn schema_wrong_endpoint_and_space_are_compile_time_errors() {
+    let source = include_str!("../examples/schema.weave");
+    assert_eq!(
+        compile(&source.replace("to \"gateway\" relation", "to \"device\" relation"))
+            .unwrap_err()
+            .code,
+        "E_SCHEMA_ENDPOINT_TYPE"
+    );
+    assert_eq!(
+        compile(&source.replace(
+            "entity \"device-17\" space \"operations\"",
+            "entity \"device-17\" space \"physical\""
+        ))
+        .unwrap_err()
+        .code,
+        "E_SCHEMA_SPACE"
+    );
+}
+#[test]
+fn schema_cross_space_edges_require_explicit_permission_in_schema() {
+    let source = "schema S revision \"1\" {node A {} node B {} edge R from A to B {}} graph G schema S {node \"a\" type A entity \"a\" space \"one\";node \"b\" type B entity \"b\" space \"two\";edge \"e\" type R from \"a\" to \"b\" relation \"r\" valid 0 until 1;}";
+    assert_eq!(compile(source).unwrap_err().code, "E_SCHEMA_CROSS_SPACE");
+    assert!(
+        compile(&source.replace("edge R from A to B {}", "edge R from A to B cross_space {}"))
+            .is_ok()
+    );
+}
+#[test]
+fn unknown_schema_and_invalid_declared_endpoint_types_are_rejected() {
+    assert_eq!(
+        compile("graph G schema Missing {}").unwrap_err().code,
+        "E_UNKNOWN_SCHEMA"
+    );
+    assert_eq!(
+        compile("schema S revision \"1\" {node A{} edge R from A to Missing{}}")
+            .unwrap_err()
+            .code,
+        "E_SCHEMA_ENDPOINT_TYPE"
+    );
+    assert_eq!(
+        compile("graph G {node \"a\" type A entity \"e\" space \"s\";}")
+            .unwrap_err()
+            .code,
+        "E_SCHEMA_MISSING"
+    );
+}
+#[test]
+fn schema_open_properties_are_explicit_and_duplicate_schema_fields_fail() {
+    let source = "schema S revision \"1\" {node A {open;}} graph G schema S {node \"a\" type A entity \"e\" space \"s\" property \"extra\" true;}";
+    assert!(compile(source).is_ok());
+    assert_eq!(compile("schema S revision \"1\" {node A {property \"k\" string optional;property \"k\" string required;}}").unwrap_err().code,"E_DUPLICATE");
+    assert_eq!(
+        compile("schema S revision \"1\" {} schema S revision \"2\" {}")
+            .unwrap_err()
+            .code,
+        "E_DUPLICATE"
+    );
+}
+
+#[test]
+fn named_metadata_and_cycle_compile_to_one_atomic_batch_then_graph_values() {
+    let plan = compile(include_str!("../examples/metadata_cycle.weave")).unwrap();
+    let Command::CommitBatch { batch_id, commits } = &plan.commands[0] else {
+        panic!()
+    };
+    assert_eq!(batch_id, "boot");
+    assert_eq!(commits.len(), 2);
+    assert_eq!(commits[0].data.attachments[0].key, "evidence");
+    let weave_contract::MetadataValue::Graph { reference } = &commits[1].data.attachments[0].value
+    else {
+        panic!()
+    };
+    assert_eq!(reference.revision, "logical:boot:Operations");
+    let Command::Bind {
+        value: GraphExpression::Metadata { host, key, .. },
+        ..
+    } = &plan.commands[2]
+    else {
+        panic!()
+    };
+    assert_eq!(
+        *host,
+        weave_contract::MetadataHost::Edge {
+            id: "connection".into()
+        }
+    );
+    assert_eq!(key, "evidence");
+}
+#[test]
+fn invalid_attachment_hosts_intervals_and_unbound_sources_fail() {
+    assert_eq!(compile("graph G {attachment \"a\" on edge \"missing\" key \"proof\" graph \"P\" revision \"r\" valid 0 until 1;}").unwrap_err().code,"E_ATTACHMENT_HOST");
+    assert_eq!(compile("graph G {attachment \"a\" on graph key \"proof\" graph \"P\" revision \"r\" valid 1 until 1;}").unwrap_err().code,"E_INTERVAL");
+    assert_eq!(compile("use G graph \"g\";lens L from G {at param t;} metadata M from L on graph key \"proof\";").unwrap_err().code,"E_UNBOUND_PARAMETER");
+}
+#[test]
+fn transactions_are_bounded_declaration_batches_not_nested_effect_programs() {
+    assert!(compile("transaction B {}").is_err());
+    assert!(compile("transaction B {transaction C {graph G {}}}").is_err());
+    assert!(compile("transaction B {use G graph \"g\";}").is_err());
+    assert!(compile("}").is_err());
+    assert_eq!(
+        compile("transaction B {graph G{}} transaction B {graph H{}}")
+            .unwrap_err()
+            .code,
+        "E_DUPLICATE"
+    );
+    let source = format!("transaction {} {{graph G{{}}}}", "x".repeat(65));
+    assert!(compile(&source).is_err());
+}
+
+#[test]
+fn known_mixed_typed_untyped_join_is_rejected_without_dropping_types() {
+    let source = format!(
+        "{} graph Untyped {{}} join Invalid from Network to Untyped relation \"r\";",
+        include_str!("../examples/schema.weave")
+    );
+    assert_eq!(compile(&source).unwrap_err().code, "E_SCHEMA_JOIN");
+    assert!(compile(include_str!("../examples/typed_join.weave")).is_ok());
 }

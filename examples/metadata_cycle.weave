@@ -1,0 +1,26 @@
+// Logical references resolve inside one atomic local snapshot manifest.
+transaction boot {
+  graph Operations {
+    node "device" entity "device-17" space "operations";
+    node "gateway" entity "gateway-2" space "operations";
+    edge "connection" from "device" to "gateway" relation "connected" valid 0 until infinity;
+    attachment "edge-evidence" on edge "connection" key "evidence"
+      graph "Evidence" revision "logical:boot:Evidence" valid 0 until infinity required;
+  }
+  graph Evidence {
+    node "reading" entity "reading-1" space "evidence";
+    node "document" entity "document-1" space "documents";
+    edge "source" from "reading" to "document" relation "recorded_in" valid 0 until infinity;
+    attachment "host-backref" on node "reading" key "host"
+      graph "Operations" revision "logical:boot:Operations" valid 0 until infinity;
+  }
+}
+lens WithEvidence from Operations {metadata depth 8;}
+metadata Proof from WithEvidence on edge "connection" key "evidence";
+lens Sources from Proof {match relation "recorded_in";}
+graph Catalog {
+  node "document-catalog" entity "document-1" space "documents";
+  node "reviewer" entity "reviewer-1" space "people";
+  edge "review" from "document-catalog" to "reviewer" relation "reviewed_by" valid 0 until infinity;
+}
+join ReviewedEvidence from Sources to Catalog relation "reviewed_evidence";

@@ -1,0 +1,18 @@
+schema Infrastructure revision "1" {
+  node Device space "operations" {
+    property "label" string required;
+    property "sample_count" integer optional nullable;
+  }
+  node Gateway space "operations" {}
+  edge Connected from Device to Gateway {
+    property "active" boolean required;
+  }
+}
+graph Network schema Infrastructure {
+  node "device" type Device entity "device-17" space "operations"
+    property "label" "Device 17" property "sample_count" null;
+  node "gateway" type Gateway entity "gateway-2" space "operations";
+  edge "connection" type Connected from "device" to "gateway" relation "connected_to"
+    valid 100 until infinity property "active" true;
+}
+lens Connected from Network {match relation "connected_to";at 150;}

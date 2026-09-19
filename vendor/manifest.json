@@ -1,16 +1,17 @@
 {
   "source_repository": "https://github.com/weave-graph/weave-engine",
   "source_path": "crates/weave-contract",
-  "contract_version": "0.3.0",
+  "contract_version": "0.4.0",
   "files": {
-    "Cargo.toml": "36822b112c2632bcdb0e1cfff36734cbc0a02fdb9d8a56eac3b310a8c8d392d2",
-    "src/lib.rs": "d1f128bb5520ac1cea5be24ab21bbde47d77cbd710fe344979580f0102b1e5d8",
-    "LICENSE": "9e24b3303156fce3c77e21da9d3e3b4cc864291987721d55286415a22ea5cfb7"
+    "Cargo.toml": "304944cb47456ec61e9ed3420887d15820b471b52c35ee95994026a19b83dcdd",
+    "LICENSE": "9e24b3303156fce3c77e21da9d3e3b4cc864291987721d55286415a22ea5cfb7",
+    "src/lib.rs": "33ba25f0b7550ee4b66fa6c341af16b577e7b171cb9d2b159eb8bccf7ce3a861",
+    "src/schema.rs": "959ae66f317cb8bfbff0afcbb0770b14b1efb06c11aea3938ef01b7d08fdc9b4"
   },
-  "source_revision": "7cdf6b4c77ad8fc180326c933db09ccaeca4e592",
+  "source_revision": "5d932eba8e1a440035bc7cc299ccb04ad0f9d3c7",
   "license_source_path": "LICENSE",
   "documentation": {
-    "path": "docs/contract/v0.3/README.md",
-    "sha256": "78f897bcf9d703dad297f5e66e1772a3cf520d85e17f6ec60d0688c220ec4694"
+    "path": "docs/contract/v0.4/README.md",
+    "sha256": "22d5dba89b707be3686bdc4c4a7926696a96715c4cbfd12c8c7bc8a666ad603e"
   }
 }

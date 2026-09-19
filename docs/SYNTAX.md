@@ -3,13 +3,23 @@
 This is implemented experimental syntax, **not recovered white-paper syntax**. The compiler has no I/O authority beyond reading the source file in its CLI; output is a plan for the engine to validate and execute. Epoch values are signed Unix milliseconds. Intervals are half-open `[start, end)`.
 
 ```ebnf
-program = { graph | use | lens | bind | join } ;
-graph = "graph", identifier, "{", { node | edge }, "}" ;
-node = "node", string, "entity", string, "space", string, { metadata | property }, ";" ;
-edge = "edge", string, "from", string, "to", string,
+program = { schema | transaction | graph | use | lens | bind | join | metadata_query } ;
+transaction = "transaction", identifier, "{", graph, { graph }, "}" ;
+metadata_query = "metadata", identifier, "from", identifier, "on", host, "key", string, ";" ;
+host = ("node" | "edge" | "entity"), string | "graph" ;
+schema = "schema", identifier, "revision", string, "{", { node_schema | edge_schema }, "}" ;
+node_schema = "node", identifier, [ "space", string ], shape ;
+edge_schema = "edge", identifier, "from", identifier, "to", identifier, [ "cross_space" ], shape ;
+shape = "{", { "property", string, scalar_type, ("required" | "optional"), ["nullable"], ";" | "open", ";" }, "}" ;
+scalar_type = "string" | "integer" | "boolean" ;
+graph = "graph", identifier, [ "schema", identifier ], "{", { node | edge | attachment }, "}" ;
+node = "node", string, [ "type", identifier ], "entity", string, "space", string, { metadata | property }, ";" ;
+edge = "edge", string, [ "type", identifier ], "from", string, "to", string,
        "relation", string, [ "polarity", ("positive" | "negative") ], "valid", integer, "until", (integer | "infinity"),
        { metadata | property }, ";" ;
 metadata = "metadata", "graph", string, "revision", string ;
+attachment = "attachment", string, "on", host, "key", string, "graph", string,
+             "revision", string, "valid", integer, "until", (integer | "infinity"), [ "required" ], ";" ;
 property = "property", string, (string | integer | "true" | "false" | "null") ;
 use = "use", identifier, "graph", string, [ "revision", string ], ";" ;
 lens = "lens", identifier, "from", identifier, "{", { filter }, "}" ;
@@ -38,6 +48,7 @@ Metadata graph revisions are opaque references. The compiler does not pretend to
 ```sh
 cargo run -- check examples/fleet.weave
 cargo run -- ast examples/fleet.weave
+cargo run -- describe examples/schema.weave
 cargo run -- plan examples/fleet.weave > fleet.plan.json
 ```
 
@@ -63,6 +74,20 @@ Edges default to positive support; `polarity negative` records explicit negative
 
 Nodes and edges accept repeated `property "key" value` clauses for scalar metadata. Values are strings, signed integers, booleans or null; property keys must be unique and nonempty. Graph-valued metadata continues using `metadata graph ... revision ...`. Scalar strings are data, not executable code. Floats, arrays and structured scalar objects are not in this grammar yet.
 
-## Recursive metadata boundary
+## Named metadata and cyclic local transactions
 
-References are represented finitely, including unresolved self-reference strings. This is not proof of a resolvable same-revision cyclic metadata graph. The engine's current content-hash revision model supports pinned historical reference traversal but cannot construct mutually recursive same-commit hashes by fixed point. Cycle conformance remains open pending a versioned revision-identity design; the compiler does not fabricate revisions or claim otherwise.
+[metadata_cycle.weave](../examples/metadata_cycle.weave) creates two graph snapshots inside one explicit `transaction boot { ... }`. An `attachment` has its own identity, host kind/identity, key, pinned graph value and valid interval. `required` demands that the runtime validate the referenced snapshot's availability. The source profile currently emits public attachments without custom origin/schema-revision fields; those richer runtime fields remain future source syntax.
+
+The transaction lowers to one atomic `CommitBatch`. A same-batch graph revision is written as `logical:batch-id:graph-id`; the runtime resolves those identities through one snapshot manifest and validates required references after inserting all members. This allows real cyclic references without recursive hashes. The batch ID is an ASCII identifier at most 64 bytes. Nested transactions, empty batches and non-graph statements inside a batch are rejected. Graph declarations currently create new snapshots; source-level expected-head updates/rebinding remain later work.
+
+A query resolves named metadata with `metadata depth N;`. `metadata Proof from Result on edge "connection" key "evidence";` selects the resolved graph as another immutable graph value. It preserves attachment-path provenance and visibility. Missing, ambiguous or unmaterialized metadata yields explicit incomplete coverage from the engine, not fabricated emptiness. It performs no hidden live read. That value can feed ordinary lenses and joins.
+
+Legacy anonymous `metadata graph ... revision ...` remains available for compatibility. Named attachments are the path to the full paper model. Live handles, typed graph-valued schema fields and independently specified attachment origin/policy fields are not yet exposed in source.
+
+## Versioned schemas and discovery
+
+[Schema example](../examples/schema.weave) declares a versioned graph schema with distinct node and edge types. A graph selects it with `schema Name`; each node/edge declares `type Name`. Schemas must be declared before use. Definitions state property types and presence/nullability, optional exact node spaces, and edge endpoint types. Cross-space edges require explicit `cross_space`; undeclared scalar properties require explicit `open;` in the type's shape.
+
+`weave describe FILE` validates the file and emits its source schema descriptors as JSON without executing a plan. This is source-level discovery, not a privileged inventory of remote graphs. The engine's graph results carry their own schema descriptor; runtime authorization still governs access.
+
+Both compiler and direct runtime clients use the same portable validator. Supported scalar schema types are string, signed 64-bit integer and boolean; nullable values are explicit. Exact decimal, vector/quantity, graph-valued metadata field schemas, variance and disconnected migrations remain open. The grammar's schema revision is an explicit identity, not a claim that a field rename or unit change is safe.

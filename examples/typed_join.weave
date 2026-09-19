@@ -1,0 +1,22 @@
+schema DeviceModel revision "1" {
+  node Thing space "devices" {property "name" string required;}
+  node Bridge space "catalog" {}
+  edge Link from Thing to Bridge cross_space {}
+}
+schema ModelIssue revision "1" {
+  node Bridge space "catalog" {}
+  node Thing space "advisories" {property "critical" boolean required;}
+  edge Link from Bridge to Thing cross_space {}
+}
+graph Devices schema DeviceModel {
+  node "device" type Thing entity "device-17" space "devices" property "name" "D17";
+  node "model" type Bridge entity "model-4" space "catalog";
+  edge "model-of" type Link from "device" to "model" relation "model_of" valid 100 until 200;
+}
+graph Issues schema ModelIssue {
+  node "vendor-model" type Bridge entity "model-4" space "catalog";
+  node "issue" type Thing entity "issue-31" space "advisories" property "critical" true;
+  edge "affected" type Link from "vendor-model" to "issue" relation "affected_by" valid 150 until 250;
+}
+// Same-spelled Thing/Link types belong to different versioned schemas.
+join Exposure from Devices to Issues relation "exposed_to";

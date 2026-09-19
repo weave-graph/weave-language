@@ -19,9 +19,9 @@ The language and companion engine papers have been read against the current code
 
 ## Current executable profile and next implementation work
 
-Protocol v0.3 implements public nodes/edges and scalar/pinned-reference metadata, valid intervals, trusted-host runtime authorization, immutable named graph results, typed relation/time parameters, partial application, temporal path joins and preserved leaf provenance. Native integration and source distribution have been checked. This is a coherent **partial** profile; calling it full compliance with L §12 would be incorrect because typed schemas, explicit space bridges, full capability semantics and reactive language operations are missing.
+Protocol v0.4 implements public typed nodes/edges, versioned scalar schemas, named pinned-reference metadata, atomic cyclic snapshot batches, native metadata graph extraction, valid intervals, trusted-host runtime authorization, immutable named graph results, typed relation/time parameters, partial application, temporal path joins and preserved attachment/leaf provenance. Native integration and source distribution have been checked. This is a coherent **partial** profile; calling it full compliance with L §12 would be incorrect because rich schema types/migrations, explicit space bridges, full capability semantics and reactive language operations are missing.
 
-The next language milestone implements versioned graph schemas, distinct node/edge types, scalar metadata shape checks, typed endpoints and space constraints, plus machine-readable schema discovery. The same portable schema validator must run at the engine boundary so direct JSON clients cannot bypass the language checker. Its protocol additions are coordinated with the engine's metadata/snapshot-manifest work before release.
+Protocol v0.4 implements the first profile of versioned graph schemas, distinct node/edge types, scalar metadata shape checks, typed endpoints and space constraints, plus machine-readable source schema discovery. The same portable schema validator runs at the engine boundary so direct JSON clients cannot bypass the language checker. Its protocol additions are coordinated with the engine's named metadata/snapshot-manifest implementation. The metadata-cycle example now constructs a real host/evidence cycle and joins native edge metadata into an independent catalog.
 
 Subsequent work follows the existing DAG: named metadata queries and local atomic graph construction; richer graph algebra and complete-scope reasoning; explicit spaces/bridges; reactive effects and incremental views; offline language operations/governance; geometric/multiscale service calls. Each scope needs real tests and cannot be completed by labeling all missing operations as external adapters.
 
@@ -29,8 +29,8 @@ Subsequent work follows the existing DAG: named metadata queries and local atomi
 
 | L §12 test | Current evidence | Remaining acceptance |
 |---|---|---|
-| Edge evidence graph can be queried and joined natively | Engine resolves pinned metadata into results | Language must name the attachment, use its graph as a first-class source and join it while retaining attachment provenance. |
-| Metadata graph refers to host | Reference representation is finite; unavailable refs report partial | Implement logical within-snapshot manifests; construct and traverse a real cycle with explicit budget outcome. |
+| Edge evidence graph can be queried and joined natively | Actual metadata_cycle.weave execution extracts named edge evidence and joins it to a catalog with attachment provenance | Extend from this pinned public example to full attachment types/policy/schema semantics. |
+| Metadata graph refers to host | A real host/evidence cycle commits atomically and traverses with complete bounded coverage | Broader adversarial cycle/fan-out and explicit budget failure profiles remain under engine testing. |
 | Shared metadata advances, pins stay unchanged | Historical revision queries exist | Named attachments, explicit rebind/live distinction and a dedicated historical attachment test. |
 | Concurrent peers edit one attachment | Local engine branch/capsule groundwork | Keep both attachment versions and policy-selected interpretation through language-visible conflict queries. |
 | Shared identity, independent local manifestation state | Distinct entity/space values supported | Protected identity-link set, counterpart coverage and explicit propagation semantics. |

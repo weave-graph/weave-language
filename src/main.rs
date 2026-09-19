@@ -1,9 +1,9 @@
 use std::{env, fs, io::Read, process};
 fn main() {
     let args: Vec<_> = env::args().skip(1).collect();
-    if args.len() != 2 || !["check", "plan", "ast"].contains(&args[0].as_str()) {
+    if args.len() != 2 || !["check", "plan", "ast", "describe"].contains(&args[0].as_str()) {
         eprintln!(
-            "Usage: weave <check|plan|ast> FILE.weave\nplan emits Weave Engine protocol JSON; host authorization belongs to the engine."
+            "Usage: weave <check|plan|ast|describe> FILE.weave\nplan emits Weave Engine protocol JSON; host authorization belongs to the engine."
         );
         process::exit(2);
     }
@@ -14,7 +14,12 @@ fn main() {
         );
         process::exit(1)
     });
-    if args[0] == "ast" {
+    if args[0] == "describe" {
+        match weave_language::describe(&source) {
+            Ok(schemas) => println!("{}", serde_json::to_string_pretty(&schemas).unwrap()),
+            Err(e) => fail(e),
+        }
+    } else if args[0] == "ast" {
         match weave_language::parse(&source) {
             Ok(ast) => println!("{}", serde_json::to_string_pretty(&ast).unwrap()),
             Err(e) => fail(e),

@@ -4,10 +4,10 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.4 schema/metadata work addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, basic graph validation, JSON diagnostics and check/ast/plan CLI implemented; 22 tests. Full schemas/types/effects/formatter remain. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.4 schema/metadata implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 32 tests. Rich graph/vector/quantity types, effects and formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. General higher-order lenses/joins, context and four-valued support remain. |
-| L3 Full knowledge semantics | in_progress, provisional | Node manifestations, pinned graph-valued edge/node metadata, scalar properties and explicit negative claims represented in IR. Same-commit cyclic metadata references await the logical snapshot-manifest implementation specified by engine paper §2.1. General identity alignment, rule evaluation, provenance derivation/scenarios remain. |
+| L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. General identity alignment, rule evaluation, provenance derivation/scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
 | L5 Spatial and multiscale language | proposed | No geometry, embedding or clustering language yet. |
 | L6 Distributed offline governance | proposed | Portable source structure only; no mobile, networking or governance conformance claim. |
@@ -15,11 +15,11 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 ## Local verification
 
-- `cargo test --locked`: 22 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
+- `cargo test --locked`: 32 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
-- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.3.0 protocol plan.
+- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.4.0 protocol plan.
 
 The checks above were run locally on macOS with Rust 1.94.0. A CI definition is not evidence of remote CI success. `cargo check --locked --lib --target wasm32-unknown-unknown` passed; browser-host execution and mobile integration remain unverified. Exact cross-project integration is recorded separately by the orchestrator.
 
@@ -40,3 +40,13 @@ Reproduce with `python3 scripts/check_composed.py --engine /path/to/weave-engine
 ## Source distribution audit
 
 The independent source archive at `ea484f7f1c24932b177e4a87daf7bb875cecb671` passed contract verification, all 22 tests with locked cached dependencies, CLI installation, and the composed-example compile check without a sibling engine checkout. The archive contained the complete vendored contract and excluded the private source export. [Release readiness](RELEASE_READINESS.md) records exact evidence and publication limits; [acceptance gaps](ACCEPTANCE_GAPS.md) maps all 30 remaining full-design requirement areas.
+
+## Paper-directed v0.4 verification
+
+32 frontend tests cover schema field/type/space errors, discovery, named metadata, local transaction boundaries and graph-value composition. The shared portable validator has four additional engine-contract tests. Strict Clippy and the WASM library target check pass.
+
+Actual CLI runs of `schema.weave` retain the graph schema. `metadata_cycle.weave` commits the two mutually referring snapshots atomically, traverses the real cycle with complete coverage, selects an edge's evidence graph and joins it to an independent catalog. Its final provenance contains the evidence edge, the named host attachment and the catalog review edge. The orchestrator independently ran both examples through the compiler/runtime.
+
+Full schema types/migrations, live-handle source syntax, arbitrary attachment policies, source-level rebinding and the remaining full-design gates are still incomplete. Current docs and source artifacts do not imply those capabilities.
+
+The typed cross-schema join example deliberately reuses type names with different definitions. Its actual runtime result retains two distinct resolvable node types, a declared derived edge type and valid interval `[150, 200)`. The compiler rejects statically known mixed typed/untyped joins; dynamic inputs remain subject to the same runtime check.
