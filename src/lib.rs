@@ -92,6 +92,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
     let mut commands = Vec::new();
     let mut declared = BTreeSet::new();
     let mut schemas: BTreeMap<String, GraphSchema> = BTreeMap::new();
+    let mut rule_sets = BTreeMap::new();
     let mut statements = Vec::new();
     let mut batches = BTreeMap::new();
     let mut batch_names = BTreeSet::new();
@@ -121,6 +122,21 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             active_batch = Some((name, count, Vec::new()));
         }
 
+        if let Statement::Rules {
+            name,
+            name_span,
+            definition,
+        } = statement
+        {
+            if rule_sets.insert(name, definition).is_some() {
+                return Err(diagnostic(
+                    "E_DUPLICATE",
+                    "Duplicate rule module",
+                    name_span,
+                ));
+            }
+            continue;
+        }
         if let Statement::Schema {
             name,
             name_span,
@@ -145,7 +161,10 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             continue;
         }
         let (name, name_span) = match &statement {
-            Statement::Algebra {
+            Statement::Reason {
+                name, name_span, ..
+            }
+            | Statement::Algebra {
                 name, name_span, ..
             }
             | Statement::Graph {
@@ -169,7 +188,8 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             Statement::Schema { .. }
             | Statement::Transaction { .. }
             | Statement::Function { .. }
-            | Statement::Apply { .. } => unreachable!(),
+            | Statement::Apply { .. }
+            | Statement::Rules { .. } => unreachable!(),
         };
         if !declared.insert(name.clone()) {
             return Err(diagnostic(
@@ -182,7 +202,8 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             Statement::Schema { .. }
             | Statement::Transaction { .. }
             | Statement::Function { .. }
-            | Statement::Apply { .. } => unreachable!(),
+            | Statement::Apply { .. }
+            | Statement::Rules { .. } => unreachable!(),
             Statement::Graph {
                 name,
                 name_span,
@@ -483,6 +504,44 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                         data,
                     });
                 }
+            }
+            Statement::Reason {
+                name,
+                name_span: _,
+                source,
+                source_span,
+                rule_set,
+                rule_span,
+            } => {
+                let lens = names.get(&source).ok_or_else(|| {
+                    diagnostic(
+                        "E_UNKNOWN_GRAPH",
+                        format!("Unknown graph '{source}'"),
+                        source_span,
+                    )
+                })?;
+                if lens.relation.is_some() || lens.time.is_some() {
+                    return Err(diagnostic(
+                        "E_UNBOUND_PARAMETER",
+                        "Rule inputs must be fully bound",
+                        source_span,
+                    ));
+                }
+                let rules = rule_sets.get(&rule_set).cloned().ok_or_else(|| {
+                    diagnostic(
+                        "E_UNKNOWN_RULES",
+                        format!("Unknown rule module '{rule_set}'"),
+                        rule_span,
+                    )
+                })?;
+                let mut output = Lens::concrete(base_query(String::new(), None));
+                output.typed = lens.typed;
+                output.input = Some(GraphExpression::Reason {
+                    input: Box::new(lens.expression()),
+                    rules,
+                });
+                output.emit(&name, &mut commands);
+                names.insert(name, output);
             }
             Statement::Algebra {
                 name,

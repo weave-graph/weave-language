@@ -30,6 +30,19 @@ pub type Span = (usize, usize);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
+    Rules {
+        name: String,
+        name_span: Span,
+        definition: weave_contract::RuleSet,
+    },
+    Reason {
+        name: String,
+        name_span: Span,
+        source: String,
+        source_span: Span,
+        rule_set: String,
+        rule_span: Span,
+    },
     Function {
         name: String,
         name_span: Span,
@@ -638,6 +651,136 @@ impl Parser {
             _ => Err(self.error("Expected node, edge, entity or graph metadata host")),
         }
     }
+    fn rule_atom(&mut self) -> Result<(weave_contract::RuleAtom, [(usize, usize); 2]), Diagnostic> {
+        let polarity = if self.peek().kind == Kind::Word("negative".into()) {
+            self.take();
+            weave_contract::Polarity::Negative
+        } else {
+            weave_contract::Polarity::Positive
+        };
+        let predicate = self.string()?;
+        self.symbol('(')?;
+        let term = |parser: &mut Self| -> Result<(weave_contract::RuleTerm, Span), Diagnostic> {
+            let span = (parser.peek().start, parser.peek().end);
+            let value = if matches!(parser.peek().kind, Kind::String(_)) {
+                weave_contract::RuleTerm::Node {
+                    id: parser.string()?,
+                }
+            } else {
+                weave_contract::RuleTerm::Variable {
+                    name: parser.name()?,
+                }
+            };
+            Ok((value, span))
+        };
+        let (from, a) = term(self)?;
+        self.symbol(',')?;
+        let (to, b) = term(self)?;
+        self.symbol(')')?;
+        self.symbol(';')?;
+        Ok((
+            weave_contract::RuleAtom {
+                predicate,
+                from,
+                to,
+                polarity,
+            },
+            [a, b],
+        ))
+    }
+    fn rules(&mut self, name: String, name_span: Span) -> Result<Statement, Diagnostic> {
+        self.word("revision")?;
+        let revision = self.string()?;
+        self.symbol('{')?;
+        let mut rules = Vec::new();
+        let mut ids = std::collections::BTreeSet::new();
+        while self.peek().kind != Kind::Symbol('}') {
+            self.word("rule")?;
+            let span = (self.peek().start, self.peek().end);
+            let id = self.name()?;
+            if !ids.insert(id.clone()) {
+                return Err(Diagnostic::new(
+                    "E_DUPLICATE",
+                    "Duplicate rule ID",
+                    span.0,
+                    span.1,
+                ));
+            }
+            self.symbol('{')?;
+            let mut body = Vec::new();
+            let mut head = None;
+            let mut allow_cross_space = false;
+            while self.peek().kind != Kind::Symbol('}') {
+                match self.name()?.as_str() {
+                    "when" => body.push(self.rule_atom()?.0),
+                    "yield" => {
+                        if head.is_some() {
+                            return Err(self.error("Rule has more than one conclusion"));
+                        }
+                        head = Some(self.rule_atom()?);
+                    }
+                    "cross_space" => {
+                        if allow_cross_space {
+                            return Err(self.error("Duplicate cross_space declaration"));
+                        }
+                        allow_cross_space = true;
+                        self.symbol(';')?;
+                    }
+                    _ => return Err(self.error("Rule expects when, yield or cross_space")),
+                }
+            }
+            self.symbol('}')?;
+            let (head, spans) = head.ok_or_else(|| self.error("Rule requires a conclusion"))?;
+            let bound: std::collections::BTreeSet<_> = body
+                .iter()
+                .flat_map(|a| [&a.from, &a.to])
+                .filter_map(|t| match t {
+                    weave_contract::RuleTerm::Variable { name } => Some(name.as_str()),
+                    _ => None,
+                })
+                .collect();
+            for (term, span) in [(&head.from, spans[0]), (&head.to, spans[1])] {
+                if let weave_contract::RuleTerm::Variable { name } = term
+                    && !bound.contains(name.as_str())
+                {
+                    return Err(Diagnostic::new(
+                        "E_RULE_RANGE",
+                        format!("Head variable '{name}' is not bound by evidence"),
+                        span.0,
+                        span.1,
+                    ));
+                }
+            }
+            rules.push(weave_contract::Rule {
+                id,
+                head,
+                body,
+                allow_cross_space,
+            });
+        }
+        self.symbol('}')?;
+        let definition = weave_contract::RuleSet {
+            id: name.clone(),
+            revision,
+            rules,
+        };
+        if let Some(d) = weave_contract::validate_rule_set(&definition)
+            .into_iter()
+            .next()
+        {
+            return Err(Diagnostic::new(
+                &d.code,
+                d.message,
+                name_span.0,
+                name_span.1,
+            ));
+        }
+        Ok(Statement::Rules {
+            name,
+            name_span,
+            definition,
+        })
+    }
     fn program(&mut self, context: u8) -> Result<Program, Diagnostic> {
         let mut statements = Vec::new();
         while self.peek().kind != Kind::End
@@ -657,7 +800,7 @@ impl Parser {
             if context == 2
                 && matches!(
                     kind.as_str(),
-                    "function" | "transaction" | "graph" | "use" | "schema"
+                    "function" | "transaction" | "graph" | "use" | "schema" | "rules"
                 )
             {
                 return Err(
@@ -665,6 +808,26 @@ impl Parser {
                 );
             }
             match kind.as_str() {
+                "rules" => {
+                    statements.push(self.rules(name, name_span)?);
+                }
+                "reason" => {
+                    self.word("from")?;
+                    let source_span = (self.peek().start, self.peek().end);
+                    let source = self.name()?;
+                    self.word("using")?;
+                    let rule_span = (self.peek().start, self.peek().end);
+                    let rule_set = self.name()?;
+                    self.symbol(';')?;
+                    statements.push(Statement::Reason {
+                        name,
+                        name_span,
+                        source,
+                        source_span,
+                        rule_set,
+                        rule_span,
+                    });
+                }
                 "function" => {
                     self.word("revision")?;
                     let revision = self.string()?;

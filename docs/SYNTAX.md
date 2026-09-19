@@ -146,3 +146,19 @@ Use `explicit schema S` to validate structural relation types and endpoint prope
 Named metadata uses `on edge "relationship"` for the structural relationship or `on assertion "inspection"` for one source claim. A structural-only graph yields no claim edges when queried. Legacy `edge` declarations remain supported in ordinary graphs; they cannot be mixed into an explicit graph. See [the example](../examples/assertions.weave) and `scripts/check_assertions.py`.
 
 Function revision labels now travel with their normalized source digests in program and result manifests. `weave fingerprint FILE.weave` includes those revisions and the ordered expanded plan. Whitespace and comments do not change the normalized source identity; changing a function revision or bound argument does. These labels identify supplied code, and do not authenticate its author.
+
+## Finite rule modules (protocol 0.7)
+
+```weave
+rules Reach revision "1" {
+  rule Seed { when "link"(x, y); yield "reach"(x, y); }
+  rule Step { when "reach"(x, y); when "link"(y, z); yield "reach"(x, z); }
+}
+reason Closure from Input using Reach;
+```
+
+Rule predicates are fixed strings; bare endpoint identifiers are variables, and quoted endpoints are exact current graph-value node IDs. Every head variable must occur in the body. `when negative "p"(x,y);` consumes explicit negative evidence; it never means that a positive claim is absent. `yield negative` produces an explicitly negative conclusion. `cross_space;` is required when a conclusion connects different spaces. Rule modules are immutable code and may be referenced by graph functions declared after them. They are not graph values.
+
+This profile has a finite input-node domain, no term generation, and time intervals formed from premise intersections. Saturation deduplicates the same fact and leaf-premise set; independent support sets remain alternatives. It keeps a bounded canonical witness for recursive support instead of enumerating infinitely many cyclic proofs. Rules, bindings, source revisions and exact leaf premises remain in derivations. Exceeding host step, round, object, byte or alternative limits is an explicit error, never an empty or complete truncated answer. Partial input coverage stays partial. Rule results are graph values, with schemas and origins preserved, and can feed later operators without a hidden commit.
+
+Contextual evidence still requires explicit context selection; this profile rejects its consumption. Stratified absence, complete-scope certificates, aggregations and arbitrary arithmetic recursion are not implemented. See [rules example](../examples/rules.weave) and [executable acceptance](../scripts/check_rules.py).

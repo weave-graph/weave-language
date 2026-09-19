@@ -49,7 +49,10 @@
         "../tests/conformance.rs",
         "STATUS.md#explicit-assertions-and-identity-v06-verification",
         "../examples/assertions.weave",
-        "../scripts/check_assertions.py"
+        "../scripts/check_assertions.py",
+        "STATUS.md#finite-rules-v07-verification",
+        "../examples/rules.weave",
+        "../scripts/check_rules.py"
       ],
       "provisional": true
     },
@@ -115,7 +118,10 @@
         "../scripts/check_algebra.py",
         "STATUS.md#explicit-assertions-and-identity-v06-verification",
         "../examples/assertions.weave",
-        "../scripts/check_assertions.py"
+        "../scripts/check_assertions.py",
+        "STATUS.md#finite-rules-v07-verification",
+        "../examples/rules.weave",
+        "../scripts/check_rules.py"
       ],
       "provisional": true
     },

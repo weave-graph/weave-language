@@ -1,0 +1,28 @@
+graph Network {
+  node "a" entity "a" space "network";
+  node "b" entity "b" space "network";
+  node "c" entity "c" space "network";
+  edge "ab" from "a" to "b" relation "link" valid 0 until 10;
+  edge "bc" from "b" to "c" relation "link" valid 5 until 20;
+  edge "ca" from "c" to "a" relation "link" valid 0 until 20;
+}
+rules Reach revision "1" {
+  rule Seed {
+    when "link"(x, y);
+    yield "reach"(x, y);
+  }
+  rule Step {
+    when "reach"(x, y);
+    when "link"(y, z);
+    yield "reach"(x, z);
+  }
+}
+lens Input from Network {}
+reason Closure from Input using Reach;
+reason Repeated from Closure using Reach;
+function Reachable revision "1" (graph input) {
+  reason Result from input using Reach;
+  return Result;
+}
+apply ThroughFunction from Reachable { graph input Input; }
+lens AtSeven from Closure { match relation "reach"; at 7; }

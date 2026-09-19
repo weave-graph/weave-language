@@ -1,21 +1,23 @@
 {
   "source_repository": "https://github.com/weave-graph/weave-engine",
   "source_path": "crates/weave-contract",
-  "contract_version": "0.6.0",
+  "contract_version": "0.7.0",
   "files": {
-    "Cargo.toml": "8fc3ffd17337c4f61bc82929cf1f8b07f26bea74244281526b2a687194bdefde",
-    "LICENSE": "9e24b3303156fce3c77e21da9d3e3b4cc864291987721d55286415a22ea5cfb7",
-    "src/lib.rs": "bbb05d9816c423e92c0dc2d85a6f1f633d5a5fbb4f1393db049847e389f64963",
-    "src/schema.rs": "4f11aea159aa7ad92f3b62ce54681a3fa9d233ce7fb2e96d2e9694c610b0f085",
-    "src/algebra.rs": "972a2060540a01e5ba7c3d03493d11ec78c85c9f8b4479be85bab605a9d3d68f",
+    "Cargo.toml": "d7865fb397da264e8ae91c7903d3eb9207ee5933efe4470bfda02e8d8f9d4072",
+    "src/algebra.rs": "5d2cba390cdd7b80b0b9a49727e7a979bf59f8bd0becb037b34aeb087ffbadd7",
     "src/algebra_types.rs": "15362810f685b74a2c69db1ebdd8ddf926eb1f6e186856220af81e4f0a3f1c3a",
     "src/assertions.rs": "b24243be54aa40cb623b5ee89aa326dfe5712eef0c7758a466f786a47ab845ed",
-    "src/identity.rs": "2c198a057d1d76b0eb19b2ea84a6ccfeee836e6cdca27406bc36558b16b8ec4b"
+    "src/identity.rs": "2c198a057d1d76b0eb19b2ea84a6ccfeee836e6cdca27406bc36558b16b8ec4b",
+    "src/lib.rs": "ab5c7e3b92e3bd00b248a2dbab2df8e79e31da4c75fb9f205ef356873727705f",
+    "src/rules.rs": "fe3c347ca41ff80089bf56a472a16ab36a5dbc157db3609ebcdfa049766fae29",
+    "src/rules_types.rs": "0ebc0be4e190de8e4bf37198307ba6bcfc6873aa08db9d0630146d7b76952b26",
+    "src/schema.rs": "4f11aea159aa7ad92f3b62ce54681a3fa9d233ce7fb2e96d2e9694c610b0f085",
+    "LICENSE": "9e24b3303156fce3c77e21da9d3e3b4cc864291987721d55286415a22ea5cfb7"
   },
-  "source_revision": "0da99fcd01f067bde56f79b37e7f2b0fd46d291e",
+  "source_revision": "dabd1def794b2bf4699a97b5a39fdc1ab4548ca9",
   "license_source_path": "LICENSE",
   "documentation": {
-    "path": "docs/contract/v0.6/README.md",
-    "sha256": "14ae71e03e617333666152a2c0a2b6b943566b42574dd4c5c9c9e8218c83f2e8"
+    "path": "docs/contract/v0.7/README.md",
+    "sha256": "22d0b1632136404c88c50761c42eb0c53f4f8aa981593b29b236b93d0576eece"
   }
 }

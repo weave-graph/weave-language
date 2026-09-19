@@ -38,7 +38,13 @@ fn error(code: &str, message: impl Into<String>, span: Span) -> Diagnostic {
 }
 fn declaration(statement: &Statement) -> (&str, Span) {
     match statement {
-        Statement::Function {
+        Statement::Rules {
+            name, name_span, ..
+        }
+        | Statement::Reason {
+            name, name_span, ..
+        }
+        | Statement::Function {
             name, name_span, ..
         }
         | Statement::Apply {
@@ -122,6 +128,7 @@ fn time_value(
 }
 struct Expander {
     functions: BTreeMap<String, Arc<Closure>>,
+    rule_modules: BTreeSet<String>,
     graphs: BTreeMap<String, BTreeSet<String>>,
     reserved: BTreeSet<String>,
     output: Vec<Statement>,
@@ -182,7 +189,7 @@ impl Expander {
         };
         if !matches!(
             statement,
-            Statement::Schema { .. } | Statement::Transaction { .. }
+            Statement::Rules { .. } | Statement::Schema { .. } | Statement::Transaction { .. }
         ) {
             self.graphs.insert(name, pending);
         }
@@ -190,6 +197,9 @@ impl Expander {
             for s in body {
                 self.graphs.insert(declaration(s).0.into(), BTreeSet::new());
             }
+        }
+        if let Statement::Rules { name, .. } = &statement {
+            self.rule_modules.insert(name.clone());
         }
         self.output.push(statement);
         Ok(())
@@ -265,6 +275,21 @@ impl Expander {
                     output_span,
                     captured,
                 };
+                for statement in &definition.body {
+                    if let Statement::Reason {
+                        rule_set,
+                        rule_span,
+                        ..
+                    } = statement
+                        && !self.rule_modules.contains(rule_set)
+                    {
+                        return Err(error(
+                            "E_UNKNOWN_RULES",
+                            format!("Unknown rule module '{rule_set}'"),
+                            *rule_span,
+                        ));
+                    }
+                }
                 validate_definition(&definition)?;
                 self.functions.insert(
                     name,
@@ -472,7 +497,13 @@ fn specialize(
                 time_value(v, values, *source_span)?;
             }
         }
-        Statement::Bind {
+        Statement::Reason {
+            name: n,
+            source,
+            source_span,
+            ..
+        }
+        | Statement::Bind {
             name: n,
             source,
             source_span,
@@ -665,7 +696,12 @@ fn validate_definition(definition: &Definition) -> Result<(), Diagnostic> {
                     functions.insert(name.clone(), signature);
                 }
             }
-            Statement::Lens {
+            Statement::Reason {
+                source,
+                source_span,
+                ..
+            }
+            | Statement::Lens {
                 source,
                 source_span,
                 ..
@@ -748,6 +784,7 @@ pub(crate) fn expand(program: Program) -> Result<Program, Diagnostic> {
     }
     let mut expander = Expander {
         functions: BTreeMap::new(),
+        rule_modules: BTreeSet::new(),
         graphs: BTreeMap::new(),
         reserved,
         output: Vec::new(),
@@ -772,6 +809,7 @@ fn normalized_statement(statement: &Statement) -> serde_json::Value {
         for key in [
             "name_span",
             "source_span",
+            "rule_span",
             "left_span",
             "right_span",
             "function_span",
@@ -827,7 +865,22 @@ pub(crate) fn source_revisions(
         .statements
         .iter()
         .filter_map(|statement| {
-            if let Statement::Function {
+            if let Statement::Rules {
+                name,
+                name_span,
+                definition,
+            } = statement
+            {
+                Some(
+                    weave_contract::identity::source_fingerprint(definition)
+                        .map(|digest| weave_contract::SourceRevision {
+                            name: name.clone(),
+                            revision: definition.revision.clone(),
+                            digest,
+                        })
+                        .map_err(|e| error(&e.code, e.message, *name_span)),
+                )
+            } else if let Statement::Function {
                 name,
                 name_span,
                 revision,

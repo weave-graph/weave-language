@@ -811,3 +811,74 @@ fn named_attachments_can_target_individual_source_assertions() {
         "E_ATTACHMENT_HOST"
     );
 }
+
+#[test]
+fn finite_rules_compile_through_graph_functions_and_preserve_source_identity() {
+    let source = include_str!("../examples/rules.weave");
+    let plan = compile(source).unwrap();
+    assert!(
+        plan.source_revisions
+            .iter()
+            .any(|s| s.name == "Reach" && s.revision == "1")
+    );
+    let reason = plan
+        .commands
+        .iter()
+        .find_map(|c| match c {
+            Command::Bind {
+                name,
+                value: GraphExpression::Reason { rules, .. },
+            } if name == "Closure" => Some(rules),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(reason.rules.len(), 2);
+    assert_eq!(
+        plan.source_revisions
+            .iter()
+            .find(|s| s.name == "Reach")
+            .unwrap()
+            .digest,
+        weave_contract::identity::source_fingerprint(reason).unwrap()
+    );
+    assert_eq!(
+        weave_language::fingerprint(source).unwrap(),
+        weave_language::fingerprint(&format!("// shifted locations\n{source}")).unwrap()
+    );
+    assert_ne!(
+        weave_language::fingerprint(source).unwrap(),
+        weave_language::fingerprint(&source.replace("rule Seed", "rule First")).unwrap()
+    );
+}
+#[test]
+fn unsafe_rule_head_reports_exact_token_and_unbound_modules_fail() {
+    let source = "// missing\nrules R revision \"1\" { rule A { when \"p\"(x,y); yield \"q\"(x,missing); } }";
+    let error = compile(source).unwrap_err();
+    assert_eq!(error.code, "E_RULE_RANGE");
+    assert_eq!(&source[error.start..error.end], "missing");
+    assert_eq!(error.start, source.rfind("missing").unwrap());
+    assert!(compile("use G graph \"G\"; reason X from G using Missing;").is_err());
+    assert!(
+        compile(
+            "rules R revision \"1\" {rule A {when \"p\"(x,y);yield \"q\"(x,y);}} lens X from R {}"
+        )
+        .is_err()
+    );
+}
+#[test]
+fn negative_rule_atoms_are_explicit_evidence_and_constants_are_preserved() {
+    let p=compile("use G graph \"G\"; rules R revision \"1\" {rule A {when negative \"p\"(x,\"fixed\");yield negative \"q\"(x,\"fixed\"); cross_space;}} reason X from G using R;").unwrap();
+    let Command::Bind {
+        value: GraphExpression::Reason { rules, .. },
+        ..
+    } = &p.commands[0]
+    else {
+        panic!("reason expected")
+    };
+    assert_eq!(
+        rules.rules[0].body[0].polarity,
+        weave_contract::Polarity::Negative
+    );
+    assert!(matches!(&rules.rules[0].head.to,weave_contract::RuleTerm::Node{id} if id == "fixed"));
+    assert!(rules.rules[0].allow_cross_space);
+}
