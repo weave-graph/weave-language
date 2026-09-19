@@ -1,6 +1,6 @@
 # Typed context axes: proposed bounded next stage
 
-Status: review proposal after protocol 0.13; no protocol version reserved and no wire change implemented. This document separates a portable type-validation stage from the runtime evidence boundary it needs. Neither alone completes L18.
+Historical design proposal, now implemented as the bounded protocol 0.14 profile. See [the current contract and source guide](../TYPED_CONTEXTS.md); later sections retain proposal history rather than override that guide. This document separates a portable type-validation stage from the runtime evidence boundary it needs. Neither alone completes L18.
 
 ## Source requirements and design choices
 
@@ -115,11 +115,11 @@ Explicit compatibility mappings, broadcast declarations, governed world crossing
 
 ## Profile A implementation checkpoint
 
-The isolated language library now exports `context_axes` with the types above, bounded `ContextSchema::from_json` / `ContextDefinition::from_json`, validation, canonical bytes, SHA-256 fingerprints and a bounded local `ContextSchemas` conflict registry. The actual Quantity variant is `Quantity { unit: UnitDescriptor }`, serialized with `kind: "quantity"` and a `unit` descriptor. Other variants use `kind` names `boolean`, `integer`, `string`, `decimal` and `enum` (with `members`). Public map-bearing structs deliberately do not implement generic Serde `Deserialize`: callers must use the strict entrypoints to avoid duplicate-key overwrite. Constructed Rust values must pass `validate` or a canonicalization/fingerprint operation before use.
+The isolated language library now exports `context_axes` with the types above, bounded `ContextSchema::from_json` / `ContextDefinition::from_json`, validation, canonical bytes, SHA-256 fingerprints and a bounded local `ContextSchemas` conflict registry. The actual Quantity variant is `Quantity { unit: UnitDescriptor }`, serialized with `kind: "quantity"` and a `unit` descriptor. Other variants use `kind` names `boolean`, `integer`, `string`, `decimal` and `enum` (with `members`). At the initial profile A checkpoint the public map-bearing structs did not implement generic Serde `Deserialize`. Protocol 0.14 adds custom strict deserialization that preserves duplicate-key rejection and a separate cumulative 64 KiB budget even when embedded inside a larger plan. Constructed Rust values must pass `validate` or a canonicalization/fingerprint operation before use.
 
 The decoder rejects duplicate keys at every object depth, including escaped aliases of the same key, rejects unknown fields and bounds raw input before parsing. Canonicalization validates complete sizes/types before cloning. Schema registration is an in-memory local declaration/composition aid; arbitrary graph property storage or typed-context reads do not install a global schema registry. Equal values/fingerprints do not equate separate context GraphRefs, which remain outside this pure module.
 
-Eight focused tests cover exact total assignment, nominal quantities, forbidden conversions, duplicates/unknown fields, ordering, schema conflicts without replacement, size/depth/count limits, malformed inputs and finite registry capacity. The full isolated language suite has 76 passing tests; strict Clippy, formatting and the WASM library target pass. No source grammar, runtime descriptor lookup, witness carrier or wire integration has been added by this checkpoint.
+Eight focused tests cover exact total assignment, nominal quantities, forbidden conversions, duplicates/unknown fields, ordering, schema conflicts without replacement, size/depth/count limits, malformed inputs and finite registry capacity. The full isolated language suite has 76 passing tests; strict Clippy, formatting and the WASM library target pass. That historical profile A checkpoint preceded the implemented 0.14 grammar, descriptor lookup, persisted witness carrier and wire integration.
 
 ## Profile B DTO review constraints
 

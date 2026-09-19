@@ -6,8 +6,8 @@ This checklist concerns distribution of the current experimental source, not ful
 
 - Repository includes MIT license, contribution and security guidance, source, tests, examples, lockfile and a standalone vendored contract.
 - Contract verifier checks the exact vendored file set, license, Cargo version, protocol constant and current documentation hash.
-- Source grammar and public API are documented as provisional; current protocol is v0.4.0. Historical contract notes are labeled historical.
-- `check`, `ast`, `plan` and source-schema `describe` are the implemented CLI subcommands. No formatter, language runner, remote privileged discovery, LSP or mobile SDK is advertised as implemented.
+- Source grammar and public API are documented as provisional; current protocol is v0.14.0. Historical contract notes are labeled historical.
+- `check`, `ast`, `plan`, `fingerprint` and source-schema `describe` are the implemented CLI subcommands. No formatter, language runner, remote privileged discovery, LSP or mobile SDK is advertised as implemented.
 - `publish = false` prevents accidental registry publication before the separate contract package has an approved distribution path. Git source distribution remains available.
 
 ## Distribution procedure
@@ -20,7 +20,7 @@ git archive --format=tar --output=weave-language-source.tar HEAD
 
 Extract into a new directory, verify the contract and build/test/install there. `cargo install --locked --path . --root ./install-check` installs the CLI without publishing anything. Dependencies are locked but still require access to crates.io unless already cached; an offline-capable runtime is not the same as a dependency-free offline build.
 
-The source archive includes `vendor/weave-contract/{Cargo.toml,LICENSE,src/lib.rs}`. Cargo's registry package excludes nested package files and rewrites path dependencies; it is deliberately not the release artifact at this stage.
+The source archive includes every canonical contract source/test file, Cargo metadata and LICENSE; `vendor/manifest.json` identifies the exact file set. Cargo's registry package excludes nested package files and rewrites path dependencies; it is deliberately not the release artifact at this stage.
 
 ## CI configuration
 

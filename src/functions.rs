@@ -38,7 +38,16 @@ fn error(code: &str, message: impl Into<String>, span: Span) -> Diagnostic {
 }
 fn declaration(statement: &Statement) -> (&str, Span) {
     match statement {
-        Statement::NativeService {
+        Statement::ContextSchema {
+            name, name_span, ..
+        }
+        | Statement::ContextValue {
+            name, name_span, ..
+        }
+        | Statement::TypedContext {
+            name, name_span, ..
+        }
+        | Statement::NativeService {
             name, name_span, ..
         }
         | Statement::Rules {
@@ -192,7 +201,10 @@ impl Expander {
         };
         if !matches!(
             statement,
-            Statement::Rules { .. } | Statement::Schema { .. } | Statement::Transaction { .. }
+            Statement::Rules { .. }
+                | Statement::Schema { .. }
+                | Statement::ContextSchema { .. }
+                | Statement::Transaction { .. }
         ) {
             self.graphs.insert(name, pending);
         }

@@ -30,6 +30,28 @@ pub type Span = (usize, usize);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
+    ContextSchema {
+        name: String,
+        name_span: Span,
+        definition: weave_contract::context_axes::ContextSchema,
+    },
+    ContextValue {
+        name: String,
+        name_span: Span,
+        schema: String,
+        schema_span: Span,
+        attribution: String,
+        axes: Vec<ContextAxisBinding>,
+    },
+    TypedContext {
+        name: String,
+        name_span: Span,
+        source: String,
+        source_span: Span,
+        reference: weave_contract::GraphRef,
+        schema: String,
+        schema_span: Span,
+    },
     NativeService {
         name: String,
         name_span: Span,
@@ -128,6 +150,13 @@ pub enum Statement {
         include_metadata: bool,
         max_depth: u32,
     },
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ContextAxisBinding {
+    pub name: String,
+    pub name_span: Span,
+    pub value: serde_json::Value,
+    pub value_span: Span,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "service", rename_all = "snake_case")]
@@ -1083,7 +1112,7 @@ impl Parser {
             let kind = self.name()?;
             let name_span = (self.peek().start, self.peek().end);
             let name = self.name()?;
-            if context == 1 && kind != "graph" {
+            if context == 1 && !matches!(kind.as_str(), "graph" | "context_value") {
                 return Err(
                     self.error("A local transaction contains only graph snapshot declarations")
                 );
@@ -1098,7 +1127,16 @@ impl Parser {
                     self.error("Pure functions may only compose declared input graph values")
                 );
             }
-            if context == 2 && matches!(kind.as_str(), "resolve_identity" | "cluster_navigation") {
+            if context == 2
+                && matches!(
+                    kind.as_str(),
+                    "resolve_identity"
+                        | "cluster_navigation"
+                        | "typed_context"
+                        | "context_schema"
+                        | "context_value"
+                )
+            {
                 return Err(Diagnostic::new(
                     "E_FUNCTION_EFFECT",
                     "Pinned service reads must be bound outside pure functions and passed as graph arguments",
@@ -1107,6 +1145,137 @@ impl Parser {
                 ));
             }
             match kind.as_str() {
+                "context_schema" => {
+                    self.word("revision")?;
+                    let revision = self.selector_string()?;
+                    self.symbol('{')?;
+                    let mut axes = BTreeMap::new();
+                    while self.peek().kind != Kind::Symbol('}') {
+                        if axes.len() >= 32 {
+                            return Err(self.error("Context schema permits at most 32 axes"));
+                        }
+                        self.word("axis")?;
+                        let span = (self.peek().start, self.peek().end);
+                        let axis = self.selector_string()?;
+                        if axes.contains_key(&axis) {
+                            return Err(Diagnostic::new(
+                                "E_DUPLICATE",
+                                "Duplicate context axis",
+                                span.0,
+                                span.1,
+                            ));
+                        }
+                        let kind=match self.name()?.as_str() {
+                            "boolean"=>weave_contract::context_axes::ContextAxisType::Boolean,
+                            "integer"=>weave_contract::context_axes::ContextAxisType::Integer,
+                            "string"=>weave_contract::context_axes::ContextAxisType::String,
+                            "decimal"=>weave_contract::context_axes::ContextAxisType::Decimal,
+                            "quantity"=>weave_contract::context_axes::ContextAxisType::Quantity{unit:self.unit_descriptor()?},
+                            "enum"=>{
+                                self.symbol('[')?;let mut members=Vec::new();
+                                while self.peek().kind!=Kind::Symbol(']') {
+                                    if members.len()>=128{return Err(self.error("Context enum permits at most 128 members"));}
+                                    let token=self.peek().clone();let member=self.selector_string()?;
+                                    if members.contains(&member){return Err(Diagnostic::new("E_DUPLICATE","Duplicate context enum member",token.start,token.end));}
+                                    members.push(member);
+                                    if self.peek().kind!=Kind::Symbol(']'){self.symbol(',')?;}
+                                }
+                                self.symbol(']')?;weave_contract::context_axes::ContextAxisType::Enum{members}
+                            }
+                            _=>return Err(self.error("Expected boolean, integer, string, decimal, quantity or enum axis type")),
+                        };
+                        self.symbol(';')?;
+                        axes.insert(axis, kind);
+                    }
+                    self.symbol('}')?;
+                    let definition = weave_contract::context_axes::ContextSchema {
+                        reference: weave_contract::context_axes::ContextSchemaRef {
+                            id: name.clone(),
+                            revision,
+                        },
+                        axes,
+                    };
+                    definition.validate().map_err(|_| {
+                        Diagnostic::new(
+                            "E_CONTEXT_SCHEMA",
+                            "Invalid bounded context schema",
+                            name_span.0,
+                            name_span.1,
+                        )
+                    })?;
+                    statements.push(Statement::ContextSchema {
+                        name,
+                        name_span,
+                        definition,
+                    });
+                }
+                "context_value" => {
+                    self.word("schema")?;
+                    let schema_span = (self.peek().start, self.peek().end);
+                    let schema = self.name()?;
+                    self.word("source")?;
+                    let attribution = self.selector_string()?;
+                    self.symbol('{')?;
+                    let mut axes = Vec::new();
+                    let mut seen = std::collections::BTreeSet::new();
+                    while self.peek().kind != Kind::Symbol('}') {
+                        if axes.len() >= 32 {
+                            return Err(self.error("Context value permits at most 32 axes"));
+                        }
+                        self.word("axis")?;
+                        let name_span = (self.peek().start, self.peek().end);
+                        let name = self.selector_string()?;
+                        if !seen.insert(name.clone()) {
+                            return Err(Diagnostic::new(
+                                "E_DUPLICATE",
+                                "Duplicate context assignment",
+                                name_span.0,
+                                name_span.1,
+                            ));
+                        }
+                        let start = self.peek().start;
+                        let value = self.literal(0)?;
+                        let value_span = (start, self.tokens[self.cursor.saturating_sub(1)].end);
+                        self.symbol(';')?;
+                        axes.push(ContextAxisBinding {
+                            name,
+                            name_span,
+                            value,
+                            value_span,
+                        });
+                    }
+                    self.symbol('}')?;
+                    statements.push(Statement::ContextValue {
+                        name,
+                        name_span,
+                        schema,
+                        schema_span,
+                        attribution,
+                        axes,
+                    });
+                }
+                "typed_context" => {
+                    self.word("from")?;
+                    let source_span = (self.peek().start, self.peek().end);
+                    let source = self.name()?;
+                    self.word("graph")?;
+                    let graph_id = self.selector_string()?;
+                    self.word("revision")?;
+                    let revision = self.selector_string()?;
+                    self.word("schema")?;
+                    let schema_span = (self.peek().start, self.peek().end);
+                    let schema = self.name()?;
+                    self.symbol(';')?;
+                    statements.push(Statement::TypedContext {
+                        name,
+                        name_span,
+                        source,
+                        source_span,
+                        reference: weave_contract::GraphRef { graph_id, revision },
+                        schema,
+                        schema_span,
+                    });
+                }
                 "resolve_identity" | "cluster_navigation" => {
                     self.word("source")?;
                     self.word("graph")?;

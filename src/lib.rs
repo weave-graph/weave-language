@@ -84,6 +84,37 @@ impl Lens {
         }
     }
 }
+fn emit_snapshot(
+    name: String,
+    data: GraphData,
+    names: &mut BTreeMap<String, Lens>,
+    commands: &mut Vec<Command>,
+    active_batch: &mut Option<(String, usize, Vec<SnapshotCommit>)>,
+) {
+    let mut lens = Lens::concrete(base_query(name.clone(), None));
+    lens.typed = Some(data.schema.is_some());
+    names.insert(name.clone(), lens);
+    if let Some((_, remaining, members)) = active_batch {
+        members.push(SnapshotCommit {
+            graph_id: name,
+            branch_id: "main".into(),
+            expected_head: None,
+            data,
+        });
+        *remaining -= 1;
+        if *remaining == 0 {
+            let (batch_id, _, commits) = active_batch.take().unwrap();
+            commands.push(Command::CommitBatch { batch_id, commits });
+        }
+    } else {
+        commands.push(Command::Commit {
+            graph_id: name,
+            branch_id: "main".into(),
+            expected_head: None,
+            data,
+        });
+    }
+}
 /// Compile proposed surface syntax into the shared, versioned engine protocol.
 /// Declarations are sequential. A lens can compose earlier lenses by adding
 /// compatible filters. Graph declarations emit new-branch snapshot commits.
@@ -96,6 +127,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
     let mut declared = BTreeSet::new();
     let mut schemas: BTreeMap<String, GraphSchema> = BTreeMap::new();
     let mut rule_sets = BTreeMap::new();
+    let mut context_schemas = BTreeMap::new();
     let mut statements = Vec::new();
     let mut batches = BTreeMap::new();
     let mut batch_names = BTreeSet::new();
@@ -125,6 +157,21 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             active_batch = Some((name, count, Vec::new()));
         }
 
+        if let Statement::ContextSchema {
+            name,
+            name_span,
+            definition,
+        } = statement
+        {
+            if context_schemas.insert(name, definition).is_some() {
+                return Err(diagnostic(
+                    "E_DUPLICATE",
+                    "Duplicate context schema",
+                    name_span,
+                ));
+            }
+            continue;
+        }
         if let Statement::Rules {
             name,
             name_span,
@@ -164,7 +211,13 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             continue;
         }
         let (name, name_span) = match &statement {
-            Statement::NativeService {
+            Statement::ContextValue {
+                name, name_span, ..
+            }
+            | Statement::TypedContext {
+                name, name_span, ..
+            }
+            | Statement::NativeService {
                 name, name_span, ..
             }
             | Statement::Reason {
@@ -191,7 +244,8 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             | Statement::Metadata {
                 name, name_span, ..
             } => (name, *name_span),
-            Statement::Schema { .. }
+            Statement::ContextSchema { .. }
+            | Statement::Schema { .. }
             | Statement::Transaction { .. }
             | Statement::Function { .. }
             | Statement::Apply { .. }
@@ -205,11 +259,98 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
             ));
         }
         match statement {
-            Statement::Schema { .. }
+            Statement::ContextSchema { .. }
+            | Statement::Schema { .. }
             | Statement::Transaction { .. }
             | Statement::Function { .. }
             | Statement::Apply { .. }
             | Statement::Rules { .. } => unreachable!(),
+            Statement::ContextValue {
+                name,
+                name_span,
+                schema,
+                schema_span,
+                attribution,
+                axes,
+            } => {
+                let schema = context_schemas.get(&schema).ok_or_else(|| {
+                    diagnostic("E_CONTEXT_SCHEMA", "Unknown context schema", schema_span)
+                })?;
+                let mut values = BTreeMap::new();
+                for axis in axes {
+                    if !schema.axes.contains_key(&axis.name) {
+                        return Err(diagnostic(
+                            "E_CONTEXT_AXIS",
+                            "Undeclared context axis",
+                            axis.name_span,
+                        ));
+                    }
+                    schema
+                        .validate_value(&axis.name, &axis.value)
+                        .map_err(|_| {
+                            diagnostic(
+                                "E_CONTEXT_VALUE",
+                                "Axis value does not match its exact declared type",
+                                axis.value_span,
+                            )
+                        })?;
+                    values.insert(axis.name, axis.value);
+                }
+                let definition = weave_contract::context_axes::ContextDefinition {
+                    schema: schema.clone(),
+                    values,
+                };
+                definition.validate().map_err(|_| {
+                    diagnostic(
+                        "E_CONTEXT_VALUE",
+                        "Context requires a total bounded assignment",
+                        name_span,
+                    )
+                })?;
+                let data:GraphData=serde_json::from_value(serde_json::json!({
+                    "profile":"explicit",
+                    "nodes":[{"id":"context","entity_id":name,"space_id":"weave:context"}],
+                    "structural_edges":[{"id":"descriptor","from":"context","to":"context","predicate":"weave:context:definition"}],
+                    "assertions":[{"id":"definition","edge_id":"descriptor","source":attribution,"valid_time":{"start":i64::MIN},"polarity":"positive","properties":{"weave.context":definition}}]
+                })).expect("compiler constructs valid descriptor shape");
+                emit_snapshot(name, data, &mut names, &mut commands, &mut active_batch);
+            }
+            Statement::TypedContext {
+                name,
+                source,
+                source_span,
+                reference,
+                schema,
+                schema_span,
+                ..
+            } => {
+                let schema = context_schemas.get(&schema).ok_or_else(|| {
+                    diagnostic("E_CONTEXT_SCHEMA", "Unknown context schema", schema_span)
+                })?;
+                let input = names.get(&source).ok_or_else(|| {
+                    diagnostic(
+                        "E_UNKNOWN_GRAPH",
+                        "Unknown typed-context input",
+                        source_span,
+                    )
+                })?;
+                if input.relation.is_some() || input.time.is_some() {
+                    return Err(diagnostic(
+                        "E_UNBOUND_PARAMETER",
+                        "Typed context input must be fully bound",
+                        source_span,
+                    ));
+                }
+                let mut lens = Lens::concrete(base_query(String::new(), None));
+                lens.typed = input.typed;
+                lens.input = Some(GraphExpression::TypedContext {
+                    input: Box::new(input.expression()),
+                    reference,
+                    expected_schema: schema.clone(),
+                });
+                lens.emit(&name, &mut commands);
+                names.insert(name, lens);
+            }
             Statement::Graph {
                 name,
                 name_span,
@@ -492,29 +633,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                 if let Some(error) = weave_contract::validate_schema_graph(&data).first() {
                     return Err(diagnostic(&error.code, &error.message, name_span));
                 }
-                let mut graph_lens = Lens::concrete(base_query(name.clone(), None));
-                graph_lens.typed = Some(data.schema.is_some());
-                names.insert(name.clone(), graph_lens);
-                if let Some((_, remaining, members)) = &mut active_batch {
-                    members.push(SnapshotCommit {
-                        graph_id: name,
-                        branch_id: "main".into(),
-                        expected_head: None,
-                        data,
-                    });
-                    *remaining -= 1;
-                    if *remaining == 0 {
-                        let (batch_id, _, commits) = active_batch.take().unwrap();
-                        commands.push(Command::CommitBatch { batch_id, commits });
-                    }
-                } else {
-                    commands.push(Command::Commit {
-                        graph_id: name,
-                        branch_id: "main".into(),
-                        expected_head: None,
-                        data,
-                    });
-                }
+                emit_snapshot(name, data, &mut names, &mut commands, &mut active_batch);
             }
             Statement::NativeService { name, service, .. } => {
                 let (expression, typed) = match service {

@@ -266,3 +266,7 @@ cluster_navigation Navigation
 Every revision and the context are mandatory. Replace `context default` with `context graph "World" revision "world-revision"` for an exact pinned context. Identity resolution reads a previously accepted decision under current trusted host policy; source cannot install, approve or revoke that policy. Cluster navigation reads one pinned stored graph, includes isolated visible nodes and returns a reusable graph with scoped partial coverage. It does not change the source or exact query semantics. Both forms are top-level reads; pure functions may consume their graph outputs but cannot hide service calls. IDs are bounded to 512 UTF-8 bytes, `levels` is an integer from 0 through 10,000, and clustering rejects the maximum signed timestamp because its output needs a representable exclusive interval end.
 
 See [native services](NATIVE_SERVICES.md) for runnable fixtures, authority boundaries and remaining requirements.
+
+## Typed total context declarations
+
+Protocol 0.14 adds `context_schema`, attributed `context_value` snapshot declarations and `typed_context` exact descriptor reads. [The typed-context guide](TYPED_CONTEXTS.md) defines the grammar, strict scalar/enum/Decimal/Quantity types, persistence witnesses and privacy boundary. Run `examples/typed_contexts.weave` in a fresh database with explicit host write grants for `Estonia` and `Claims`. No schema or axis value grants authority or implies compatibility between different context pins.

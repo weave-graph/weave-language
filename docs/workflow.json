@@ -61,7 +61,11 @@
         "STATUS.md#geometry-and-source-explanation-v09-verification",
         "DECIMAL.md",
         "../examples/quantities.weave",
-        "../scripts/check_quantities.py"
+        "../scripts/check_quantities.py",
+        "STATUS.md#typed-total-contexts-v014-verification",
+        "TYPED_CONTEXTS.md",
+        "../examples/typed_contexts.weave",
+        "../scripts/check_typed_contexts.py"
       ],
       "provisional": true
     },
@@ -99,7 +103,11 @@
         "../examples/contexts.weave",
         "../scripts/check_contexts.py",
         "NATIVE_SERVICES.md",
-        "../scripts/check_services.py"
+        "../scripts/check_services.py",
+        "STATUS.md#typed-total-contexts-v014-verification",
+        "TYPED_CONTEXTS.md",
+        "../examples/typed_contexts.weave",
+        "../scripts/check_typed_contexts.py"
       ],
       "provisional": true
     },
@@ -145,7 +153,11 @@
         "../examples/counterparts.weave",
         "../scripts/check_counterparts.py",
         "NATIVE_SERVICES.md",
-        "../scripts/check_services.py"
+        "../scripts/check_services.py",
+        "STATUS.md#typed-total-contexts-v014-verification",
+        "TYPED_CONTEXTS.md",
+        "../examples/typed_contexts.weave",
+        "../scripts/check_typed_contexts.py"
       ],
       "provisional": true
     },

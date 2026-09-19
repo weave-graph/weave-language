@@ -4,9 +4,9 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.13 schema/metadata/algebra/assertion/rule/context/geometry implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 68 tests. Rich graph/vector/quantity types, effects and formatter remain. |
-| L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. General higher-order lenses/joins and typed contextual axes remain. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.14 schema/metadata/algebra/assertion/rule/context/geometry implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 80 tests. Rich graph/vector/quantity types, effects and formatter remain. |
+| L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. Typed total contextual assignments now preserve exact descriptor witnesses; general higher-order lenses/joins and explicit context compatibility remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity resolution now executes with explicit policy/mapping pins; general alignment, stratified absence and richer scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
 | L5 Spatial and multiscale language | in_progress, provisional | Assertion-backed distance, transforms and display projections now lower to engine services. Pinned bounded cluster navigation now executes; general vector types, learned mappings and overlapping clustering remain. |
@@ -15,11 +15,11 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 ## Local verification
 
-- `cargo test --locked`: 68 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
+- `cargo test --locked`: 80 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
-- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.13.0 protocol plan.
+- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.14.0 protocol plan.
 
 The checks above were run locally on macOS with Rust 1.94.0. A CI definition is not evidence of remote CI success. `cargo check --locked --lib --target wasm32-unknown-unknown` passed; browser-host execution and mobile integration remain unverified. Exact cross-project integration is recorded separately by the orchestrator.
 
@@ -122,3 +122,11 @@ Actual `scripts/check_quantities.py` verifies compiler output persisted by the n
 68 language tests (63 conformance and five exact-arithmetic tests) pass. Source `resolve_identity` and `cluster_navigation` bind reusable graph values from explicit stored snapshot pins and an explicit default/pinned context. Accepted identity requires an exact policy and mapping decision revision; plans cannot install policy, propose or accept mappings. Runtime current authorization/revocation remains authoritative. Clustering returns conservative scoped partial navigation, retains isolated source nodes and does not prune ordinary exact queries.
 
 Actual `scripts/check_services.py` uses the engine's explicitly trusted `native_services_fixture` example to seed/accept/revoke an independent-ID mapping. It verifies native/source graph equality, pure function and nested-union reuse, no hidden events, revocation rollback, pinned clustering and old-profile preflight rollback. Contract 0.13 is an exact 18-file vendor snapshot at `8c488fbb0ddffe0521dda07e5af71c9566c8409a`. Computed-input clustering, pure-function service reads, source governance authority, private pairwise identity policy and full multiscale semantics remain open. See [native service usage and boundaries](NATIVE_SERVICES.md).
+
+## Typed total contexts v0.14 verification
+
+80 language tests (67 compiler conformance, eight portable axis tests and five Decimal tests), strict Clippy, formatting and WASM library checking pass. The exact 22-file contract distribution is pinned to engine `52a8f35d5b53ba477d957e59c753aa443cc39a05`; its separate portable suite validates strict embedded decoding, bounded carriers and generated proof propagation.
+
+`python3 scripts/check_typed_contexts.py --engine /path/to/weave-engine` executes the actual compiler and runtime. It checks canonical Decimal axes, attributed descriptor commits, exact typed selection, support/unknown/explanation/function/union composition, private persisted scalar and empty values after record readers are cleared, generic descriptor denial/schema mismatch, old-protocol rejection and whole-program rollback. Source declarations remain public bootstrap data; the harness uses trusted setup to restrict the descriptor.
+
+The carrier deliberately gates the whole graph value with all retained descriptor witnesses. Mixed unions and empty projections can therefore deny more than a minimal per-record policy would; they cannot erase a private context by dropping records. This is a documented conservative first profile. No implicit compatibility, broadcast, authority installation, reference-valued axis, hypothetical-world or complete-scope absence behavior is claimed. See [typed contexts](TYPED_CONTEXTS.md).

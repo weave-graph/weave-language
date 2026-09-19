@@ -1,0 +1,38 @@
+context_schema OperatingWorld revision "1" {
+  axis "region" enum ["EE", "FI"];
+  axis "scenario" string;
+  axis "load" decimal;
+  axis "simulated" boolean;
+}
+transaction typed_worlds {
+  context_value Estonia schema OperatingWorld source "scenario-author" {
+    axis "region" "EE";
+    axis "scenario" "baseline";
+    axis "load" decimal "0.750";
+    axis "simulated" false;
+  }
+  graph Claims explicit {
+    node "a" entity "A" space "operations";
+    node "b" entity "B" space "operations";
+    relation "p" from "a" to "b" predicate "available";
+    claim "yes" on "p" source "observer"
+      context graph "Estonia" revision "logical:typed_worlds:Estonia"
+      polarity positive valid 0 until 10;
+    claim "no" on "p" source "other-observer"
+      polarity negative valid 0 until 10;
+  }
+}
+use Evidence graph "Claims" revision "logical:typed_worlds:Claims";
+typed_context Selected from Evidence
+  graph "Estonia" revision "logical:typed_worlds:Estonia" schema OperatingWorld;
+support Known from Selected relation "available"
+  from entity "A" space "operations" to entity "B" space "operations" at 5;
+support Unknown from Selected relation "missing"
+  from entity "A" space "operations" to entity "B" space "operations" at 5;
+explain Proof from Known;
+function Preserve revision "1" (graph input) {
+  lens kept from input { at 5; }
+  return kept;
+}
+apply Reused from Preserve { graph input Selected; }
+union Repeated from Selected with Selected;

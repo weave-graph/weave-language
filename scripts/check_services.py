@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory(prefix="weave-services-") as directory:
     def compile_text(text,name):
         path=work/f"{name}.weave";path.write_text(text)
         plan=json.loads(subprocess.check_output(["cargo","run","--locked","--quiet","--","plan",str(path)],cwd=root))
-        assert plan["version"]=="0.13.0"
+        assert tuple(map(int, plan["version"].split("."))) >= (0, 13, 0)
         return plan
     def run(plan,name,database):
         path=work/f"{name}.json";path.write_text(json.dumps(plan))

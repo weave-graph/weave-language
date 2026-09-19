@@ -1220,3 +1220,107 @@ fn service_bindings_do_not_smuggle_policy_authority_or_schema_compatibility() {
     assert!(compile("install_identity_policy Grant { approver \"reader\"; }").is_err());
     assert!(compile("accept_identity Accepted mapping \"m\";").is_err());
 }
+
+#[test]
+fn typed_context_source_declarations_lower_canonical_descriptor_and_exact_read() {
+    let source = include_str!("../examples/typed_contexts.weave");
+    let program = weave_language::compile(source).unwrap();
+    assert_eq!(program.version, "0.14.0");
+    let json = serde_json::to_value(program).unwrap();
+    assert_eq!(json["commands"][0]["op"], "commit_batch");
+    let descriptor = &json["commands"][0]["commits"][0]["data"];
+    assert_eq!(descriptor["profile"], "explicit");
+    assert_eq!(descriptor["assertions"][0]["source"], "scenario-author");
+    assert_eq!(descriptor["assertions"][0]["valid_time"]["start"], i64::MIN);
+    assert_eq!(
+        descriptor["assertions"][0]["properties"]["weave.context"]["values"]["load"],
+        "0.75"
+    );
+    let selected = json["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "Selected")
+        .unwrap();
+    assert_eq!(selected["value"]["kind"], "typed_context");
+    assert_eq!(
+        selected["value"]["reference"]["revision"],
+        "logical:typed_worlds:Estonia"
+    );
+    assert_eq!(
+        selected["value"]["expected_schema"]["reference"]["id"],
+        "OperatingWorld"
+    );
+    assert_eq!(
+        json["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|c| c["op"] == "commit_batch" || c["op"] == "commit")
+            .count(),
+        1
+    );
+}
+#[test]
+fn context_assignment_errors_preserve_exact_literal_and_duplicate_spans() {
+    let source = "// earlier region and 0.75\ncontext_schema S revision \"1\" { axis \"region\" decimal; } context_value C schema S source \"author\" { axis \"region\" 0.75; }";
+    let error = weave_language::compile(source).unwrap_err();
+    assert_eq!(error.code, "E_CONTEXT_VALUE");
+    assert_eq!(&source[error.start..error.end], "0.75");
+    let source = "// earlier duplicate\ncontext_schema S revision \"1\" { axis \"é\" string; axis \"é\" string; }";
+    let error = weave_language::compile(source).unwrap_err();
+    assert_eq!(error.code, "E_DUPLICATE");
+    assert_eq!(error.start, source.rfind("\"é\"").unwrap());
+    let source = "context_schema S revision \"1\" { axis \"r\" enum [\"EE\", \"EE\"]; }";
+    assert_eq!(
+        weave_language::compile(source).unwrap_err().code,
+        "E_DUPLICATE"
+    );
+}
+#[test]
+fn typed_context_requires_total_exact_assignments_and_declared_explicit_pins() {
+    let schema = "context_schema S revision \"1\" {axis \"x\" integer;}";
+    for body in [
+        "",
+        "axis \"y\" 1;",
+        "axis \"x\" 1.5;",
+        "axis \"x\" true;",
+        "axis \"x\" 1; axis \"x\" 2;",
+    ] {
+        let source = format!("{schema} context_value C schema S source \"a\" {{{body}}}");
+        assert!(weave_language::compile(&source).is_err(), "{body}");
+    }
+    for source in [
+        "context_value C schema Missing source \"a\" {axis \"x\" 1;}",
+        "graph G{} typed_context T from G graph \"C\" schema S;",
+        "graph G{} typed_context T from G graph \"C\" revision \"r\" schema Missing;",
+        "context_schema S revision \"1\"{axis \"x\" float;}",
+        "context_schema S revision \"1\"{}",
+    ] {
+        assert!(weave_language::compile(source).is_err(), "{source}");
+    }
+    let source = format!(
+        "{schema} graph G{{}} function F revision \"1\"(graph input) {{typed_context T from input graph \"C\" revision \"r\" schema S; return T;}} "
+    );
+    assert_eq!(
+        weave_language::compile(&source).unwrap_err().code,
+        "E_FUNCTION_EFFECT"
+    );
+}
+#[test]
+fn context_quantities_validate_nominal_units_without_authorizing_conversion() {
+    let prefix = "context_schema S revision \"1\" {axis \"x\" quantity dimension \"length\" unit \"metre\" revision \"1\";} context_value C schema S source \"author\" {axis \"x\" ";
+    let good = format!(
+        "{prefix} quantity \"1.250\" dimension \"length\" unit \"metre\" revision \"1\";}}"
+    );
+    assert!(weave_language::compile(&good).is_ok());
+    let wrong = good.replacen(
+        "quantity \"1.250\" dimension \"length\" unit \"metre\" revision \"1\"",
+        "quantity \"1.250\" dimension \"length\" unit \"metre\" revision \"2\"",
+        1,
+    );
+    assert_eq!(
+        weave_language::compile(&wrong).unwrap_err().code,
+        "E_CONTEXT_VALUE"
+    );
+}
