@@ -2,7 +2,7 @@
 
 The authoritative types live in the engine's `crates/weave-contract`. This repository vendors an exact copy with hashes in `vendor/manifest.json`. Run `python3 scripts/verify_contract.py` to validate the snapshot.
 
-The compiler emits version `0.2.0`. The engine continues to accept `0.1.0` commit/query plans but must reject joins declared under that old version. Foundation commit/query semantics are described in [v0.1](../v0.1/README.md).
+This historical compiler stage emitted version `0.2.0`; the current compiler emits [v0.3.0](../v0.3/README.md). The engine continues to accept `0.1.0` commit/query plans but must reject joins declared under that old version. Foundation commit/query semantics are described in [v0.1](../v0.1/README.md).
 
 ## Path join
 
@@ -12,4 +12,4 @@ The engine independently authorizes both input queries. For two positive premise
 
 The join is a pure graph result, not a commit. It carries coverage and diagnostics from its inputs, restrictions, and `input_snapshots: Vec<GraphRef>` to preserve multiple revisions of the same graph without key collisions. `snapshots` remains the legacy primary lookup; replay must use the complete vector and metadata references. No global atomic observation is implied by resolving remote inputs separately.
 
-The language's present join output cannot yet be used as another source; this restriction is checked rather than lowered to an invented persistent graph. General joins and composition of arbitrary derived graphs remain planned.
+At the v0.2 stage, language join output was terminal. Protocol v0.3 adds reusable program-local results; consult its notes for current behavior. General arbitrary joins remain planned.

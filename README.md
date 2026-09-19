@@ -18,6 +18,10 @@ The emitted JSON executes through the engine's trusted host interface. Graph dec
 - [Workflow and dependency graph](docs/WORKFLOW.md)
 - [Machine-readable workflow](docs/workflow.json)
 - [Verified status and remaining gates](docs/STATUS.md)
+- [Acceptance gaps](docs/ACCEPTANCE_GAPS.md)
+- [Contributing](CONTRIBUTING.md) and [security policy](SECURITY.md)
 - [Shared protocol](docs/contract/v0.3/README.md)
 
 The contract is vendored to keep clean checkouts independently buildable; [its manifest](vendor/manifest.json) records exact file hashes. Public source-paper recovery and conformance are separate gates from this executable foundation.
+
+Build or install from a Git checkout/source archive with `cargo install --locked --path .`. Registry publication is disabled until an optional coordinated crate release; this does not block publishing the open-source repositories. See [release readiness](docs/RELEASE_READINESS.md).

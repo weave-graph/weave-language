@@ -1,6 +1,8 @@
 # Weave contract 0.1.0
 
-Normative Rust serialization types: `crates/weave-contract/src/lib.rs`. The crate contains only portable serde types, no I/O. All plan inputs reject unknown fields. Top-level `Program.version` must exactly equal `0.1.0`.
+Historical protocol notes. The current compiler emits [v0.3.0](../v0.3/README.md); these rules describe plans explicitly declaring v0.1.0.
+
+The original engine source path is `crates/weave-contract/src/lib.rs`; the current vendored types are `vendor/weave-contract/src/lib.rs`. The crate contains only portable serde types, no I/O. All plan inputs reject unknown fields. Top-level `Program.version` must exactly equal `0.1.0`.
 
 `commit` replaces one graph branch's entire snapshot, records an immutable revision and creates an event in one transaction. `expected_head` is optimistic concurrency: null requires a new branch; a string must equal its current revision. Valid times are signed integer milliseconds and half-open `[start,end)`; null end is unbounded. System time is host assigned and revisions are pinned by ID. Root revisions preserve prior snapshots. Empty node/edge readers means public; otherwise host principal must appear. Host authority is never provided by the plan. IDs must be nonempty strings.
 

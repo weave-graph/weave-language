@@ -3,6 +3,7 @@ name = "weave-language"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
+publish = false
 description = "Experimental graph-native language compiler for Weave Engine"
 repository = "https://github.com/weave-graph/weave-language"
 
