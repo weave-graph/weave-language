@@ -1,23 +1,25 @@
 {
   "source_repository": "https://github.com/weave-graph/weave-engine",
   "source_path": "crates/weave-contract",
-  "contract_version": "0.7.0",
+  "contract_version": "0.8.0",
   "files": {
-    "Cargo.toml": "d7865fb397da264e8ae91c7903d3eb9207ee5933efe4470bfda02e8d8f9d4072",
-    "src/algebra.rs": "5d2cba390cdd7b80b0b9a49727e7a979bf59f8bd0becb037b34aeb087ffbadd7",
+    "Cargo.toml": "1d73a21564832486703a337cd0b9aa5c78bd53fdcd5b3996af56c3724f8f28c2",
+    "src/algebra.rs": "22646d345b4d3b72bedf0fed5d8970e25205597d6774f38804457ac9c19f20bc",
     "src/algebra_types.rs": "15362810f685b74a2c69db1ebdd8ddf926eb1f6e186856220af81e4f0a3f1c3a",
     "src/assertions.rs": "b24243be54aa40cb623b5ee89aa326dfe5712eef0c7758a466f786a47ab845ed",
-    "src/identity.rs": "2c198a057d1d76b0eb19b2ea84a6ccfeee836e6cdca27406bc36558b16b8ec4b",
-    "src/lib.rs": "ab5c7e3b92e3bd00b248a2dbab2df8e79e31da4c75fb9f205ef356873727705f",
-    "src/rules.rs": "fe3c347ca41ff80089bf56a472a16ab36a5dbc157db3609ebcdfa049766fae29",
+    "src/context.rs": "b7529a6ee30c2b5fd6604e045e913a4e3f8a8e9e22a9fe404471a70155f2cd21",
+    "src/context_types.rs": "80ea1ca4172c40bcecd942e7982a53710f8e519a10f6f4d5233eb6fe3167effc",
+    "src/identity.rs": "f322e96932dae7de5a63b46a1eff0019bdbec6099ba54613ffaa8f9df85edcb5",
+    "src/lib.rs": "dfac85d3ea8c363096afe88f6d6d8c1bbbe8dbc9eb808e7b172b6ee9e31a5d73",
+    "src/rules.rs": "12b738be89d6e657744fb60f2a082d7d39bb7fc7ed35f305e3ad4c94d1584d7e",
     "src/rules_types.rs": "0ebc0be4e190de8e4bf37198307ba6bcfc6873aa08db9d0630146d7b76952b26",
-    "src/schema.rs": "4f11aea159aa7ad92f3b62ce54681a3fa9d233ce7fb2e96d2e9694c610b0f085",
+    "src/schema.rs": "004b83b4f225dcbf78c69f89752f8664bfa3749afdab50727b5007346a635ed8",
     "LICENSE": "9e24b3303156fce3c77e21da9d3e3b4cc864291987721d55286415a22ea5cfb7"
   },
-  "source_revision": "dabd1def794b2bf4699a97b5a39fdc1ab4548ca9",
+  "source_revision": "db57476fdad3055e155ac85deb52a88a9686916e",
   "license_source_path": "LICENSE",
   "documentation": {
-    "path": "docs/contract/v0.7/README.md",
-    "sha256": "22d0b1632136404c88c50761c42eb0c53f4f8aa981593b29b236b93d0576eece"
+    "path": "docs/contract/v0.8/README.md",
+    "sha256": "94a4ec2f003e9efacba3510b1d015262bf786e599b8f121120056ab3c2dd710a"
   }
 }

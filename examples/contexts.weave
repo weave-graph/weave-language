@@ -1,0 +1,43 @@
+transaction worlds {
+  graph World { node "scenario" entity "scenario" space "context"; }
+  graph Evidence explicit {
+    node "b" entity "B" space "network";
+    node "c" entity "C" space "network";
+    relation "reviewed" from "b" to "c" predicate "reviewed";
+    claim "review" on "reviewed" source "reviewer"
+      context graph "World" revision "logical:worlds:World"
+      polarity positive valid 5 until 20;
+  }
+  graph Claims explicit {
+    node "a" entity "A" space "network";
+    node "b" entity "B" space "network";
+    relation "p" from "a" to "b" predicate "p";
+    claim "global" on "p" source "default-source"
+      polarity negative valid 0 until 20;
+    claim "scoped" on "p" source "scenario-source"
+      context graph "World" revision "logical:worlds:World"
+      polarity positive valid 0 until 10;
+    attachment "proof" on assertion "scoped" key "evidence"
+      graph "Evidence" revision "logical:worlds:Evidence" valid 0 until 20 required
+      context graph "World" revision "logical:worlds:World";
+  }
+}
+lens All from Claims {metadata depth 4;}
+context Default from All default;
+context Scenario from All graph "World" revision "logical:worlds:World";
+context Empty from All graph "World" revision "not-selected";
+support DefaultStatus from Default relation "p" from entity "A" space "network" to entity "B" space "network" at 7;
+support ScenarioStatus from Scenario relation "p" from entity "A" space "network" to entity "B" space "network" at 7;
+support EmptyStatus from Empty relation "p" from entity "A" space "network" to entity "B" space "network" at 7;
+metadata Proof from Scenario on edge "scoped" key "evidence";
+join Validated from Scenario to Proof relation "validated";
+rules Derived revision "1" {
+  rule Copy {when "p"(x,y);yield "q"(x,y);}
+}
+reason Closure from Scenario using Derived;
+function SelectScenario revision "1" (graph input) {
+  context Result from input graph "World" revision "logical:worlds:World";
+  return Result;
+}
+apply SelectedFunction from SelectScenario {graph input All;}
+union Mixed from Scenario with Default;

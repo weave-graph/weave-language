@@ -338,6 +338,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                             });
                         }
                         Item::Attachment {
+                            context,
                             id,
                             id_span,
                             host,
@@ -359,6 +360,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                                 ));
                             }
                             data.attachments.push(MetadataAttachment {
+                                context,
                                 id,
                                 host,
                                 key,
@@ -379,6 +381,7 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                             metadata,
                             properties,
                         } => data.nodes.push(Node {
+                            context_scope: None,
                             id,
                             type_id,
                             entity_id: entity,
@@ -599,6 +602,9 @@ pub fn compile(source: &str) -> Result<Program, Diagnostic> {
                                 after: right,
                             }
                         }
+                    }
+                    AlgebraOperation::Context { selection } => {
+                        GraphExpression::Context { input, selection }
                     }
                     AlgebraOperation::Project { node_ids, edge_ids } => GraphExpression::Project {
                         input,

@@ -882,3 +882,42 @@ fn negative_rule_atoms_are_explicit_evidence_and_constants_are_preserved() {
     assert!(matches!(&rules.rules[0].head.to,weave_contract::RuleTerm::Node{id} if id == "fixed"));
     assert!(rules.rules[0].allow_cross_space);
 }
+
+#[test]
+fn exact_context_selection_and_attachment_qualifiers_survive_lowering() {
+    let source = include_str!("../examples/contexts.weave");
+    let plan = compile(source).unwrap();
+    assert!(plan.commands.iter().any(|c| matches!(c,Command::Bind {name,value:GraphExpression::Context {selection:weave_contract::ContextSelection::Default,..}} if name=="Default")));
+    assert!(plan.commands.iter().any(|c| matches!(c,Command::Bind {name,value:GraphExpression::Context {selection:weave_contract::ContextSelection::Pinned {reference},..}} if name=="Empty" && reference.revision=="not-selected")));
+    let Command::CommitBatch { commits, .. } = &plan.commands[0] else {
+        panic!("batch")
+    };
+    let claims = commits.iter().find(|c| c.graph_id == "Claims").unwrap();
+    assert_eq!(
+        claims.data.attachments[0]
+            .context
+            .as_ref()
+            .unwrap()
+            .revision,
+        "logical:worlds:World"
+    );
+    assert_eq!(
+        weave_language::fingerprint(source).unwrap(),
+        weave_language::fingerprint(&format!("// locations\n{source}")).unwrap()
+    );
+}
+#[test]
+fn context_selectors_require_exact_bounded_revisions() {
+    assert!(compile("use G graph \"G\"; context C from G graph \"World\";").is_err());
+    assert_eq!(
+        compile("use G graph \"G\"; context C from G graph \"World\" revision \"\";")
+            .unwrap_err()
+            .code,
+        "E_ID"
+    );
+    assert!(compile("context C from Unknown default;").is_err());
+    assert!(
+        compile("use G graph \"G\"; lens L from G {at param t;} context C from L default;")
+            .is_err()
+    );
+}

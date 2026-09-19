@@ -162,3 +162,18 @@ Rule predicates are fixed strings; bare endpoint identifiers are variables, and 
 This profile has a finite input-node domain, no term generation, and time intervals formed from premise intersections. Saturation deduplicates the same fact and leaf-premise set; independent support sets remain alternatives. It keeps a bounded canonical witness for recursive support instead of enumerating infinitely many cyclic proofs. Rules, bindings, source revisions and exact leaf premises remain in derivations. Exceeding host step, round, object, byte or alternative limits is an explicit error, never an empty or complete truncated answer. Partial input coverage stays partial. Rule results are graph values, with schemas and origins preserved, and can feed later operators without a hidden commit.
 
 Contextual evidence still requires explicit context selection; this profile rejects its consumption. Stratified absence, complete-scope certificates, aggregations and arbitrary arithmetic recursion are not implemented. See [rules example](../examples/rules.weave) and [executable acceptance](../scripts/check_rules.py).
+
+## Exact contexts (protocol 0.8)
+
+```weave
+context Local from Input default;
+context Scenario from Input graph "World" revision "r1";
+```
+
+A default claim applies in the default context only. A pinned selection matches the complete graph/revision pair; selecting a world does not read its graph or grant access. The selected scope survives empty output. Selecting another world from an already selected value is rejected because discarded claims cannot be recovered; select again from the original value.
+
+Named attachments may end with `context graph "World" revision "r1"`, after an optional `required` flag. Their applicability is independent data. Consuming a contextual attachment requires its exact scope. For the current profile, contextual metadata traversal also requires compatible target claim, attachment and scoped-node qualifiers and retains that scope; incompatible targets fail instead of being relabeled. Ordinary default navigation does not transfer the parent's selected world to independently qualified target content.
+
+Selected support, joins and rules preserve the context on conclusions. A join cannot mix pinned and default scopes. Union retains individual qualifiers and clears its selected scope when inputs disagree; diff rejects mismatched selected scopes. Support status nodes—including unknown results—and explanation nodes retain generic `context_scope` qualifiers, so mixed unions remain filterable even without evidence edges. Ordinary structural nodes remain unqualified representations; selection retains them and filters only qualified derived nodes and claims.
+
+This is exact context selection, not typed scenario axes, automatic compatibility, broadcasts, world conversion or governance. Those remain explicit design and implementation gates. [Context example](../examples/contexts.weave) and [executable acceptance](../scripts/check_contexts.py) exercise the current boundary.

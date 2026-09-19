@@ -154,6 +154,9 @@ pub enum ArgumentValue {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "operator", rename_all = "snake_case")]
 pub enum AlgebraOperation {
+    Context {
+        selection: weave_contract::ContextSelection,
+    },
     Union {
         right: String,
         right_span: Span,
@@ -220,6 +223,7 @@ pub enum Item {
         properties: BTreeMap<String, serde_json::Value>,
     },
     Attachment {
+        context: Option<weave_contract::GraphRef>,
         id: String,
         id_span: Span,
         host: MetadataHost,
@@ -928,11 +932,36 @@ impl Parser {
                         body,
                     });
                 }
-                "union" | "diff" | "project" | "support" => {
+                "union" | "diff" | "project" | "support" | "context" => {
                     self.word("from")?;
                     let source_span = (self.peek().start, self.peek().end);
                     let source = self.name()?;
                     let operation = match kind.as_str() {
+                        "context" => {
+                            let selection = if self.peek().kind == Kind::Word("default".into()) {
+                                self.take();
+                                weave_contract::ContextSelection::Default
+                            } else {
+                                self.word("graph")?;
+                                let graph_id = self.string()?;
+                                self.word("revision")?;
+                                let revision = self.string()?;
+                                weave_contract::ContextSelection::Pinned {
+                                    reference: weave_contract::GraphRef { graph_id, revision },
+                                }
+                            };
+                            if let Err(d) = weave_contract::context::validate_selection(&selection)
+                            {
+                                return Err(Diagnostic::new(
+                                    &d.code,
+                                    d.message,
+                                    name_span.0,
+                                    name_span.1,
+                                ));
+                            }
+                            self.symbol(';')?;
+                            AlgebraOperation::Context { selection }
+                        }
                         "union" | "diff" => {
                             self.word(if kind == "union" { "with" } else { "to" })?;
                             let right_span = (self.peek().start, self.peek().end);
@@ -1153,7 +1182,18 @@ impl Parser {
                                 } else {
                                     false
                                 };
+                                let context = if self.peek().kind == Kind::Word("context".into()) {
+                                    self.take();
+                                    self.word("graph")?;
+                                    let graph_id = self.string()?;
+                                    self.word("revision")?;
+                                    let revision = self.string()?;
+                                    Some(weave_contract::GraphRef { graph_id, revision })
+                                } else {
+                                    None
+                                };
                                 Item::Attachment {
+                                    context,
                                     id,
                                     id_span,
                                     host,

@@ -4,22 +4,22 @@ As of 2026-09-19, this is an experimental compiler foundation, not full Weave im
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.7 schema/metadata/algebra/assertion/rule implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 48 tests. Rich graph/vector/quantity types, effects and formatter remain. |
-| L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. General higher-order lenses/joins and context remain. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.8 schema/metadata/algebra/assertion/rule/context implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 50 tests. Rich graph/vector/quantity types, effects and formatter remain. |
+| L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. General higher-order lenses/joins and typed contextual axes remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. General identity alignment, stratified absence, source-level explanation syntax and scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
 | L5 Spatial and multiscale language | proposed | No geometry, embedding or clustering language yet. |
 | L6 Distributed offline governance | proposed | Portable source structure only; no mobile, networking or governance conformance claim. |
-| L7 Tooling and release | in_progress, provisional | MIT license, independent crate, README and three-platform/WASM CI definition exist. The orchestrator verified public v0.4 CI on Ubuntu/macOS/Windows and the WASM target; current v0.5 publication remains separately tracked. LSP is optional proposed editor tooling, not a user-scope completion gate. |
+| L7 Tooling and release | in_progress, provisional | MIT license, independent crate, README and three-platform/WASM CI definition exist. The orchestrator verified public v0.4 CI on Ubuntu/macOS/Windows and the WASM target; later milestone publication remains tracked in PUBLICATION.md. LSP is optional proposed editor tooling, not a user-scope completion gate. |
 
 ## Local verification
 
-- `cargo test --locked`: 45 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
+- `cargo test --locked`: 50 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
 - `cargo fmt --check`: passed.
 - `cargo run --quiet -- check examples/fleet.weave`: valid, three commands.
-- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.6.0 protocol plan.
+- `cargo run --quiet -- plan examples/fleet.weave`: emitted version 0.8.0 protocol plan.
 
 The checks above were run locally on macOS with Rust 1.94.0. A CI definition is not evidence of remote CI success. `cargo check --locked --lib --target wasm32-unknown-unknown` passed; browser-host execution and mobile integration remain unverified. Exact cross-project integration is recorded separately by the orchestrator.
 
@@ -74,3 +74,11 @@ The portable explanation helper is graph-valued, current-principal-scoped and co
 48 frontend tests and 27 portable contract tests cover source rule modules, exact unsafe-variable diagnostics, immutable function use, cyclic fixed points, explicit negative evidence, time intersection, typed composition, independent support alternatives and explicit budget exhaustion. Prior derivations cannot introduce empty or foreign leaf support through a supplied trace. Module labels with conflicting digests fail explicitly. Actual `scripts/check_rules.py` execution verifies repeated closure and function equivalence, graph-valued filtering, exact premise lineage and no hidden commit.
 
 The rule evaluator accepts only host-authorized materialized values. Trace labels are descriptive execution/provenance records, not authenticated remote attestations. Current context-free evaluation is the default context, never universal applicability. Context selection, typed contextual axes, stratified absence over certified complete scopes, aggregations and richer rule types remain mandatory gaps. Full implementation gates remain in progress.
+
+## Exact context v0.8 verification
+
+50 frontend tests and 33 portable contract tests cover exact selected scopes, default isolation, bounded pins, contextual attachment syntax, function use, scoped support and rules, mixed union/diff behavior, and generic derived-node qualifiers. Support schema revision2 adds readable context fields. Unknown status and explanation nodes retain scope after mixed union, and cannot reappear as default-world results through selection. Schema validation checks claim endpoints against their value scopes. Strict Clippy, formatting and portable WASM checks pass.
+
+Actual `scripts/check_contexts.py` executes a transaction containing world, evidence and source-claim graphs. Default support is refuted, the selected world is supported, and an absent world is unknown with its pin retained. Contextual metadata feeds a join carrying the source claim, attachment and evidence claim as exact premises. A graph function and direct context selection agree; a rule conclusion retains the world pin. The rule fixture also still passes against the updated runtime.
+
+No context compatibility is inferred from names, missing fields or coordinates. Typed axes, explicit broadcast/conversion policies and governed world crossing remain open. Root-owned runtime admission, capsules and remote CI evidence are tracked separately.
