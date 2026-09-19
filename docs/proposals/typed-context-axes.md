@@ -112,3 +112,32 @@ No current shared file is owned by this proposal until engine/root assign it. Ca
 ## Still mandatory beyond this slice
 
 Explicit compatibility mappings, broadcast declarations, governed world crossing, hypothetical assumptions/branch masks, object-reference axes, richer function signatures, complete-scope absence and aggregation remain open. Typed labels alone do not satisfy those requirements. They also do not replace representation spaces or solve offline acceptance coordination.
+
+## Profile A implementation checkpoint
+
+The isolated language library now exports `context_axes` with the types above, bounded `ContextSchema::from_json` / `ContextDefinition::from_json`, validation, canonical bytes, SHA-256 fingerprints and a bounded local `ContextSchemas` conflict registry. The actual Quantity variant is `Quantity { unit: UnitDescriptor }`, serialized with `kind: "quantity"` and a `unit` descriptor. Other variants use `kind` names `boolean`, `integer`, `string`, `decimal` and `enum` (with `members`). Public map-bearing structs deliberately do not implement generic Serde `Deserialize`: callers must use the strict entrypoints to avoid duplicate-key overwrite. Constructed Rust values must pass `validate` or a canonicalization/fingerprint operation before use.
+
+The decoder rejects duplicate keys at every object depth, including escaped aliases of the same key, rejects unknown fields and bounds raw input before parsing. Canonicalization validates complete sizes/types before cloning. Schema registration is an in-memory local declaration/composition aid; arbitrary graph property storage or typed-context reads do not install a global schema registry. Equal values/fingerprints do not equate separate context GraphRefs, which remain outside this pure module.
+
+Eight focused tests cover exact total assignment, nominal quantities, forbidden conversions, duplicates/unknown fields, ordering, schema conflicts without replacement, size/depth/count limits, malformed inputs and finite registry capacity. The full isolated language suite has 76 passing tests; strict Clippy, formatting and the WASM library target pass. No source grammar, runtime descriptor lookup, witness carrier or wire integration has been added by this checkpoint.
+
+## Profile B DTO review constraints
+
+The proposed expression should carry `input`, exact context `GraphRef` and the complete expected canonical `ContextSchema`. Comparing only a caller-supplied schema hash or label is insufficient for type validation. Runtime resolves the descriptor and compares full canonical descriptors; reads do not install global schema identities. Same-label conflicts are rejected within the relevant program/composition environment.
+
+A witness proposal must specify both its materialized-result carrier and its persisted graph carrier. A `QueryResult`-only field disappears when the graph is saved, so it does not establish semantic closure. Each scoped record needs an unambiguous association to its exact context and expected descriptor identity; an empty selected result also needs a scope witness so subsequent `support`/`explain` can retain descriptor restrictions. Witnesses cannot be serialized into ordinary user properties and then treated as trusted origins.
+
+Suggested conceptual DTO (field placement remains engine review):
+
+```rust
+struct TypedContextWitness {
+    context: GraphRef,
+    schema: ContextSchema,
+    definition: AssertionRef,
+    anchor_nodes: Vec<NodeRef>,
+}
+```
+
+Runtime-derived witnesses use the exact descriptor assertion and its actual anchor nodes, never caller-supplied proof envelopes. Full schema retention allows downstream type interpretation; canonical fingerprint is computable and need not be a second independently trusted field. Either a bounded graph-level witness catalog keyed by exact context or explicit per-record references can avoid repeated full-schema copies, but must preserve privacy when mixed-world union/projection removes records. Limits must charge witness bytes and object counts before cloning, with at most one compatible schema per exact selected context. Old protocol variants must reject these fields before writes.
+
+Before finalizing the DTO, audit every constructor/consumer: query, union/diff/project/filter, join/rules/support, metadata paths, geometry/explain, identity/clustering, save/read/capsule, view cache/revocation, signed admission and source fingerprints. Missing witness dependencies must fail closed, not degrade a typed result to an untyped/default claim. The next shared version remains unassigned until this boundary is approved.
