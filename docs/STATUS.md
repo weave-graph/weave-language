@@ -98,3 +98,9 @@ The 0.9 node-proof closure adds conservative recorded dependencies to geometry, 
 56 frontend tests include source syntax, distinct bounded space selectors, strict integer time, undefined graph diagnostics, protocol round trips and function composition. `scripts/check_counterparts.py` executes the typed explicit-assertion example: source assertion and structural identity remain intact, manifestation state stays distinct, a normal join retains both leaf claims and their time intersection, and reverse/out-of-window selection is empty. The portable selector preserves partial coverage, exact selected contexts and endpoint proof dependencies.
 
 This profile selects positive directed bridge claims whose endpoints already declare the same entity identifier in different spaces. It does not establish mapping acceptance, uniqueness or contradiction resolution. Governed mapping snapshots, independently assigned identifiers, supersession/splits and privacy-preserving pairwise identity remain open requirements.
+
+## Isolated exact decimal library verification
+
+The public `decimal` module implements a bounded exact decimal profile without shared-protocol changes. Five tests pass, including a 6,561-pair rational arithmetic oracle, canonical string serialization beyond binary64 integer precision, exact cancellation and explicit error boundaries. Strict Clippy and the WASM library check pass. See [profile and limits](DECIMAL.md).
+
+This library work addresses part of the paper's required scalar family. Source literal/type syntax, runtime schema integration, typed quantities and units remain unimplemented for Decimal; existing Float semantics are unchanged.

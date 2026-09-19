@@ -1,5 +1,6 @@
 //! Experimental, deterministic front end for the Weave graph language.
 //! No source program can invoke host effects: compilation only emits a plan.
+pub mod decimal;
 mod functions;
 pub mod syntax;
 use std::collections::{BTreeMap, BTreeSet};
