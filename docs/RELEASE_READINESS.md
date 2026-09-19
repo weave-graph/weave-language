@@ -35,3 +35,9 @@ Native jobs check contract integrity, formatting, strict Clippy, all-target test
 - Label the release experimental and link the complete acceptance gaps; do not claim original-paper conformance before source recovery.
 
 Registry packages, binary signing, packaged WASM/browser execution and mobile distributions are later optional delivery artifacts or platform requirements with their own evidence. Their absence does not prevent a truthful public GitHub source release.
+
+## Archive audit evidence
+
+A 174,080-byte `git archive` of commit `ea484f7f1c24932b177e4a87daf7bb875cecb671` was extracted to a new temporary directory without `.git` or the private conversation export. All three vendored contract files were present. From that directory, contract verification, `cargo test --locked --offline --all-targets` (22 tests), debug CLI installation and `weave check examples/composed.weave` passed. Offline refers to previously cached registry dependencies; no sibling engine checkout was needed for the language build.
+
+The repository also passed optimized `cargo install --locked --path .` locally. Dependency metadata reported a license declaration for every resolved package: MIT, MIT OR Apache-2.0, Unlicense OR MIT, and the Unicode crate's combined MIT/Apache and Unicode-3.0 expression. This records upstream declarations, not an independent legal audit. Current contract bytes and MIT license were matched against engine commit `7cdf6b4c77ad8fc180326c933db09ccaeca4e592`.

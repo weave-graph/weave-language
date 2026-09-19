@@ -36,3 +36,7 @@ The orchestrator verified a clean independent clone of foundation commit `573bef
 The v0.3 example was executed against the native engine CLI in a fresh temporary database. A first join fed a parameterized lens and a second join, followed by a final time filter. Ten commands produced three explicit source commits and one final `needs_fix` edge valid over `[170, 200)`, with three input snapshots and exactly the three leaf premises `uses-model`, `affected-model`, and `repair`. No intermediate derived value was committed. The source's negative repair claim did not generate a positive conclusion.
 
 Reproduce with `python3 scripts/check_composed.py --engine /path/to/weave-engine`. This is an actual cross-project local execution result; separate independent orchestrator review is still required for the new stage.
+
+## Source distribution audit
+
+The independent source archive at `ea484f7f1c24932b177e4a87daf7bb875cecb671` passed contract verification, all 22 tests with locked cached dependencies, CLI installation, and the composed-example compile check without a sibling engine checkout. The archive contained the complete vendored contract and excluded the private source export. [Release readiness](RELEASE_READINESS.md) records exact evidence and publication limits; [acceptance gaps](ACCEPTANCE_GAPS.md) maps all 30 remaining full-design requirement areas.
