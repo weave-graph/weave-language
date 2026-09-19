@@ -1,6 +1,6 @@
 # Contributing
 
-Weave Language is an experimental implementation of a broader proposed design. Start with [verified status](docs/STATUS.md), [acceptance gaps](docs/ACCEPTANCE_GAPS.md), [syntax](docs/SYNTAX.md), and the [implementation workflow](docs/WORKFLOW.md). Original white-paper reconciliation remains open; illustrative grammar and exploratory implementation choices are not ratified specifications.
+Weave Language is an experimental implementation of a broader proposed design. Start with [verified status](docs/STATUS.md), [acceptance gaps](docs/ACCEPTANCE_GAPS.md), [syntax](docs/SYNTAX.md), and the [implementation workflow](docs/WORKFLOW.md). Original white-paper reconciliation is recorded in docs/SOURCE_RECONCILIATION.md; illustrative grammar and exploratory implementation choices are not ratified specifications.
 
 Before a change, identify the requirement IDs, observable acceptance behavior and affected protocol version. Keep semantic changes separate from maintenance. Compiler changes that affect the runtime contract need coordinated engine review and fixtures in both projects. Do not hand-edit vendored protocol code: import the complete authoritative engine crate, preserve its MIT license, update `vendor/manifest.json`, and run its verifier.
 

@@ -4,7 +4,7 @@ Status: proposed execution plan, 2026-09-19. No implementation is claimed by thi
 
 ## Evidence and scope
 
-The source available for this draft is a recovered conversation excerpt (kept private; not an original paper), including explicit user requirements and architecture proposals. It is incomplete and is **not either original white paper**. The original language paper is reported as a 14-page v0.1 architecture proposal. Gate L0 requires retrieving it, preserving its exact bytes and provenance, and reconciling this plan before a conformance claim. Illustrative syntax in the discussion is not an adopted grammar.
+The original [language white paper v0.1](source/Weave_Language_White_Paper_v0.1.md) and companion engine paper were supplied on 2026-09-19 and reconciled in [SOURCE_RECONCILIATION.md](SOURCE_RECONCILIATION.md). Exact source integrity is recorded in [provenance.json](source/provenance.json). They are architecture proposals: illustrative syntax is not a ratified grammar. Source recovery is complete; conformance and implementation gates remain open.
 
 The user's scope includes the full multidimensional graph language and its cooperation with the decentralized event-driven runtime. The first executable release is one milestone, not a redefinition of completion. All rows below must be implemented and independently verified, or explicitly amended by the owner, before calling the requested scope complete.
 
@@ -40,7 +40,7 @@ Class **U** means an explicit recovered user requirement; **P** means a proposed
 | L04 | U | Joinable graphs | Named argument matching, union, joins and explicit resolution | Union preserves assertions; joins cannot silently resolve contradiction or equate entities | L2 |
 | L05 | U | Temporal knowledge | Valid-time operators, pinned system snapshots and temporal IR | Half-open boundary, late correction and disjoint-time fixtures; old query remains reproducible | L2 |
 | L06 | U | One entity in multiple dimensions | Space, manifestation and protected counterpart operations | Shared entity identity with independent per-space state; incomplete/offline membership reported | L3 |
-| L07 | U | First-class nodes and edges | Stable node/edge IDs, directed edges, n-ary assertion support | Metadata can target either node or edge; moving coordinates does not reverse an edge | L1 |
+| L07 | U | First-class nodes and edges | Stable node/edge IDs and directed edges; optional n-ary extension | Metadata can target either node or edge; moving coordinates does not reverse an edge | L1 |
 | L08 | U | Metadata may itself be graphs | Typed GraphRef metadata, pinned revisions, nested query/traversal | Query graph-valued edge evidence; shared references preserved; cycle and missing-reference cases terminate with explicit status | L3 |
 | L09 | U | Automatic recursive clustering and zoom | Typed clusterize/expand/inspect plans and graph-valued clusters | Arbitrary requested finite depth under fuel limit; membership/source/method retained; no invented detail | L5 |
 | L10 | U | 3D graphs and vector directionality | Frame, unit, coordinate, displacement and transform types | Compatible transforms compose; incompatible frames/units rejected; physical and relational direction differ | L5 |
@@ -72,7 +72,7 @@ The authority should be `weave-engine/docs/contract/v0.1` with a version/hash-pi
 The protocol must define:
 
 1. Opaque stable IDs for entity, manifestation, space, graph, edge and assertion; immutable revision IDs; no identity inference from string spelling or content hashes.
-2. First-class nodes and directed edges; n-ary named-argument assertions; metadata values that include scalar, typed artifact or graph reference. Graph references include graph identity, pinned revision, optional scope and resolution state. Recursive graph values use references, never recursive inline expansion.
+2. First-class nodes and directed edges; optional n-ary named-argument assertions; metadata values that include scalar, typed artifact or graph reference. Graph references include graph identity, pinned revision, optional scope and resolution state. Recursive graph values use references, never recursive inline expansion.
 3. Assertions with polarity, valid interval, contextual scope, source, derivation and restriction metadata. Engine-owned system revision/time cannot be supplied authoritatively by a client.
 4. A `SnapshotSet` pinning every input graph, schema, map and policy revision needed for replay. Pinning separate peers does not assert globally atomic observation.
 5. Pure query plans and separate atomic transaction/effect commands. Plans declare capability requirements, exact/approximate mode and budgets; the engine independently validates authority at execution.
@@ -108,7 +108,7 @@ Performance targets must be measured and ratified before optimization claims: re
 
 ## Research and decisions still open
 
-- Recover the complete source papers and their proposed conformance tests before finalizing scope. No missing paragraph is reconstructed as an authenticated original.
+- The complete source papers are recovered. Use their explicit conformance tests and SOURCE_RECONCILIATION.md; optional n-ary relations and paper research questions are not mandatory completion gates.
 - Final surface grammar and the distinction between total pure lenses and general resource-bounded functions.
 - Stable identity and canonical view encoding, typed timestamps and interval infinities; cryptographic integrity is engine-owned but byte semantics are shared.
 - Provenance size/retention, shared/cyclic metadata reference traversal and denial-versus-unavailability diagnostics that avoid existence leakage.

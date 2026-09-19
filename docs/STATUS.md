@@ -1,13 +1,13 @@
 # Verified status
 
-As of 2026-09-19, this is an experimental compiler foundation, not full Weave implementation and not verified conformance to the unrecovered white papers.
+As of 2026-09-19, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | blocked | Original paper attachments require source recovery. Protocol v0.3.0 is implemented for the subset and vendored with SHA256 manifest. Full paper reconciliation remains mandatory. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.4 schema/metadata work addresses documented model gaps. Full semantic conformance remains open. |
 | L1 Front end | in_progress, provisional | Lexer/parser, basic graph validation, JSON diagnostics and check/ast/plan CLI implemented; 22 tests. Full schemas/types/effects/formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. General higher-order lenses/joins, context and four-valued support remain. |
-| L3 Full knowledge semantics | in_progress, provisional | Node manifestations, pinned graph-valued edge/node metadata, scalar properties and explicit negative claims represented in IR. Same-commit cyclic metadata references remain unresolved by the content-hash revision design. General identity alignment, rule evaluation, provenance derivation/scenarios remain. |
+| L3 Full knowledge semantics | in_progress, provisional | Node manifestations, pinned graph-valued edge/node metadata, scalar properties and explicit negative claims represented in IR. Same-commit cyclic metadata references await the logical snapshot-manifest implementation specified by engine paper §2.1. General identity alignment, rule evaluation, provenance derivation/scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |
 | L5 Spatial and multiscale language | proposed | No geometry, embedding or clustering language yet. |
 | L6 Distributed offline governance | proposed | Portable source structure only; no mobile, networking or governance conformance claim. |
@@ -25,7 +25,7 @@ The checks above were run locally on macOS with Rust 1.94.0. A CI definition is 
 
 ## Publication boundary
 
-The private, partial chat export is excluded by `.gitignore`; it is not an original white paper and must not enter public history. Public docs summarize requirements without publishing unrelated private conversation material. Source-paper publication/reconciliation remains incomplete. Public GitHub organization and repositories are orchestrator-owned; this status file does not imply they exist.
+The private, partial chat export is excluded by `.gitignore`; it is not an original white paper and must not enter public history. Public docs summarize requirements without publishing unrelated private conversation material. The original language paper is preserved under docs/source with exact provenance; source reconciliation is complete. Full implementation remains incomplete. The public MIT repositories are https://github.com/weave-graph/weave-language and https://github.com/weave-graph/weave-engine. Publication and CI verification are orchestrator-owned; a local commit is not necessarily the current remote head.
 
 ## Independent orchestrator review
 

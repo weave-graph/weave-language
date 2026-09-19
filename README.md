@@ -4,7 +4,7 @@ An experimental graph-native language for composing and explaining multidimensio
 
 **Implemented foundation:** a bounded lexer/parser, basic graph validation, structured diagnostics, pinned graph references and graph-valued metadata, typed relation/time parameters and partial application, plus filter composition and reusable temporal path-join graph values compiled to engine protocol v0.3.0. Node/edge scalar properties and explicit negative claims are supported. Rust library and CLI; MIT licensed.
 
-**Not yet complete:** general higher-order graph functions and joins, rules, live views, permission syntax, spatial/embedding operators, clustering, distributed governance and mobile integration. The full roadmap is retained. Original white-paper attachments have not yet been recovered, so the syntax and implementation remain provisional.
+**Not yet complete:** general higher-order graph functions and joins, rules, live views, permission syntax, spatial/embedding operators, clustering, distributed governance and mobile integration. The full roadmap is retained. Original white papers are recovered and [reconciled](docs/SOURCE_RECONCILIATION.md); the implementation remains a partial profile and the syntax is provisional.
 
 ```sh
 cargo test --locked

@@ -1,0 +1,15 @@
+{
+  "source": "User-supplied Weave_White_Papers_v0.1 archive",
+  "received_date": "2026-09-19",
+  "paper_date": "2026-09-11",
+  "status": "architecture proposal v0.1, not a formal complete specification",
+  "files": {
+    "Weave_Language_White_Paper_v0.1.md": "e9965099f0cedefd7b1e7f02051550e761a9411421c6fab283c9c05cba15247c"
+  },
+  "companion": {
+    "name": "Weave_Engine_White_Paper_v0.1.md",
+    "sha256": "4a917b1b185a1b92e1edadae0e63259c68c94cf177dd231052e9db5bcce6f705",
+    "publication_repository": "https://github.com/weave-graph/weave-engine"
+  },
+  "integrity": "Copied original Markdown bytes without modification; private conversation export remains excluded."
+}

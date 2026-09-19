@@ -32,7 +32,7 @@ Native jobs check contract integrity, formatting, strict Clippy, all-target test
 - Verify no private source export, credentials, private paths or generated local databases enter the tree/history.
 - Link the exact source commit and public CI results. A local passing run does not substitute for remote matrix outcomes.
 - Confirm contribution and security contact/reporting statements reflect actual repository settings.
-- Label the release experimental and link the complete acceptance gaps; do not claim original-paper conformance before source recovery.
+- Label the release experimental and link the complete acceptance gaps; do not claim original-paper conformance before conformance tests pass.
 
 Registry packages, binary signing, packaged WASM/browser execution and mobile distributions are later optional delivery artifacts or platform requirements with their own evidence. Their absence does not prevent a truthful public GitHub source release.
 

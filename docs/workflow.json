@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "weave-language",
   "scope": "full requested design; intermediate releases do not imply completion",
-  "source_status": "Original paper recovery blocked on source login; implementation is explicitly provisional.",
+  "source_status": "Original paired v0.1 papers recovered and reconciled on 2026-09-19; full implementation gates remain open.",
   "states": [
     "proposed",
     "ready",
@@ -17,16 +17,17 @@
     {
       "id": "L0",
       "title": "Source and contract",
-      "status": "blocked",
+      "status": "in_progress",
       "owner": "language-agent",
       "depends_on": [],
       "external_dependencies": [],
       "requirements": [],
       "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
       "evidence": [
-        "STATUS.md#publication-boundary"
+        "SOURCE_RECONCILIATION.md",
+        "source/provenance.json"
       ],
-      "blocker": "Original white papers have not been recovered."
+      "source_reconciliation": "verified"
     },
     {
       "id": "L1",
