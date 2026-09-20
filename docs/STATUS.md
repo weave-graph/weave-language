@@ -2,6 +2,29 @@
 
 As of 2026-09-20, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
 
+## Exact source Interval values (source-only, protocol 0.18)
+
+Checked nonempty half-open Interval values now support pure parameters/results,
+partial unary callbacks, imported functions, literal metadata and computed Time
+arguments. Strict bounds/deserialization and separate before/meets semantics retain
+open-end and i64 boundary behavior without overflow. No runtime schema, protocol,
+clock or authority capability is added. See [the bounded profile](INTERVALS.md).
+
+Local verification passed **157 all-target tests**, strict all-target Clippy,
+rustfmt, exact 28-file vendor and three original-source checks. Native and zero-import
+WebAssembly fixture execution produced **11,876 identical JSON bytes**, including
+Interval values/errors and existing view/handler artifacts. All **23 preexisting
+standalone examples** retain byte-equivalent parsed artifacts, including fingerprints,
+commands, values and source manifests, against the preserved protocol-0.18 compiler.
+The independent CLI finite-set oracle passed **368 boolean checks and four expected
+failures**. Actual compiler/engine execution passed computed valid-at endpoints,
+end-exclusive edge/metadata filtering, canonical literal persistence, a fresh-process
+pinned read and failed-specialization/no-plan behavior. Source archive and hosted
+publication evidence are recorded separately.
+
+General graph temporal windows/sequences, calendar and recorded-time correction
+semantics, runtime interval schemas and full L05 remain open.
+
 ## Compiled event handlers (protocol 0.18)
 
 The compiler vendors the exact 28-file canonical contract and versioned documentation

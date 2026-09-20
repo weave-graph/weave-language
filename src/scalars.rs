@@ -1,4 +1,5 @@
 //! Bounded compile-time ordinary values. No graph reads or host effects.
+use crate::interval::Interval as TimeInterval;
 use crate::syntax::{Diagnostic, Span};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -13,6 +14,7 @@ pub enum ScalarType {
     Integer,
     String,
     Time,
+    Interval,
     Decimal,
     Quantity(UnitDescriptor),
 }
@@ -23,6 +25,7 @@ pub enum ScalarValue {
     Integer(i64),
     String(String),
     Time(i64),
+    Interval(TimeInterval),
     Decimal(Decimal),
     Quantity(Quantity),
 }
@@ -33,6 +36,7 @@ impl ScalarValue {
             Self::Integer(_) => ScalarType::Integer,
             Self::String(_) => ScalarType::String,
             Self::Time(_) => ScalarType::Time,
+            Self::Interval(_) => ScalarType::Interval,
             Self::Decimal(_) => ScalarType::Decimal,
             Self::Quantity(q) => ScalarType::Quantity(q.unit().clone()),
         }
@@ -40,6 +44,7 @@ impl ScalarValue {
     pub(crate) fn size(&self) -> usize {
         match self {
             Self::String(s) => s.len() + 32,
+            Self::Interval(_) => 128,
             Self::Quantity(q) => {
                 q.unit().dimension_id().len()
                     + q.unit().unit_id().len()
@@ -54,6 +59,7 @@ impl ScalarValue {
             Self::Boolean(v) => serde_json::json!(v),
             Self::Integer(v) | Self::Time(v) => serde_json::json!(v),
             Self::String(v) => serde_json::json!(v),
+            Self::Interval(v) => serde_json::json!(v),
             Self::Decimal(v) => serde_json::json!(v),
             Self::Quantity(v) => serde_json::json!(v),
         }
@@ -163,6 +169,18 @@ impl Budget {
 fn output(operator: &str, args: &[ScalarType], span: Span) -> Result<ScalarType, Diagnostic> {
     use ScalarType::*;
     let expected = match operator {
+        "time_equal" | "time_lt" if args == [Time, Time] => Some(Boolean),
+        "interval" if args == [Time, Time] => Some(Interval),
+        "interval_open" if args == [Time] => Some(Interval),
+        "interval_start" | "interval_end" if args == [Interval] => Some(Time),
+        "interval_contains" if args == [Interval, Time] => Some(Boolean),
+        "interval_equal" | "interval_overlaps" | "interval_before" | "interval_meets"
+        | "interval_within"
+            if args == [Interval, Interval] =>
+        {
+            Some(Boolean)
+        }
+        "interval_intersection" if args == [Interval, Interval] => Some(Interval),
         "boolean_not" if args == [Boolean] => Some(Boolean),
         "boolean_and" | "boolean_or" if args == [Boolean, Boolean] => Some(Boolean),
         "integer_add" | "integer_sub" | "integer_mul" | "integer_div"
@@ -354,6 +372,38 @@ impl ScalarExpr {
                 use ScalarValue::*;
                 let numeric = |message: &str| error("E_NUMERIC", message, self.span);
                 match args.as_slice() {
+                    [Time(a), Time(b)] => match operator.as_str() {
+                        "time_equal" => Boolean(a == b),
+                        "time_lt" => Boolean(a < b),
+                        "interval" => Interval(
+                            TimeInterval::new(*a, Some(*b))
+                                .map_err(|e| error(e.code(), e.to_string(), self.span))?,
+                        ),
+                        _ => unreachable!("checked temporal signature"),
+                    },
+                    [Time(a)] => {
+                        Interval(TimeInterval::new(*a, None).expect("unbounded interval is valid"))
+                    }
+                    [Interval(a)] => Time(match operator.as_str() {
+                        "interval_start" => a.start(),
+                        "interval_end" => a
+                            .finite_end()
+                            .map_err(|e| error(e.code(), e.to_string(), self.span))?,
+                        _ => unreachable!("checked interval accessor"),
+                    }),
+                    [Interval(a), Time(b)] => Boolean(a.contains(*b)),
+                    [Interval(a), Interval(b)] => match operator.as_str() {
+                        "interval_equal" => Boolean(a == b),
+                        "interval_overlaps" => Boolean(a.overlaps(*b)),
+                        "interval_before" => Boolean(a.before(*b)),
+                        "interval_meets" => Boolean(a.meets(*b)),
+                        "interval_within" => Boolean(a.within(*b)),
+                        "interval_intersection" => Interval(
+                            a.intersection(*b)
+                                .map_err(|e| error(e.code(), e.to_string(), self.span))?,
+                        ),
+                        _ => unreachable!("checked interval signature"),
+                    },
                     [Boolean(a)] => Boolean(!a),
                     [Boolean(a), Boolean(b)] => Boolean(if operator == "boolean_and" {
                         *a && *b

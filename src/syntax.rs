@@ -894,6 +894,7 @@ impl Parser {
             "integer" => ValueType::Integer,
             "string" => ValueType::String,
             "time" => ValueType::Time,
+            "interval" => ValueType::Interval,
             "decimal" => ValueType::Decimal,
             "quantity" => ValueType::Quantity(self.unit_descriptor()?),
             _ => return Err(self.error("Expected ordinary scalar type")),
@@ -1047,6 +1048,7 @@ impl Parser {
             "function" if !callback => ParameterKind::Function,
             "boolean" => ParameterKind::Scalar(ValueType::Boolean),
             "integer" => ParameterKind::Scalar(ValueType::Integer),
+            "interval" => ParameterKind::Scalar(ValueType::Interval),
             "decimal" => ParameterKind::Scalar(ValueType::Decimal),
             "quantity" => ParameterKind::Scalar(ValueType::Boolean),
             _ => return Err(self.error("Expected graph, scalar or function parameter")),
@@ -2078,7 +2080,7 @@ impl Parser {
                         let value = match kind.as_str() {
                             "graph" => ArgumentValue::Graph(self.name()?),
                             "function" => ArgumentValue::Function(self.name()?),
-                            "boolean" | "integer" | "decimal" | "quantity" => {
+                            "boolean" | "integer" | "decimal" | "quantity" | "interval" => {
                                 ArgumentValue::Scalar {
                                     kind: kind.clone(),
                                     value: self.scalar_expr(0)?,

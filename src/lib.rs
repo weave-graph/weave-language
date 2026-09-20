@@ -5,6 +5,7 @@ pub mod decimal;
 mod format;
 mod functions;
 mod graph_types;
+pub mod interval;
 pub mod modules;
 pub mod scalars;
 pub mod syntax;

@@ -1,0 +1,27 @@
+// Source intervals are pure values; the host still authorizes these graph reads.
+function Intersect revision "1" (interval input, interval other) returns interval {
+  return interval_intersection(param input, param other);
+}
+function At revision "1" (graph input, time instant) {
+  lens Result from input { match relation "available"; at param instant; }
+  return Result;
+}
+apply Window from Intersect {
+  interval input interval(time 10, time 20);
+  interval other interval_open(time 15);
+}
+value Start interval_start(value Window);
+value End interval_end(value Window);
+value Inside interval_contains(value Window, time 15);
+value Outside interval_contains(value Window, time 20);
+value Meets interval_meets(value Window, interval(time 20, time 30));
+value Before interval_before(value Window, interval(time 20, time 30));
+graph Windows {
+  node "a" entity "asset" space "operations" property "window" value Window;
+  node "b" entity "service" space "operations";
+  edge "availability" from "a" to "b" relation "available" valid 15 until 20;
+  attachment "window" on graph key "window" literal value Window valid 15 until 20;
+}
+apply AtStart from At { graph input Windows; time instant value Start; }
+apply AtEnd from At { graph input Windows; time instant value End; }
+lens WindowMetadata from Windows { at 15; metadata depth 1; }

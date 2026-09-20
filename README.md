@@ -34,3 +34,5 @@ Build or install from a Git checkout/source archive with `cargo install --locked
 The [source formatter](docs/FORMATTER.md) preserves tokens and comments: `weave fmt FILE.weave` prints formatted source, `--check` checks it and explicit `--write` updates one regular file. Formatting a content-pinned module changes its byte digest and requires explicit relinking.
 
 [Compiled handlers](docs/HANDLER_ARTIFACTS.md) seal pure event recipes separately from Programs. `weave handler-plan examples/handlers.weave --handler Warning` emits an inert artifact; the trusted host explicitly installs its subscription/output mapping and prepares/completes pinned event occurrences.
+
+Exact source [Interval values](docs/INTERVALS.md) support checked half-open temporal predicates and pure function specialization without changing the runtime protocol.

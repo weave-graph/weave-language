@@ -94,6 +94,7 @@ fn marker_matches(a: &ArgumentValue, t: &ScalarType) -> bool {
         ArgumentValue::Scalar { kind, .. } => match t {
             ScalarType::Boolean => kind == "boolean",
             ScalarType::Integer => kind == "integer",
+            ScalarType::Interval => kind == "interval",
             ScalarType::Decimal => kind == "decimal",
             ScalarType::Quantity(_) => kind == "quantity",
             _ => false,
