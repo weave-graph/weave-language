@@ -36,3 +36,5 @@ The [source formatter](docs/FORMATTER.md) preserves tokens and comments: `weave 
 [Compiled handlers](docs/HANDLER_ARTIFACTS.md) seal pure event recipes separately from Programs. `weave handler-plan examples/handlers.weave --handler Warning` emits an inert artifact; the trusted host explicitly installs its subscription/output mapping and prepares/completes pinned event occurrences.
 
 Exact source [Interval values](docs/INTERVALS.md) support checked half-open temporal predicates and pure function specialization without changing the runtime protocol.
+
+[Typed source vectors](docs/TYPED_VECTORS.md) retain full physical/embedding descriptors through pure functions and lower to existing native geometry payloads.

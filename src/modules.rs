@@ -64,6 +64,7 @@ struct Location {
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Kind {
+    VectorType,
     Schema,
     ContextSchema,
     Function,
@@ -72,6 +73,7 @@ enum Kind {
 impl Kind {
     fn label(self) -> &'static str {
         match self {
+            Self::VectorType => "vector",
             Self::Schema => "schema",
             Self::ContextSchema => "context",
             Self::Function => "function",
@@ -143,6 +145,7 @@ fn declaration(s: &Statement) -> (&str, Span) {
 }
 fn kind(s: &Statement) -> Option<Kind> {
     match s {
+        Statement::VectorType { .. } => Some(Kind::VectorType),
         Statement::Schema { .. } => Some(Kind::Schema),
         Statement::ContextSchema { .. } => Some(Kind::ContextSchema),
         Statement::Function { .. } => Some(Kind::Function),
@@ -224,7 +227,7 @@ fn inspect(ast: &syntax::Program, module: Option<(&str, &str)>) -> Result<Vec<Im
                 if module.is_some() && (kind(s).is_none() || !valid_symbol(name)) {
                     return Err(issue(
                         "E_MODULE_EFFECT",
-                        "Imported units permit only bounded pure function, schema, context-schema and finite-rule declarations",
+                        "Imported units permit only bounded pure function, vector-type, schema, context-schema and finite-rule declarations",
                         span,
                     ));
                 }

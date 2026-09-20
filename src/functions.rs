@@ -95,6 +95,7 @@ fn marker_matches(a: &ArgumentValue, t: &ScalarType) -> bool {
             ScalarType::Boolean => kind == "boolean",
             ScalarType::Integer => kind == "integer",
             ScalarType::Interval => kind == "interval",
+            ScalarType::Vector(_) => kind == "vector",
             ScalarType::Decimal => kind == "decimal",
             ScalarType::Quantity(_) => kind == "quantity",
             _ => false,
@@ -157,6 +158,9 @@ pub(crate) fn declaration(statement: &Statement) -> (&str, Span) {
             name, name_span, ..
         }
         | Statement::Pin {
+            name, name_span, ..
+        }
+        | Statement::VectorType {
             name, name_span, ..
         }
         | Statement::ContextSchema {

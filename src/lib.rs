@@ -9,6 +9,8 @@ pub mod interval;
 pub mod modules;
 pub mod scalars;
 pub mod syntax;
+mod vector_types;
+pub mod vectors;
 pub use format::format_source;
 use std::collections::{BTreeMap, BTreeSet};
 use syntax::{AlgebraOperation, BindingValue, Item, Metadata, Statement, StringExpr, TimeExpr};
@@ -194,6 +196,7 @@ pub(crate) fn compile_artifacts_parsed(
             ));
         }
     }
+    let parsed = vector_types::resolve(parsed)?;
     let source_revisions = functions::source_revisions(&parsed)?;
     let expansion = functions::expand(parsed)?;
     lower_artifacts(expansion, source_revisions, false)
@@ -363,6 +366,7 @@ fn lower_artifacts(
             | Statement::ContextSchema { .. }
             | Statement::Schema { .. }
             | Statement::Transaction { .. }
+            | Statement::VectorType { .. }
             | Statement::Value { .. }
             | Statement::Function { .. }
             | Statement::Apply { .. }
@@ -603,6 +607,7 @@ fn lower_artifacts(
             | Statement::ContextSchema { .. }
             | Statement::Schema { .. }
             | Statement::Transaction { .. }
+            | Statement::VectorType { .. }
             | Statement::Value { .. }
             | Statement::Function { .. }
             | Statement::Apply { .. }

@@ -106,6 +106,15 @@ impl<'a> Resolver<'a> {
         top: bool,
         locals: &BTreeSet<String>,
     ) -> Result<(), Diagnostic> {
+        let mut vector_error = None;
+        crate::vector_types::local_refs(statement, &mut |name, span| {
+            if let Err(e) = self.reference(name, *span, Kind::VectorType, &BTreeSet::new()) {
+                vector_error = Some(e);
+            }
+        });
+        if let Some(e) = vector_error {
+            return Err(e);
+        }
         let mut scalar_error = None;
         crate::syntax::scalar_expressions(statement, &mut |e| {
             if let Err(error) = e.visit_references(&mut |n, span, _| Self::local_graph(n, span)) {
@@ -125,6 +134,11 @@ impl<'a> Resolver<'a> {
             ));
         }
         match statement {
+            Statement::VectorType { name, .. } => {
+                if top && let Some(export) = self.own.and_then(|e| e.get(&original)) {
+                    *name = export.symbol.clone();
+                }
+            }
             Statement::Schema {
                 name, definition, ..
             } => {
@@ -382,6 +396,12 @@ pub(super) fn shift(statement: &mut Statement, base: usize) {
         e.spans(&mut |s| {
             s.0 += base;
             s.1 += base;
+        })
+    });
+    crate::vector_types::walk(statement, &mut |s| {
+        crate::vector_types::local_refs(s, &mut |_, span| {
+            span.0 += base;
+            span.1 += base;
         })
     });
     crate::syntax::callback_constraints(statement, &mut |s| {

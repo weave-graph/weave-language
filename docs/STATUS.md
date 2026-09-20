@@ -2,6 +2,36 @@
 
 As of 2026-09-20, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
 
+## Typed source vector values (source-only, protocol 0.18)
+
+Physical position/direction and embedding vector values now retain complete canonical
+Space descriptors through pure functions, partial unary callbacks, pinned modules
+and literal metadata. Nominal mismatches, duplicate descriptor keys, invalid roles,
+nonfinite values and unbounded component counts fail explicitly. Checked private
+values retain `ScalarValue: Eq`, normalize negative zero, and precharge scalar work
+and materialization. See [the bounded profile](TYPED_VECTORS.md).
+
+The separately vendored five-file portable `weave-spaces` set is pinned exactly to
+engine `2127b5aff5783a722537704064e61f5663650c8d`, which only exposes pure
+validation wrappers and adds two tests. Protocol 0.18's 28-file canonical contract
+and existing runtime geometry payload remain unchanged. Source vectors never
+construct authorized Evidence or install a space/identity policy.
+
+Local verification passed **164 all-target tests**, strict all-target Clippy,
+rustfmt, exact contract/spaces/original-paper verification, and actual source-to-native
+geometry acceptance. The typed fixture produces exactly the existing geometry
+Program and preserves physical distance, explicit transform reuse, cosine distance,
+current visibility/time, incompatible encoder and projection rejection. Native and
+zero-import WASM execution produced **20,050 identical JSON bytes**, including vector
+boundary values/diagnostics and existing complete artifacts. All **24 preexisting
+standalone artifacts**, including Interval values, retain exact commands, values,
+manifests and fingerprints. Root independently verified vector boundaries and native
+acceptance; the prior Interval oracle also passed 368 checks and four failures.
+Source-archive and hosted evidence are recorded separately.
+
+General vector arithmetic/runtime schemas, full spatial declarations, learned bridges,
+uncertainty and governed unit conversion remain open portions of L01/L03/L10/L11.
+
 ## Exact source Interval values (source-only, protocol 0.18)
 
 Checked nonempty half-open Interval values now support pure parameters/results,

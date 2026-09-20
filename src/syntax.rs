@@ -41,6 +41,11 @@ pub struct HandlerEvent {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
+    VectorType {
+        name: String,
+        name_span: Span,
+        definition: crate::vectors::VectorDescriptor,
+    },
     Value {
         name: String,
         name_span: Span,
@@ -859,9 +864,7 @@ impl Parser {
                                 key.end,
                             ));
                         };
-                        self.symbol(':')?;
-                        let value = self.literal(depth + 1)?;
-                        if values.insert(name, value).is_some() {
+                        if values.contains_key(&name) {
                             return Err(Diagnostic::new(
                                 "E_DUPLICATE",
                                 "Duplicate object key",
@@ -869,6 +872,9 @@ impl Parser {
                                 key.end,
                             ));
                         }
+                        self.symbol(':')?;
+                        let value = self.literal(depth + 1)?;
+                        values.insert(name, value);
                         if self.peek().kind != Kind::Symbol(',') {
                             break;
                         }
@@ -895,6 +901,14 @@ impl Parser {
             "string" => ValueType::String,
             "time" => ValueType::Time,
             "interval" => ValueType::Interval,
+            "vector" => {
+                self.word("type")?;
+                let span = (self.peek().start, self.peek().end);
+                ValueType::VectorReference {
+                    name: self.name()?,
+                    span,
+                }
+            }
             "decimal" => ValueType::Decimal,
             "quantity" => ValueType::Quantity(self.unit_descriptor()?),
             _ => return Err(self.error("Expected ordinary scalar type")),
@@ -915,6 +929,53 @@ impl Parser {
             Kind::Number(v) => ScalarExpression::Literal(ScalarValue::Integer(v)),
             Kind::Word(v) if v == "true" || v == "false" => {
                 ScalarExpression::Literal(ScalarValue::Boolean(v == "true"))
+            }
+            Kind::Word(v) if v == "vector" => {
+                let type_span = (self.peek().start, self.peek().end);
+                let name = self.name()?;
+                self.symbol('[')?;
+                let mut values = Vec::new();
+                while self.peek().kind != Kind::Symbol(']') {
+                    if values.len() >= crate::vectors::MAX_DIMENSIONS {
+                        return Err(Diagnostic::new(
+                            "E_VECTOR_DIMENSION",
+                            "Vector components exceed 4096",
+                            token.start,
+                            self.peek().end,
+                        ));
+                    }
+                    let component = self.take();
+                    let v = match component.kind {
+                        Kind::Number(v) => v as f64,
+                        Kind::Float(v) => v,
+                        _ => {
+                            return Err(Diagnostic::new(
+                                "E_VECTOR_VALUE",
+                                "Expected finite binary64 component literal",
+                                component.start,
+                                component.end,
+                            ));
+                        }
+                    };
+                    if !v.is_finite() {
+                        return Err(Diagnostic::new(
+                            "E_VECTOR_VALUE",
+                            "Expected finite component",
+                            component.start,
+                            component.end,
+                        ));
+                    }
+                    values.push(v);
+                    if self.peek().kind != Kind::Symbol(']') {
+                        self.symbol(',')?;
+                    }
+                }
+                self.symbol(']')?;
+                ScalarExpression::VectorLiteral {
+                    name,
+                    type_span,
+                    values,
+                }
             }
             Kind::Word(v) if v == "time" => {
                 ScalarExpression::Literal(ScalarValue::Time(self.number()?))
@@ -1050,11 +1111,19 @@ impl Parser {
             "integer" => ParameterKind::Scalar(ValueType::Integer),
             "interval" => ParameterKind::Scalar(ValueType::Interval),
             "decimal" => ParameterKind::Scalar(ValueType::Decimal),
-            "quantity" => ParameterKind::Scalar(ValueType::Boolean),
+            "quantity" | "vector" => ParameterKind::Scalar(ValueType::Boolean),
             _ => return Err(self.error("Expected graph, scalar or function parameter")),
         };
         let span = (self.peek().start, self.peek().end);
         let name = self.name()?;
+        if label == "vector" {
+            self.word("type")?;
+            let span = (self.peek().start, self.peek().end);
+            kind = ParameterKind::Scalar(ValueType::VectorReference {
+                name: self.name()?,
+                span,
+            });
+        }
         if label == "quantity" {
             kind = ParameterKind::Scalar(ValueType::Quantity(self.unit_descriptor()?));
         }
@@ -1489,7 +1558,13 @@ impl Parser {
             if context == 2
                 && matches!(
                     kind.as_str(),
-                    "function" | "transaction" | "graph" | "use" | "schema" | "rules"
+                    "function"
+                        | "transaction"
+                        | "graph"
+                        | "use"
+                        | "schema"
+                        | "rules"
+                        | "vector_type"
                 )
             {
                 return Err(
@@ -1781,6 +1856,38 @@ impl Parser {
                         source_span,
                         valid_at,
                         metadata_depth,
+                    });
+                }
+                "vector_type" => {
+                    self.word("space")?;
+                    let raw = self.literal(0)?; // rejects duplicate keys before inserting into Value
+                    let space = serde_json::from_value(raw).map_err(|e| {
+                        Diagnostic::new(
+                            "E_VECTOR_DESCRIPTOR",
+                            format!("Invalid Space: {e}"),
+                            name_span.0,
+                            name_span.1,
+                        )
+                    })?;
+                    self.word("role")?;
+                    let role = serde_json::from_value(serde_json::Value::String(self.name()?))
+                        .map_err(|e| {
+                            Diagnostic::new(
+                                "E_VECTOR_DESCRIPTOR",
+                                format!("Invalid vector role: {e}"),
+                                name_span.0,
+                                name_span.1,
+                            )
+                        })?;
+                    let definition =
+                        crate::vectors::VectorDescriptor::new(space, role).map_err(|e| {
+                            Diagnostic::new(e.0, e.to_string(), name_span.0, name_span.1)
+                        })?;
+                    self.symbol(';')?;
+                    statements.push(Statement::VectorType {
+                        name,
+                        name_span,
+                        definition,
                     });
                 }
                 "context_schema" => {
@@ -2080,12 +2187,11 @@ impl Parser {
                         let value = match kind.as_str() {
                             "graph" => ArgumentValue::Graph(self.name()?),
                             "function" => ArgumentValue::Function(self.name()?),
-                            "boolean" | "integer" | "decimal" | "quantity" | "interval" => {
-                                ArgumentValue::Scalar {
-                                    kind: kind.clone(),
-                                    value: self.scalar_expr(0)?,
-                                }
-                            }
+                            "boolean" | "integer" | "decimal" | "quantity" | "interval"
+                            | "vector" => ArgumentValue::Scalar {
+                                kind: kind.clone(),
+                                value: self.scalar_expr(0)?,
+                            },
                             "string" if matches!(&self.peek().kind,Kind::Word(v) if v!="param") => {
                                 ArgumentValue::String(StringExpr::Value(self.scalar_expr(0)?))
                             }

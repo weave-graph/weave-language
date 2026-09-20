@@ -126,7 +126,7 @@ apply Specialized from Transform { function transform AtFifteen; }
 apply Output from Specialized { graph input Evidence; }
 ```
 
-`apply` binds named arguments once. Incomplete application yields an immutable function value; complete application yields a graph value. Graph arguments are captured as immutable program-local graph bindings when supplied, including during partial application. Scalar arguments support Boolean, Integer, String, Time, Interval, exact Decimal and nominal Quantity; see [scalar functions](SCALAR_FUNCTIONS.md). Function arguments have one remaining graph parameter named `input` and return a graph. Graph parameter schemas are retained through evaluation; exact static schema-constrained signatures are documented in [schema functions](SCHEMA_FUNCTIONS.md); dynamic schema assertions remain future work.
+`apply` binds named arguments once. Incomplete application yields an immutable function value; complete application yields a graph value. Graph arguments are captured as immutable program-local graph bindings when supplied, including during partial application. Scalar arguments support Boolean, Integer, String, Time, Interval, typed Vector, exact Decimal and nominal Quantity; see [scalar functions](SCALAR_FUNCTIONS.md). Function arguments have one remaining graph parameter named `input` and return a graph. Graph parameter schemas are retained through evaluation; exact static schema-constrained signatures are documented in [schema functions](SCHEMA_FUNCTIONS.md); dynamic schema assertions remain future work.
 
 Bodies may compose input graphs and previously declared pure functions. They cannot read undeclared global graphs, declare sources or writes, recurse, or access host effects. Body variables are hygienically renamed. Function definitions are checked even when unused. Expansion is bounded to depth 32, 10,000 emitted statements and 4 MiB of serialized AST; exceeding a bound is an error rather than a partial executable plan.
 
@@ -298,3 +298,5 @@ Protocol 0.16 adds `accepted Name view "view" decision "exact-occurrence";` and 
 ## Explicit compiled handlers
 
 Protocol 0.18 adds entry-level `handler Name revision "1" using Function { input event graph "G" branch "main" metadata depth 4; on "graph.accepted", "graph.committed"; output slot "result"; replay pinned; }`. The function must have one remaining unconstrained graph parameter, a graph result and no captured graph values. Compilation emits a separate sealed pure recipe seeded by the actual host event, never a synthetic Query or registration effect. `artifacts` returns complete output; `handler-plan --handler Name` explicitly selects one template. See [syntax, bounds, host mapping and replay semantics](HANDLER_ARTIFACTS.md).
+
+Typed physical and embedding vector declarations, parameters and payloads are documented in [typed vectors](TYPED_VECTORS.md).

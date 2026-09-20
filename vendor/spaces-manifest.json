@@ -1,0 +1,13 @@
+{
+  "source_repository": "https://github.com/weave-graph/weave-engine",
+  "source_commit": "2127b5aff5783a722537704064e61f5663650c8d",
+  "source_path": "crates/weave-spaces",
+  "files": {
+    "Cargo.toml": "cb5c80d2c4a2ec33c95c0ec9e495e4fd28fa131dcf642d124b4cdac533f032b0",
+    "src/lib.rs": "2b638a3479a84143c4c525c888b16ef97b49c76c92e80beae761a9842c5436e0",
+    "tests/geometry.rs": "3d34985885d6bcdc59be205c6a705f093967fff4a29b6573bfab11e48eaf8525",
+    "tests/vector_validation.rs": "4541a422456819aec269dafd6ac000718fdee13ffc92c2e69585b1cda8eb655a",
+    "LICENSE": "9e24b3303156fce3c77e21da9d3e3b4cc864291987721d55286415a22ea5cfb7"
+  },
+  "license_source": "LICENSE"
+}

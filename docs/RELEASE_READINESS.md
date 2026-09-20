@@ -4,7 +4,7 @@ This checklist concerns distribution of the current experimental source, not ful
 
 ## Verified locally
 
-- Repository includes MIT license, contribution and security guidance, source, tests, examples, lockfile and a standalone vendored contract.
+- Repository includes MIT license, contribution and security guidance, source, tests, examples, lockfile, a standalone vendored contract and separately pinned pure geometry crate.
 - Contract verifier checks the exact vendored file set, license, Cargo version, protocol constant and current documentation hash.
 - Source grammar and public API are documented as provisional; current protocol is v0.18.0. Historical contract notes are labeled historical.
 - `check`, `ast`, `plan`, `fingerprint`, `values`, `artifacts`, `view-plan`, `handler-plan`, source-schema `describe` and token-preserving `fmt` are implemented CLI subcommands. Host registration/execution remains explicit and separate. No language runner, remote privileged discovery or LSP is advertised as implemented.
@@ -18,9 +18,9 @@ Use a clean commit, with no required untracked files:
 git archive --format=tar --output=weave-language-source.tar HEAD
 ```
 
-Extract into a new directory, verify the contract and build/test/install there. `cargo install --locked --path . --root ./install-check` installs the CLI without publishing anything. Dependencies are locked but still require access to crates.io unless already cached; an offline-capable runtime is not the same as a dependency-free offline build.
+Extract into a new directory, run `verify_contract.py` and `verify_spaces.py`, then build/test/install there. `cargo install --locked --path . --root ./install-check` installs the CLI without publishing anything. Dependencies are locked but still require access to crates.io unless already cached; an offline-capable runtime is not the same as a dependency-free offline build.
 
-The source archive includes every canonical contract source/test file, Cargo metadata and LICENSE; `vendor/manifest.json` identifies the exact file set. Cargo's registry package excludes nested package files and rewrites path dependencies; it is deliberately not the release artifact at this stage.
+The source archive includes every canonical contract source/test file, Cargo metadata and LICENSE; `vendor/manifest.json` identifies the exact file set. The additional portable geometry file set is bound by `vendor/spaces-manifest.json`. Cargo's registry package excludes nested package files and rewrites path dependencies; it is deliberately not the release artifact at this stage.
 
 ## CI configuration
 

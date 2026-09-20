@@ -1,0 +1,48 @@
+// Pure typed vectors emit the existing authorized native geometry payloads.
+vector_type MetresPosition space {"id":"metres","revision":"1","geometry":{"kind":"physical3d","frame":"building","unit":"metre"}} role position;
+vector_type CentimetresPosition space {"id":"centimetres","revision":"1","geometry":{"kind":"physical3d","frame":"display-frame","unit":"centimetre"}} role position;
+vector_type Embedding4 space {"id":"semantic","revision":"1","geometry":{"kind":"embedding","encoder":"encoder-v1","preprocessing":"tokens-v1","dimensions":4,"metric":"cosine_distance"}} role embedding;
+value CoordinateA vector MetresPosition [0.0, 0.0, 0.0];
+value CoordinateB vector MetresPosition [3.0, 4.0, 0.0];
+value TargetPosition vector CentimetresPosition [400.0, 400.0, 0.0];
+value EmbeddingA vector Embedding4 [1.0, 0.0, 0.0, 0.0];
+value EmbeddingB vector Embedding4 [0.0, 1.0, 0.0, 0.0];
+// Geometric annotations are explicit source claims, not implied by layout.
+graph Geometry explicit {
+  node "a" entity "A" space "metres";
+  node "b" entity "B" space "metres";
+  node "target" entity "target-origin" space "centimetres";
+  node "e1" entity "document-one" space "semantic";
+  node "e2" entity "document-two" space "semantic";
+  relation "position-a" from "a" to "a" predicate "position";
+  relation "position-b" from "b" to "b" predicate "position";
+  relation "position-target" from "target" to "target" predicate "position";
+  relation "frame-map" from "a" to "target" predicate "coordinate-transform";
+  relation "embedding-one" from "e1" to "e1" predicate "embedding";
+  relation "embedding-two" from "e2" to "e2" predicate "embedding";
+  claim "coordinate-a" on "position-a" source "survey" polarity positive valid 0 until 20
+    property "weave.geometry" value CoordinateA;
+  claim "coordinate-b" on "position-b" source "survey" polarity positive valid 5 until 15
+    property "weave.geometry" value CoordinateB;
+  claim "target-position" on "position-target" source "survey" polarity positive valid 0 until 20
+    property "weave.geometry" value TargetPosition;
+  claim "mapping" on "frame-map" source "calibration" polarity positive valid 3 until 10
+    property "weave.geometry" {"kind":"rigid_transform","from":{"id":"metres","revision":"1","geometry":{"kind":"physical3d","frame":"building","unit":"metre"}},"to":{"id":"centimetres","revision":"1","geometry":{"kind":"physical3d","frame":"display-frame","unit":"centimetre"}},"rotation":[[1.0,0.0,0.0],[0.0,1.0,0.0],[0.0,0.0,1.0]],"translation":[100.0,0.0,0.0]};
+  claim "embedding-a" on "embedding-one" source "encoder-run" polarity positive valid 0 until 20
+    property "weave.geometry" value EmbeddingA;
+  claim "embedding-b" on "embedding-two" source "encoder-run" polarity positive valid 0 until 20
+    property "weave.geometry" value EmbeddingB;
+}
+lens Observations from Geometry {}
+distance Range from Observations assertion "coordinate-a" to Observations assertion "coordinate-b" at 7;
+transform Moved from Observations assertion "coordinate-a" using Observations assertion "mapping" at 7;
+distance TargetRange from Moved assertion "value" to Observations assertion "target-position" at 7;
+distance Similarity from Observations assertion "embedding-a" to Observations assertion "embedding-b" at 7;
+project_axes Navigation from Observations assertion "embedding-a" axes (0,1,2) revision "axis-view-1" at 7;
+explain Proof from Range;
+union RepeatedProof from Proof with Proof;
+function Separation revision "1" (graph input, graph reference) {
+  distance Result from input assertion "coordinate-a" to reference assertion "coordinate-b" at 7;
+  return Result;
+}
+apply ThroughFunction from Separation {graph input Observations;graph reference Observations;}

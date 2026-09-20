@@ -10,6 +10,11 @@ fn bytes() -> &'static [u8] {
             "value Less decimal_lt(decimal \"-999999999999999999\",decimal \"0.000000000000000001\"); value Text string_concat(\"λ\",\"✓\");",
         ];
         let cases:Vec<_>=sources.iter().map(|s|{let r=weave_language::specialize(s).expect("fixed accepted fixture");serde_json::json!({"program":r.program,"values":r.values,"fingerprint":r.fingerprint().unwrap()})}).collect();
+        let vector_source = include_str!("vectors.weave");
+        let vectors = weave_language::compile_artifacts(vector_source).expect("fixed vector fixture");
+        let vector_declaration = r#"vector_type P space {"id":"physical","revision":"1","geometry":{"kind":"physical3d","frame":"A","unit":"metre"}} role position;"#;
+        let vector_boundaries = weave_language::compile_artifacts(&format!("{vector_declaration} value V vector P [1.7976931348623157e308,5e-324,-0.0];")).unwrap();
+        let vector_error = weave_language::compile_artifacts(&format!("{vector_declaration} value V vector P [0,0];")).unwrap_err();
         let interval_source = include_str!("intervals.weave");
         let intervals = weave_language::compile_artifacts(interval_source).expect("fixed interval fixture");
         let interval_errors:Vec<_>=["value I interval(time 1,time 1);","value I interval_end(interval_open(time 0));","value I interval_intersection(interval(time 0,time 1),interval(time 1,time 2));"].iter().map(|s|weave_language::compile_artifacts(s).unwrap_err()).collect();
@@ -21,7 +26,7 @@ fn bytes() -> &'static [u8] {
         let handler_source = include_str!("handlers.weave");
         let handlers = weave_language::compile_artifacts(handler_source).expect("fixed handler fixture");
         let handler_error = weave_language::compile(handler_source).unwrap_err();
-        serde_json::to_vec(&serde_json::json!({"profile":"weave-source-scalar-artifact-parity-v4","cases":cases,"intervals":intervals,"interval_fingerprint":intervals.fingerprint().unwrap(),"interval_errors":interval_errors,"errors":errors,"artifacts":artifacts,"artifact_fingerprint":artifacts.fingerprint().unwrap(),"artifact_error":artifact_error,"handlers":handlers,"handler_fingerprint":handlers.fingerprint().unwrap(),"handler_error":handler_error})).unwrap()
+        serde_json::to_vec(&serde_json::json!({"profile":"weave-source-scalar-artifact-parity-v5","cases":cases,"vectors":vectors,"vector_boundaries":vector_boundaries,"vector_error":vector_error,"vector_fingerprint":vectors.fingerprint().unwrap(),"intervals":intervals,"interval_fingerprint":intervals.fingerprint().unwrap(),"interval_errors":interval_errors,"errors":errors,"artifacts":artifacts,"artifact_fingerprint":artifacts.fingerprint().unwrap(),"artifact_error":artifact_error,"handlers":handlers,"handler_fingerprint":handlers.fingerprint().unwrap(),"handler_error":handler_error})).unwrap()
     })
 }
 #[unsafe(no_mangle)]

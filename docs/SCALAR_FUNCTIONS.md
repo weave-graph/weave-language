@@ -1,6 +1,6 @@
 # Ordinary scalar function specialization
 
-The compiler supports Boolean, signed 64-bit Integer, String, Time, Interval, exact Decimal
+The compiler supports Boolean, signed 64-bit Integer, String, Time, Interval, typed Vector, exact Decimal
 and nominal Quantity parameters and results. Evaluation is deterministic and takes
 place during compilation. It introduces no protocol change, hidden graph read,
 authority time, network access, or runtime expression service.
@@ -97,6 +97,8 @@ remain an engine/language gap.
 - Time: `time_equal`, `time_lt`, identity and forwarding; no Integer arithmetic.
 - Interval: checked half-open construction, bounds, containment/intersection and
   before/meets/overlap/within predicates; see [exact intervals](INTERVALS.md).
+- Vector: exact descriptor/role typing, checked finite binary64 construction, identity
+  and `vector_equal`; see [typed vectors](TYPED_VECTORS.md).
 
 Decimal keeps the existing exact 18-digit/scale-18 bound, canonical string encoding
 and finite exact division. There is no rounding or binary64 fallback. Quantity

@@ -1,6 +1,7 @@
 //! Bounded compile-time ordinary values. No graph reads or host effects.
 use crate::interval::Interval as TimeInterval;
 use crate::syntax::{Diagnostic, Span};
+use crate::vectors::{CheckedVector, VectorDescriptor};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use weave_contract::{
@@ -15,6 +16,8 @@ pub enum ScalarType {
     String,
     Time,
     Interval,
+    Vector(VectorDescriptor),
+    VectorReference { name: String, span: Span },
     Decimal,
     Quantity(UnitDescriptor),
 }
@@ -26,6 +29,7 @@ pub enum ScalarValue {
     String(String),
     Time(i64),
     Interval(TimeInterval),
+    Vector(CheckedVector),
     Decimal(Decimal),
     Quantity(Quantity),
 }
@@ -37,6 +41,7 @@ impl ScalarValue {
             Self::String(_) => ScalarType::String,
             Self::Time(_) => ScalarType::Time,
             Self::Interval(_) => ScalarType::Interval,
+            Self::Vector(v) => ScalarType::Vector(v.descriptor().clone()),
             Self::Decimal(_) => ScalarType::Decimal,
             Self::Quantity(q) => ScalarType::Quantity(q.unit().clone()),
         }
@@ -45,6 +50,7 @@ impl ScalarValue {
         match self {
             Self::String(s) => s.len() + 32,
             Self::Interval(_) => 128,
+            Self::Vector(v) => v.size(),
             Self::Quantity(q) => {
                 q.unit().dimension_id().len()
                     + q.unit().unit_id().len()
@@ -60,6 +66,14 @@ impl ScalarValue {
             Self::Integer(v) | Self::Time(v) => serde_json::json!(v),
             Self::String(v) => serde_json::json!(v),
             Self::Interval(v) => serde_json::json!(v),
+            Self::Vector(v) => {
+                let mut value = serde_json::to_value(v).expect("finite checked vector");
+                value
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("kind".into(), "coordinates".into());
+                value
+            }
             Self::Decimal(v) => serde_json::json!(v),
             Self::Quantity(v) => serde_json::json!(v),
         }
@@ -74,6 +88,11 @@ pub struct ScalarExpr {
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum ScalarExpression {
     Literal(ScalarValue),
+    VectorLiteral {
+        name: String,
+        type_span: Span,
+        values: Vec<f64>,
+    },
     Parameter(String),
     Value(String),
     Convert {
@@ -169,6 +188,9 @@ impl Budget {
 fn output(operator: &str, args: &[ScalarType], span: Span) -> Result<ScalarType, Diagnostic> {
     use ScalarType::*;
     let expected = match operator {
+        "vector_equal" if args.len() == 2 && args[0] == args[1] && matches!(args[0], Vector(_)) => {
+            Some(Boolean)
+        }
         "time_equal" | "time_lt" if args == [Time, Time] => Some(Boolean),
         "interval" if args == [Time, Time] => Some(Interval),
         "interval_open" if args == [Time] => Some(Interval),
@@ -225,6 +247,7 @@ impl ScalarExpr {
     pub(crate) fn retained_bytes(&self) -> usize {
         64 + match &self.expression {
             ScalarExpression::Literal(v) => v.size(),
+            ScalarExpression::VectorLiteral { name, values, .. } => name.len() + values.len() * 32,
             ScalarExpression::Parameter(n) | ScalarExpression::Value(n) => n.len(),
             ScalarExpression::Call {
                 operator,
@@ -249,7 +272,7 @@ impl ScalarExpr {
     ) -> Result<Option<ScalarValue>, Diagnostic> {
         budget.step(self.span)?;
         let closed = match &self.expression {
-            ScalarExpression::Literal(_) => true,
+            ScalarExpression::Literal(_) | ScalarExpression::VectorLiteral { .. } => true,
             ScalarExpression::Parameter(_) => false,
             ScalarExpression::Value(n) => values.contains_key(n),
             ScalarExpression::Call { arguments, .. } => {
@@ -276,6 +299,11 @@ impl ScalarExpr {
     ) -> Result<ScalarType, Diagnostic> {
         match &self.expression {
             ScalarExpression::Literal(v) => Ok(v.value_type()),
+            ScalarExpression::VectorLiteral { .. } => Err(error(
+                "E_VECTOR_DESCRIPTOR",
+                "Unresolved vector type",
+                self.span,
+            )),
             ScalarExpression::Parameter(n) => params.get(n).cloned().ok_or_else(|| {
                 error(
                     "E_FUNCTION_SCOPE",
@@ -322,6 +350,13 @@ impl ScalarExpr {
     ) -> Result<ScalarValue, Diagnostic> {
         budget.step(self.span)?;
         let value = match &self.expression {
+            ScalarExpression::VectorLiteral { .. } => {
+                return Err(error(
+                    "E_VECTOR_DESCRIPTOR",
+                    "Unresolved vector type",
+                    self.span,
+                ));
+            }
             ScalarExpression::Literal(v) => {
                 budget.charge(v.size(), self.span)?;
                 v.clone()
@@ -372,6 +407,12 @@ impl ScalarExpr {
                 use ScalarValue::*;
                 let numeric = |message: &str| error("E_NUMERIC", message, self.span);
                 match args.as_slice() {
+                    [Vector(a), Vector(b)] => {
+                        for _ in a.values() {
+                            budget.step(self.span)?;
+                        }
+                        Boolean(a == b)
+                    }
                     [Time(a), Time(b)] => match operator.as_str() {
                         "time_equal" => Boolean(a == b),
                         "time_lt" => Boolean(a < b),
