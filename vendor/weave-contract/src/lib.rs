@@ -29,6 +29,8 @@ pub mod rules;
 mod rules_types;
 pub use rules_types::*;
 pub mod algebra;
+// Development handoff: bounded pure carrier algebra, without wire integration.
+pub mod carrier_algebra;
 pub mod identity;
 pub use identity::SourceRevision;
 mod algebra_types;

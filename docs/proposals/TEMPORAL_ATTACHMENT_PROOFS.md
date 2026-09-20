@@ -90,10 +90,14 @@ not a newly serialized empty group list that would turn denial into truth.
 - Disjunction is only for alternative proofs of the **same** record/value, never
   for merging different graph inputs. Distribute each side's flat requirements
   into that side's alternatives, then concatenate/deduplicate the bounded groups.
-  A side with no groups but nonempty flats becomes a group of those flats; a side
-  with neither flats nor groups is an unconditional proof and makes the alternative
-  requirement unnecessary. This operation is internal to trusted computation;
-  serialized references still cannot authenticate user claims.
+  A side with no groups but nonempty flats becomes a group of those flats. The
+  bounded helper rejects unconditional-plus-restricted disjunction with
+  `E_INFLUENCE_DISJUNCTION_PROFILE`: removing the restriction would discard the
+  restricted branch's explanation, and an empty authorization group is invalid.
+  Both-unconditional disjunction has no traces to discard. This is deliberately
+  not full Boolean disjunction support; no new persisted trace field is proposed.
+  This operation is internal to trusted computation; serialized references still
+  cannot authenticate user claims.
 - Union of two graph values conjuncts their whole-value carriers. It must not use
   proof disjunction to release one input merely because the other is public.
 - Normalize newly constructed reference sets by exact graph/revision/object keys.
@@ -123,6 +127,35 @@ binary cannot load a record while ignoring its OR gate. Existing older capsules
 must reject new restriction fields; the owner must choose and test the next capsule
 profile rather than silently reinterpreting an older format. Signed transport
 responses must bind the actual negotiated capsule format as they already do.
+
+### Historical validation scope
+
+Read-only audit of engine history found individual empty premise groups rejected
+by native legacy-edge validation since its introduction (`61c4673`) and by explicit
+Assertion validation since introduction (`0da99fc`). Current validators accept
+node-only groups but reject groups with both assertion and node premises empty.
+An omitted or empty **list** of derivations remains valid legacy behavior. The
+portable `influence::validate_graph` has intentionally looser checks: its existing
+empty-group acceptance must not be tightened retroactively by this new helper.
+Reason and Explain independently reject missing real proof premises. Snapshot-only
+new groups require the new explicit field/profile and cannot reinterpret an old
+empty group merely because it contains descriptive `input_snapshots`.
+
+The proposed aggregate raw-reference limit applies to the new carrier profile,
+not retroactively to historical Edge/Assertion collections that were validated
+under their existing per-group/index limits. Any strengthening of historical
+records would require a separately specified migration and compatibility proof.
+
+### Vendor-only prototype
+
+`carrier_algebra.rs` keeps temporary `Carrier { flat, alternatives }` and
+`Alternative { derivation, snapshot_premises }` types outside executable DTOs.
+It implements checked construction/composition with a shared budget; it does not
+resolve references, grant authority, deserialize a new wire profile or modify old
+GraphInfluence/Node/Attachment fields. The caller-owned native authorization context
+will separately need the same shared recursion/work discipline. Its Boolean oracle
+uses exhaustive assignments to assertion/node/snapshot atoms, not the implementation's
+merge routines, and tests the explicit unconditional-disjunction limitation.
 
 This is a proposed coherent delta, **not yet approved or implemented**. If the
 engine can express the empty path with an existing authorized carrier while
@@ -168,3 +201,18 @@ AND of OR groups (bounded product), not a union of all proof leaves.
 Engine owns the canonical enum/version/store/auth boundary after facade A freeze.
 Language's current vendor-only prototype must not be integrated as a finished
 canonical contract until this composition seam is resolved and exercised natively.
+
+## Local pure-algebra evidence
+
+Vendor-only prototype verification: 7 focused carrier tests passed, including
+1,808 independent truth-table assertions. The same built test binary passed all
+50 portable contract unit tests (43 pre-existing plus 7 new). Strict contract
+all-target Clippy and the new module's rustfmt check passed. The checks used the
+existing target/cache with two low-priority jobs. The standalone generated lockfile
+was removed afterward; no package, protocol, store or executable DTO changed.
+
+These are pure algebra tests. The empty-target-to-scalar test models carrier
+copy/composition; it is not evidence that native metadata, Support, persistence,
+revocation or capsule code already implements the new profile. Those remain required
+owner integration/acceptance checks. The unexported temporal prototype remains
+separate WIP until those semantics are coherent.
