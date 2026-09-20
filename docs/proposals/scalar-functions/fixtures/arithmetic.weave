@@ -1,0 +1,43 @@
+// Proposed syntax: not executable until the scalar-function profile is implemented.
+function Sum revision "1" (decimal left, decimal right) returns decimal {
+  return decimal_add(param left, param right);
+}
+function Increment revision "1" (integer input) returns integer {
+  return integer_add(param input, 1);
+}
+function Negate revision "1" (boolean input) returns boolean {
+  return boolean_not(param input);
+}
+function Label revision "1" (string input) returns string {
+  return string_concat(param input, " ✓");
+}
+function Twice revision "1"
+  (quantity input dimension "length" unit "metre" revision "1")
+  returns quantity dimension "length" unit "metre" revision "1" {
+  return quantity_scale(param input, decimal "2");
+}
+apply AddTenth from Sum { decimal left decimal "0.1"; }
+apply Total from AddTenth { decimal right decimal "0.2"; }
+apply ExactInteger from Increment { integer input 9007199254740993; }
+apply Flag from Negate { boolean input false; }
+apply Text from Label { string input "length"; }
+apply Length from Twice {
+  quantity input quantity "1.250" dimension "length" unit "metre" revision "1";
+}
+schema Scalars revision "1" {
+  node Result space "values" {
+    property "total" decimal required;
+    property "count" integer required;
+    property "flag" boolean required;
+    property "label" string required;
+    property "length" quantity dimension "length" unit "metre" revision "1" required;
+  }
+}
+graph Results schema Scalars {
+  node "result" type Result entity "result" space "values"
+    property "total" value Total
+    property "count" value ExactInteger
+    property "flag" value Flag
+    property "label" value Text
+    property "length" value Length;
+}

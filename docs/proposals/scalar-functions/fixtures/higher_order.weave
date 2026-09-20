@@ -1,0 +1,15 @@
+// Proposed syntax: partial scalar closures have an explicit remaining signature.
+function Offset revision "1" (integer input, integer delta) returns integer {
+  return integer_add(param input, param delta);
+}
+function Transform revision "1"
+  (integer input, function transform(integer input) returns integer)
+  returns integer {
+  apply Output from transform { integer input param input; }
+  return value Output;
+}
+apply AddTwo from Offset { integer delta 2; }
+apply Specialized from Transform { function transform AddTwo; }
+apply HigherOrder from Specialized { integer input 40; }
+apply Direct from Offset { integer input 40; integer delta 2; }
+value Reference 42;

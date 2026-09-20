@@ -1,0 +1,51 @@
+{
+  "status": "proposed_not_executable_yet",
+  "positive": [
+    {
+      "file": "arithmetic.weave",
+      "values": {
+        "Total": {"type": "decimal", "value": "0.3"},
+        "ExactInteger": {"type": "integer", "value": 9007199254740994},
+        "Flag": {"type": "boolean", "value": true},
+        "Text": {"type": "string", "value": "length ✓"},
+        "Length": {"type": "quantity", "amount": "2.5", "dimension_id": "length", "unit_id": "metre", "revision": "1"}
+      },
+      "assertions": ["one authored graph commit only; scalar applications emit no query/bind/evaluate commands", "persisted properties equal handwritten canonical literals", "schema descriptor unchanged"]
+    },
+    {
+      "file": "higher_order.weave",
+      "equal_values": ["HigherOrder", "Direct", "Reference"],
+      "value": 42,
+      "runtime_commands": 0,
+      "assertions": ["partial closure AddTwo retains integer input and integer output", "scalar-only result change changes specialization fingerprint"]
+    },
+    {
+      "file": "typed_graph.weave",
+      "equal_runtime_results": ["Selected", "Reference"],
+      "assertions": ["full Infrastructure schema retained", "At remains Time, not Integer", "pure body emits no source query"]
+    }
+  ],
+  "negative": [
+    {"case": "pass integer value 5 to a time parameter", "code": "E_PARAMETER_TYPE"},
+    {"case": "pass raw string 0.1 to Decimal parameter", "code": "E_PARAMETER_TYPE"},
+    {"case": "Quantity parameter metre@1 receives metre@2", "code": "E_PARAMETER_TYPE"},
+    {"case": "returns integer body returns true, even when function unused", "code": "E_SCALAR_RETURN"},
+    {"case": "scalar higher-order callback has graph result or wrong remaining parameter name", "code": "E_FUNCTION_SIGNATURE"},
+    {"case": "integer_add(i64::MAX, 1)", "code": "E_NUMERIC"},
+    {"case": "integer_div(3, 2)", "code": "E_NUMERIC"},
+    {"case": "decimal_div(decimal 1, decimal 3)", "code": "E_NUMERIC"},
+    {"case": "parameter-dependent zero denominator upon application", "code": "E_NUMERIC", "location": "operator body span plus call trace"},
+    {"case": "unknown value reference inside imported function", "code": "E_SCALAR_UNKNOWN", "location": "original imported file span"},
+    {"case": "function refers to entry-global scalar without an explicit parameter", "code": "E_FUNCTION_SCOPE"},
+    {"case": "scalar-only expansion exceeds step or retained-byte quota", "code": "E_SCALAR_BUDGET"},
+    {"case": "Decimal/Quantity function result used in incompatible graph property schema", "code": "existing schema diagnostic", "assertion": "no silent cast or schema removal"}
+  ],
+  "additional_regressions": [
+    "unused parameter-dependent division type-checks without fake-zero evaluation",
+    "import diamond and alias rename preserve source and specialization identities",
+    "transitively captured scalar definition keeps original source revision manifest",
+    "user literal object keys span, value and param remain data",
+    "graph-value current visibility and schema tests remain unchanged",
+    "native and WASM specialization produce identical typed values and plan bytes"
+  ]
+}

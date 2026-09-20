@@ -1,0 +1,22 @@
+// Proposed syntax: scalar computations preserve existing graph schema obligations.
+schema Infrastructure revision "1" {
+  node Device space "operations" {}
+  edge Connected from Device to Device {}
+}
+function Instant revision "1" (time input) returns time {
+  return param input;
+}
+function Select revision "1" (graph input schema Infrastructure, time instant)
+  returns graph schema Infrastructure {
+  apply At from Instant { time input param instant; }
+  value Relation string_concat("con", "nected");
+  lens Result from input { match relation value Relation; at value At; }
+  return Result;
+}
+graph Network schema Infrastructure {
+  node "a" type Device entity "A" space "operations";
+  node "b" type Device entity "B" space "operations";
+  edge "link" type Connected from "a" to "b" relation "connected" valid 0 until 10;
+}
+apply Selected from Select { graph input Network; time instant 5; }
+lens Reference from Network { match relation "connected"; at 5; }
