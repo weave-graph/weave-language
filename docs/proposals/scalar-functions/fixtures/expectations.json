@@ -1,5 +1,5 @@
 {
-  "status": "proposed_not_executable_yet",
+  "status": "accepted_profile_executable_fixtures",
   "positive": [
     {
       "file": "arithmetic.weave",

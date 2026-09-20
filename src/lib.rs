@@ -5,6 +5,7 @@ pub mod decimal;
 mod functions;
 mod graph_types;
 pub mod modules;
+pub mod scalars;
 pub mod syntax;
 use std::collections::{BTreeMap, BTreeSet};
 use syntax::{AlgebraOperation, BindingValue, Item, Metadata, Statement, StringExpr, TimeExpr};
@@ -119,7 +120,23 @@ fn emit_snapshot(
 pub fn compile(source: &str) -> Result<Program, Diagnostic> {
     compile_parsed(parse(source)?)
 }
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct SpecializedProgram {
+    pub program: Program,
+    pub values: BTreeMap<String, scalars::ScalarValue>,
+}
+impl SpecializedProgram {
+    pub fn fingerprint(&self) -> Result<String, Diagnostic> {
+        weave_contract::identity::source_fingerprint(&serde_json::json!({"profile":"weave-source-specialization-v1","program":self.program,"values":self.values})).map_err(|e|diagnostic(&e.code,e.message,(0,0)))
+    }
+}
+pub fn specialize(source: &str) -> Result<SpecializedProgram, Diagnostic> {
+    specialize_parsed(parse(source)?)
+}
 pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnostic> {
+    Ok(specialize_parsed(parsed)?.program)
+}
+pub(crate) fn specialize_parsed(parsed: syntax::Program) -> Result<SpecializedProgram, Diagnostic> {
     for statement in &parsed.statements {
         if let Statement::Import { name_span, .. } | Statement::ModuleHeader { name_span, .. } =
             statement
@@ -132,7 +149,7 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
         }
     }
     let source_revisions = functions::source_revisions(&parsed)?;
-    let ast = functions::expand(parsed)?;
+    let (ast, scalar_values) = functions::expand(parsed)?;
     let mut names: BTreeMap<String, Lens> = BTreeMap::new();
     let mut commands = Vec::new();
     let mut declared = BTreeSet::new();
@@ -267,6 +284,7 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
             | Statement::ContextSchema { .. }
             | Statement::Schema { .. }
             | Statement::Transaction { .. }
+            | Statement::Value { .. }
             | Statement::Function { .. }
             | Statement::Apply { .. }
             | Statement::Rules { .. } => unreachable!(),
@@ -317,6 +335,7 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
             | Statement::ContextSchema { .. }
             | Statement::Schema { .. }
             | Statement::Transaction { .. }
+            | Statement::Value { .. }
             | Statement::Function { .. }
             | Statement::Apply { .. }
             | Statement::Rules { .. } => unreachable!(),
@@ -493,7 +512,10 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
                                 to,
                                 predicate,
                                 metadata: refs(&metadata),
-                                properties,
+                                properties: properties
+                                    .into_iter()
+                                    .map(|(k, v)| (k, v.into_json()))
+                                    .collect(),
                                 readers: Vec::new(),
                             });
                         }
@@ -545,7 +567,10 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
                                 } else {
                                     Polarity::Positive
                                 },
-                                properties,
+                                properties: properties
+                                    .into_iter()
+                                    .map(|(k, v)| (k, v.into_json()))
+                                    .collect(),
                                 metadata: refs(&metadata),
                                 readers: vec![],
                                 derived_from: vec![],
@@ -560,6 +585,7 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
                             host,
                             key,
                             value,
+                            literal: _,
                             valid_from,
                             valid_to,
                             required,
@@ -604,7 +630,10 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
                             type_id,
                             entity_id: entity,
                             space_id: space,
-                            properties,
+                            properties: properties
+                                .into_iter()
+                                .map(|(k, v)| (k, v.into_json()))
+                                .collect(),
                             metadata: refs(&metadata),
                             readers: Vec::new(),
                         }),
@@ -664,7 +693,10 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
                                 } else {
                                     Polarity::Positive
                                 },
-                                properties,
+                                properties: properties
+                                    .into_iter()
+                                    .map(|(k, v)| (k, v.into_json()))
+                                    .collect(),
                                 metadata: refs(&metadata),
                                 readers: Vec::new(),
                                 derived_from: Vec::new(),
@@ -963,6 +995,7 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
                         match expression {
                             StringExpr::Literal(v) => lens.query.predicate = Some(v),
                             StringExpr::Parameter(p) => lens.relation = Some(p),
+                            StringExpr::Value(_) => unreachable!("resolved scalar selector"),
                         }
                     }
                 }
@@ -980,6 +1013,7 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
                         match expression {
                             TimeExpr::Literal(v) => lens.query.valid_at = Some(v),
                             TimeExpr::Parameter(p) => lens.time = Some(p),
+                            TimeExpr::Value(_) => unreachable!("resolved scalar selector"),
                         }
                     }
                 }
@@ -1142,10 +1176,13 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
             }
         }
     }
-    Ok(Program {
-        source_revisions,
-        version: VERSION.into(),
-        commands,
+    Ok(SpecializedProgram {
+        values: scalar_values,
+        program: Program {
+            source_revisions,
+            version: VERSION.into(),
+            commands,
+        },
     })
 }
 

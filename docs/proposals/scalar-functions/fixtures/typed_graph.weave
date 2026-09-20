@@ -1,4 +1,4 @@
-// Proposed syntax: scalar computations preserve existing graph schema obligations.
+// Executed fixture: scalar computations preserve existing graph schema obligations.
 schema Infrastructure revision "1" {
   node Device space "operations" {}
   edge Connected from Device to Device {}

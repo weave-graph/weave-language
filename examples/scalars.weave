@@ -1,4 +1,4 @@
-// Executed acceptance fixture for the source-only scalar-function profile.
+// Pure scalar specialization; only the authored Results graph becomes a runtime commit.
 function Sum revision "1" (decimal left, decimal right) returns decimal {
   return decimal_add(param left, param right);
 }
@@ -41,3 +41,5 @@ graph Results schema Scalars {
     property "label" value Text
     property "length" value Length;
 }
+
+lens Stored from Results {}

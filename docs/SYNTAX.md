@@ -126,7 +126,7 @@ apply Specialized from Transform { function transform AtFifteen; }
 apply Output from Specialized { graph input Evidence; }
 ```
 
-`apply` binds named arguments once. Incomplete application yields an immutable function value; complete application yields a graph value. Graph arguments are captured as immutable program-local graph bindings when supplied, including during partial application. Scalar arguments currently support strings and signed Unix-millisecond time values. Function arguments have one remaining graph parameter named `input` and return a graph. Graph parameter schemas are retained through evaluation; exact static schema-constrained signatures are documented in [schema functions](SCHEMA_FUNCTIONS.md); dynamic schema assertions remain future work.
+`apply` binds named arguments once. Incomplete application yields an immutable function value; complete application yields a graph value. Graph arguments are captured as immutable program-local graph bindings when supplied, including during partial application. Scalar arguments support Boolean, Integer, String, Time, exact Decimal and nominal Quantity; see [scalar functions](SCALAR_FUNCTIONS.md). Function arguments have one remaining graph parameter named `input` and return a graph. Graph parameter schemas are retained through evaluation; exact static schema-constrained signatures are documented in [schema functions](SCHEMA_FUNCTIONS.md); dynamic schema assertions remain future work.
 
 Bodies may compose input graphs and previously declared pure functions. They cannot read undeclared global graphs, declare sources or writes, recurse, or access host effects. Body variables are hygienically renamed. Function definitions are checked even when unused. Expansion is bounded to depth 32, 10,000 emitted statements and 4 MiB of serialized AST; exceeding a bound is an error rather than a partial executable plan.
 
@@ -247,7 +247,7 @@ quantity_convert(quantity "3" dimension "length" unit "metre" revision "1", {
 })
 ```
 
-The last expression applies the caller's explicit rational factor; its labels do not establish a real-world conversion. This is pure arithmetic on authored literal data, not an authenticated conversion service over stored assertions. Graph-service conversion authority, time/context/provenance, affine offsets, quantity products/dimension algebra, general numeric function parameters and vector types remain separate requirements.
+The last expression applies the caller's explicit rational factor; its labels do not establish a real-world conversion. This is pure arithmetic on authored literal data, not an authenticated conversion service over stored assertions. Graph-service conversion authority, time/context/provenance, affine offsets, quantity products/dimension algebra, vector types and runtime data-dependent scalar evaluation remain separate requirements.
 
 ## Pinned native graph services (protocol 0.13)
 
@@ -286,3 +286,7 @@ Graph parameters optionally add `schema Name`, and signatures may add `returns g
 ## Protocol 0.15 result identity and restrictions
 
 The compiler emits 0.15 plans. Metadata navigation now returns path-qualified node wrappers while retaining original source dependencies. Nested original-node metadata selectors have a narrow exact-snapshot/attachment-provenance shorthand; projection continues to require current result IDs and rejects missing members atomically. See [the 0.15 pairing guide](PROTOCOL_015.md) for examples, compatibility boundaries and persisted whole-value influences.
+
+## Ordinary scalar functions (source-only, protocol 0.15 unchanged)
+
+Explicit scalar returns, partial application, typed unary callbacks, immutable `value` bindings, exact arithmetic and compile-time literal substitution are described in [scalar functions](SCALAR_FUNCTIONS.md). `weave values` exposes typed results and a separate specialization identity. Scalar-returning functions cannot accept graph inputs or emit graph operations.

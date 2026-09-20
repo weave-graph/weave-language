@@ -30,3 +30,9 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - run: cargo check --locked --lib --target wasm32-unknown-unknown
+      - run: cargo build --locked --example scalar_parity
+      - run: cargo build --locked --example scalar_parity --target wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python3 scripts/check_scalar_parity.py --native target/debug/examples/scalar_parity --wasm target/wasm32-unknown-unknown/debug/examples/scalar_parity.wasm

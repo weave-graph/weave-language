@@ -106,6 +106,15 @@ impl<'a> Resolver<'a> {
         top: bool,
         locals: &BTreeSet<String>,
     ) -> Result<(), Diagnostic> {
+        let mut scalar_error = None;
+        crate::syntax::scalar_expressions(statement, &mut |e| {
+            if let Err(error) = e.visit_references(&mut |n, span, _| Self::local_graph(n, span)) {
+                scalar_error = Some(error);
+            }
+        });
+        if let Some(e) = scalar_error {
+            return Err(e);
+        }
         let (original, span) = declaration(statement);
         let original = original.to_owned();
         if original.starts_with(PREFIX) {
@@ -161,6 +170,10 @@ impl<'a> Resolver<'a> {
                     }
                     scope.insert(parameter.name.clone());
                     self.constraint(&mut parameter.schema)?;
+                    if let Some(c) = &mut parameter.callback {
+                        self.constraint(&mut c.input.schema)?;
+                        self.constraint(&mut c.output_schema)?;
+                    }
                 }
                 self.constraint(output_schema)?;
                 for child in body {
@@ -353,4 +366,22 @@ pub(super) fn shift(statement: &mut Statement, base: usize) {
     let mut json = serde_json::to_value(&*statement).expect("AST serializable");
     ast(&mut json, base);
     *statement = serde_json::from_value(json).expect("offset AST remains well typed");
+    crate::syntax::scalar_expressions(statement, &mut |e| {
+        e.spans(&mut |s| {
+            s.0 += base;
+            s.1 += base;
+        })
+    });
+    crate::syntax::callback_constraints(statement, &mut |s| {
+        s.span.0 += base;
+        s.span.1 += base;
+    });
+    if let Statement::Function { parameters, .. } = statement {
+        for p in parameters {
+            if let Some(c) = &mut p.callback {
+                c.input.span.0 += base;
+                c.input.span.1 += base;
+            }
+        }
+    }
 }

@@ -1,4 +1,4 @@
-// Proposed syntax: partial scalar closures have an explicit remaining signature.
+// Executed fixture: partial scalar closures have an explicit remaining signature.
 function Offset revision "1" (integer input, integer delta) returns integer {
   return integer_add(param input, param delta);
 }

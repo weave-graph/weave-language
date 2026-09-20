@@ -35,6 +35,16 @@ pub struct ModuleDiagnostic {
     pub start: usize,
     pub end: usize,
     pub import_trace: Vec<ImportTrace>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[allow(clippy::box_collection)]
+    // Keep the public error result small; traces are exceptional.
+    pub application_trace: Box<Vec<ApplicationLocation>>,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ApplicationLocation {
+    pub source_id: String,
+    pub start: usize,
+    pub end: usize,
 }
 #[derive(Clone, Debug, Serialize)]
 pub struct Import {
@@ -106,6 +116,7 @@ fn diagnostic(location: &Location, error: Diagnostic) -> ModuleDiagnostic {
             .min(location.length),
         end: error.end.saturating_sub(location.base).min(location.length),
         import_trace: location.trace.clone(),
+        application_trace: Box::default(),
     }
 }
 fn valid_label(s: &str) -> bool {
@@ -295,10 +306,32 @@ impl LinkedProgram {
             .iter()
             .find(|l| error.start >= l.base && error.start <= l.base + l.length)
             .unwrap_or(&self.locations[0]);
-        diagnostic(location, error)
+        let trace = error
+            .trace
+            .iter()
+            .map(|&(start, end)| {
+                let l = self
+                    .locations
+                    .iter()
+                    .find(|l| start >= l.base && start <= l.base + l.length)
+                    .unwrap_or(&self.locations[0]);
+                ApplicationLocation {
+                    source_id: l.id.clone(),
+                    start: start.saturating_sub(l.base).min(l.length),
+                    end: end.saturating_sub(l.base).min(l.length),
+                }
+            })
+            .collect();
+        let mut result = diagnostic(location, error);
+        result.application_trace = Box::new(trace);
+        result
     }
     pub fn compile(&self) -> Result<Program, ModuleDiagnostic> {
-        let mut program = crate::compile_parsed(self.ast.clone()).map_err(|e| self.locate(e))?;
+        Ok(self.specialize()?.program)
+    }
+    pub fn specialize(&self) -> Result<crate::SpecializedProgram, ModuleDiagnostic> {
+        let mut output = crate::specialize_parsed(self.ast.clone()).map_err(|e| self.locate(e))?;
+        let program = &mut output.program;
         for revision in &mut program.source_revisions {
             if let Some(name) = self.identities.get(&revision.name) {
                 revision.name = name.clone();
@@ -318,7 +351,7 @@ impl LinkedProgram {
                 )));
             }
         }
-        Ok(program)
+        Ok(output)
     }
     pub fn fingerprint(&self) -> Result<String, ModuleDiagnostic> {
         weave_contract::identity::program_fingerprint(&self.compile()?, &self.schemas())

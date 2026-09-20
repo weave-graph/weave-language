@@ -3,10 +3,11 @@ use std::{env, fs, io::Read, process};
 fn main() {
     let args: Vec<_> = env::args().skip(1).collect();
     if !(args.len() == 2 || (args.len() == 4 && args[2] == "--modules"))
-        || !["check", "plan", "ast", "describe", "fingerprint"].contains(&args[0].as_str())
+        || !["check", "plan", "ast", "describe", "fingerprint", "values"]
+            .contains(&args[0].as_str())
     {
         eprintln!(
-            "Usage: weave <check|plan|ast|describe|fingerprint> FILE.weave [--modules MAP.json]\nplan emits Weave Engine protocol JSON; host authorization belongs to the engine."
+            "Usage: weave <check|plan|ast|describe|fingerprint|values> FILE.weave [--modules MAP.json]\nplan emits Weave Engine protocol JSON; host authorization belongs to the engine."
         );
         process::exit(2);
     }
@@ -37,6 +38,13 @@ fn main() {
         let linked =
             weave_language::modules::link("entry", &source, &supplied).unwrap_or_else(module_fail);
         match args[0].as_str() {
+            "values" => {
+                let output = linked.specialize().unwrap_or_else(module_fail);
+                println!(
+                    "{}",
+                    serde_json::json!({"values":output.values,"specialization_fingerprint":output.fingerprint().unwrap()})
+                );
+            }
             "ast" => println!("{}", serde_json::to_string_pretty(linked.ast()).unwrap()),
             "describe" => println!(
                 "{}",
@@ -60,7 +68,13 @@ fn main() {
         }
         return;
     }
-    if args[0] == "fingerprint" {
+    if args[0] == "values" {
+        let output = weave_language::specialize(&source).unwrap_or_else(|e| fail(e));
+        println!(
+            "{}",
+            serde_json::json!({"values":output.values,"specialization_fingerprint":output.fingerprint().unwrap()})
+        );
+    } else if args[0] == "fingerprint" {
         match weave_language::fingerprint(&source) {
             Ok(id) => println!("{}", serde_json::json!({"plan_fingerprint":id})),
             Err(e) => fail(e),

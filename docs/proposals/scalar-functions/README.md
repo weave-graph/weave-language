@@ -1,8 +1,6 @@
 # Ordinary scalar functions: proposed source-only profile
 
-Status: design for review; **not implemented**. Based on language `5c3e909` and
-protocol 0.15. The `.weave` files beside this document are acceptance inputs for
-future implementation, not examples accepted by the current compiler.
+Status: historical accepted design, now implemented as the bounded [ordinary scalar profile](../../SCALAR_FUNCTIONS.md). Based on language `5c3e909`; protocol 0.15 is unchanged. The `.weave` files beside this document are executed acceptance fixtures. The implementation additionally rejects graph parameters, graph callbacks and graph operations in scalar-returning functions to preserve zero runtime commands; graph-returning functions may use scalar locals and parameters.
 
 ## Requirement and existing boundary
 
@@ -206,7 +204,7 @@ produces no partial executable plan or partial export table.
 5. Native/WASM compiler parity, source archive build, old fixtures/identities and
    exact vendored contract hashes unchanged; independent review before publication.
 
-Only language-owned files need implementation: new `src/scalars.rs`; syntax,
+Implementation ownership remains language-only: new `src/scalars.rs`; syntax,
 functions, graph-types/module visitors, API/CLI and tests/docs. Do not edit vendored
 contract or engine files. Representative inputs and expected outcomes are in
-`fixtures/`; they are design artifacts until this proposal is approved and built.
+`fixtures/`; they now run as part of compiler conformance.

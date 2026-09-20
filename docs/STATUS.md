@@ -1,11 +1,35 @@
 # Verified status
 
-As of 2026-09-19, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
+As of 2026-09-20, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
+
+## Ordinary scalar checkpoint (source-only)
+
+[Scalar functions](SCALAR_FUNCTIONS.md) now support exact typed scalar parameters,
+results, partial application and explicit unary callbacks. Typed scalar expressions
+lower to existing protocol 0.15 properties and literal attachments. Scalar-returning
+functions cannot capture/read graphs or emit graph operations; broader mixed-result
+functions remain open. L01–L03 remain partial, not complete.
+
+Local evidence: all 122 tests passed before the final scalar graph-input guard;
+the changed scalar/root suites then passed all 21 cases, covering 123 total test
+cases. Strict all-target Clippy and formatting passed. All 21 previously tracked
+top-level examples produced the same complete JSON plans/source manifests as public
+compiler `5c3e909`. Exact vendor verification passed for 24 protocol files; all three
+original paper artifacts verified. Cargo used two low-priority jobs and one cache.
+
+Executed compiler parity passed: **5,095 identical JSON bytes**, four typed value/plan
+cases and three diagnostic cases, native versus Node WebAssembly, with zero WASM
+host imports. This is stronger than a WASM compilation check and remains a bounded
+fixed compiler profile, not browser persistence. Actual scalar CLI acceptance
+passed against the protocol-0.15 schema-12 runtime baseline: canonical Decimal and
+Quantity values, unchanged typed graph schema, fresh-process pinned replay and
+failed specialization emitting no runnable plan. Source-archive verification is
+recorded in the final orchestrator handoff; publication remains orchestrator-owned.
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
 | L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.15 schema/metadata/algebra/assertion/rule/context/geometry and graph-influence implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; 102 tests. Rich graph/vector/quantity types, effects and formatter remain. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; ordinary scalar specialization and 123 test cases now covered. Rich graph/vector/quantity types, effects and formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. Typed total contextual assignments now preserve exact descriptor witnesses; general higher-order lenses/joins and explicit context compatibility remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity resolution now executes with explicit policy/mapping pins; general alignment, stratified absence and richer scenarios remain. |
 | L4 Reactive secure integration | proposed | Public bootstrap declarations only; engine must enforce host authorization. Reactive syntax and differential live views remain. |

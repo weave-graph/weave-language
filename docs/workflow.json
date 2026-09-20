@@ -78,7 +78,11 @@
         "../tests/modules.rs",
         "../tests/root_modules.rs",
         "../tests/module_cli.rs",
-        "../scripts/check_modules.py"
+        "../scripts/check_modules.py",
+        "SCALAR_FUNCTIONS.md",
+        "../tests/scalars.rs",
+        "../tests/root_scalars.rs",
+        "../scripts/check_scalar_parity.py"
       ],
       "provisional": true
     },
@@ -128,7 +132,11 @@
         "../tests/modules.rs",
         "../tests/root_modules.rs",
         "../tests/module_cli.rs",
-        "../scripts/check_modules.py"
+        "../scripts/check_modules.py",
+        "SCALAR_FUNCTIONS.md",
+        "../tests/scalars.rs",
+        "../tests/root_scalars.rs",
+        "../scripts/check_scalar_parity.py"
       ],
       "provisional": true
     },

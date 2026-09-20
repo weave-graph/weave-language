@@ -1,3 +1,6 @@
+use crate::scalars::{
+    LiteralExpr, ScalarExpr, ScalarExpression, ScalarReturn, ScalarType as ValueType, ScalarValue,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use weave_contract::{
@@ -11,6 +14,8 @@ pub struct Diagnostic {
     pub message: String,
     pub start: usize,
     pub end: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub trace: Vec<Span>,
 }
 impl Diagnostic {
     pub(crate) fn new(code: &str, message: impl Into<String>, start: usize, end: usize) -> Self {
@@ -19,6 +24,7 @@ impl Diagnostic {
             message: message.into(),
             start,
             end,
+            trace: vec![],
         }
     }
 }
@@ -30,6 +36,11 @@ pub type Span = (usize, usize);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
+    Value {
+        name: String,
+        name_span: Span,
+        value: ScalarExpr,
+    },
     ModuleHeader {
         name: String,
         name_span: Span,
@@ -104,6 +115,8 @@ pub enum Statement {
         parameters: Vec<FunctionParameter>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         output_schema: Option<SchemaConstraint>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        scalar_return: Option<ScalarReturn>,
         body: Vec<Statement>,
         output: String,
         output_span: Span,
@@ -213,6 +226,14 @@ pub struct FunctionParameter {
     pub kind: ParameterKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schema: Option<SchemaConstraint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub callback: Option<CallbackSignature>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CallbackSignature {
+    pub input: Box<FunctionParameter>,
+    pub output_schema: Option<SchemaConstraint>,
+    pub output_type: Option<ValueType>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -221,6 +242,7 @@ pub enum ParameterKind {
     String,
     Time,
     Function,
+    Scalar(ValueType),
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Argument {
@@ -235,6 +257,7 @@ pub enum ArgumentValue {
     Function(String),
     String(StringExpr),
     Time(TimeExpr),
+    Scalar { kind: String, value: ScalarExpr },
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "operator", rename_all = "snake_case")]
@@ -287,11 +310,13 @@ pub enum AlgebraOperation {
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum StringExpr {
+    Value(ScalarExpr),
     Literal(String),
     Parameter(String),
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum TimeExpr {
+    Value(ScalarExpr),
     Literal(i64),
     Parameter(String),
 }
@@ -317,7 +342,7 @@ pub enum Item {
         to: String,
         predicate: String,
         metadata: Vec<Metadata>,
-        properties: BTreeMap<String, serde_json::Value>,
+        properties: BTreeMap<String, LiteralExpr>,
     },
     Claim {
         id: String,
@@ -329,7 +354,7 @@ pub enum Item {
         valid_from: i64,
         valid_to: Option<i64>,
         metadata: Vec<Metadata>,
-        properties: BTreeMap<String, serde_json::Value>,
+        properties: BTreeMap<String, LiteralExpr>,
     },
     Attachment {
         context: Option<weave_contract::GraphRef>,
@@ -338,6 +363,8 @@ pub enum Item {
         host: MetadataHost,
         key: String,
         value: MetadataValue,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        literal: Option<LiteralExpr>,
         valid_from: i64,
         valid_to: Option<i64>,
         required: bool,
@@ -349,7 +376,7 @@ pub enum Item {
         entity: String,
         space: String,
         metadata: Vec<Metadata>,
-        properties: BTreeMap<String, serde_json::Value>,
+        properties: BTreeMap<String, LiteralExpr>,
     },
     Edge {
         id: String,
@@ -362,7 +389,7 @@ pub enum Item {
         valid_from: i64,
         valid_to: Option<i64>,
         metadata: Vec<Metadata>,
-        properties: BTreeMap<String, serde_json::Value>,
+        properties: BTreeMap<String, LiteralExpr>,
     },
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -826,9 +853,239 @@ impl Parser {
             }
         })
     }
-    fn metadata(
+    fn scalar_type(&mut self) -> Result<ValueType, Diagnostic> {
+        Ok(match self.name()?.as_str() {
+            "boolean" => ValueType::Boolean,
+            "integer" => ValueType::Integer,
+            "string" => ValueType::String,
+            "time" => ValueType::Time,
+            "decimal" => ValueType::Decimal,
+            "quantity" => ValueType::Quantity(self.unit_descriptor()?),
+            _ => return Err(self.error("Expected ordinary scalar type")),
+        })
+    }
+    fn scalar_expr(&mut self, depth: usize) -> Result<ScalarExpr, Diagnostic> {
+        let token = self.take();
+        if depth > 32 {
+            return Err(Diagnostic::new(
+                "E_SCALAR_BUDGET",
+                "Scalar expression depth exceeds 32",
+                token.start,
+                token.end,
+            ));
+        }
+        let expression = match token.kind {
+            Kind::String(v) => ScalarExpression::Literal(ScalarValue::String(v)),
+            Kind::Number(v) => ScalarExpression::Literal(ScalarValue::Integer(v)),
+            Kind::Word(v) if v == "true" || v == "false" => {
+                ScalarExpression::Literal(ScalarValue::Boolean(v == "true"))
+            }
+            Kind::Word(v) if v == "time" => {
+                ScalarExpression::Literal(ScalarValue::Time(self.number()?))
+            }
+            Kind::Word(v) if v == "decimal" => {
+                ScalarExpression::Literal(ScalarValue::Decimal(self.decimal_literal()?))
+            }
+            Kind::Word(v) if v == "quantity" => {
+                let amount = self.decimal_literal()?;
+                ScalarExpression::Literal(ScalarValue::Quantity(
+                    weave_contract::quantity::Quantity::new(amount, self.unit_descriptor()?),
+                ))
+            }
+            Kind::Word(v) if v == "param" => ScalarExpression::Parameter(self.name()?),
+            Kind::Word(v) if v == "value" => ScalarExpression::Value(self.name()?),
+            Kind::Word(operator) if operator == "quantity_convert" => {
+                self.symbol('(')?;
+                let input = Box::new(self.scalar_expr(depth + 1)?);
+                self.symbol(',')?;
+                let raw = self.literal(depth + 1)?;
+                let conversion = serde_json::from_value(raw).map_err(|e| {
+                    Diagnostic::new("E_NUMERIC", e.to_string(), token.start, token.end)
+                })?;
+                self.symbol(')')?;
+                ScalarExpression::Convert {
+                    input,
+                    conversion: Box::new(conversion),
+                }
+            }
+            Kind::Word(operator) => {
+                self.symbol('(')?;
+                let mut arguments = Vec::new();
+                while self.peek().kind != Kind::Symbol(')') {
+                    if arguments.len() >= 2 {
+                        return Err(self.error("Scalar builtins accept at most two arguments"));
+                    }
+                    arguments.push(self.scalar_expr(depth + 1)?);
+                    if self.peek().kind != Kind::Symbol(')') {
+                        self.symbol(',')?;
+                    }
+                }
+                self.symbol(')')?;
+                ScalarExpression::Call {
+                    operator,
+                    arguments,
+                }
+            }
+            _ => {
+                return Err(Diagnostic::new(
+                    "E_SCALAR_TYPE",
+                    "Expected typed scalar expression (no Float coercion)",
+                    token.start,
+                    token.end,
+                ));
+            }
+        };
+        if let ScalarExpression::Parameter(n) | ScalarExpression::Value(n) = &expression
+            && (n.starts_with("__weave_function_") || n.starts_with("__weave_module_"))
+        {
+            return Err(Diagnostic::new(
+                "E_FUNCTION_SCOPE",
+                "Compiler-generated scalar names are not source references",
+                token.start,
+                self.tokens[self.cursor.saturating_sub(1)].end,
+            ));
+        }
+        Ok(ScalarExpr {
+            span: (token.start, self.tokens[self.cursor.saturating_sub(1)].end),
+            expression,
+        })
+    }
+    fn template_literal(&mut self, depth: usize) -> Result<LiteralExpr, Diagnostic> {
+        if depth > 32 {
+            let t = self.peek();
+            return Err(Diagnostic::new(
+                "E_BUDGET",
+                "Structured literal depth exceeds 32",
+                t.start,
+                t.end,
+            ));
+        }
+        if self.peek().kind == Kind::Word("value".into()) {
+            return Ok(LiteralExpr::Scalar(self.scalar_expr(0)?));
+        }
+        if self.peek().kind == Kind::Symbol('[') {
+            self.take();
+            let mut values = Vec::new();
+            while self.peek().kind != Kind::Symbol(']') {
+                values.push(self.template_literal(depth + 1)?);
+                if self.peek().kind != Kind::Symbol(']') {
+                    self.symbol(',')?;
+                }
+            }
+            self.symbol(']')?;
+            return Ok(LiteralExpr::Array(values));
+        }
+        if self.peek().kind == Kind::Symbol('{') {
+            self.take();
+            let mut values = BTreeMap::new();
+            while self.peek().kind != Kind::Symbol('}') {
+                let key_span = (self.peek().start, self.peek().end);
+                let key = self.string()?;
+                self.symbol(':')?;
+                let value = self.template_literal(depth + 1)?;
+                if values.insert(key, value).is_some() {
+                    return Err(Diagnostic::new(
+                        "E_DUPLICATE",
+                        "Duplicate object key",
+                        key_span.0,
+                        key_span.1,
+                    ));
+                }
+                if self.peek().kind != Kind::Symbol('}') {
+                    self.symbol(',')?;
+                }
+            }
+            self.symbol('}')?;
+            return Ok(LiteralExpr::Object(values));
+        }
+        Ok(LiteralExpr::Json(self.literal(depth)?))
+    }
+    fn function_parameter(&mut self, callback: bool) -> Result<FunctionParameter, Diagnostic> {
+        let token = self.take();
+        let Kind::Word(label) = token.kind else {
+            return Err(self.error("Expected parameter type"));
+        };
+        let mut kind = match label.as_str() {
+            "graph" => ParameterKind::Graph,
+            "string" => ParameterKind::String,
+            "time" => ParameterKind::Time,
+            "function" if !callback => ParameterKind::Function,
+            "boolean" => ParameterKind::Scalar(ValueType::Boolean),
+            "integer" => ParameterKind::Scalar(ValueType::Integer),
+            "decimal" => ParameterKind::Scalar(ValueType::Decimal),
+            "quantity" => ParameterKind::Scalar(ValueType::Boolean),
+            _ => return Err(self.error("Expected graph, scalar or function parameter")),
+        };
+        let span = (self.peek().start, self.peek().end);
+        let name = self.name()?;
+        if label == "quantity" {
+            kind = ParameterKind::Scalar(ValueType::Quantity(self.unit_descriptor()?));
+        }
+        let schema = if self.peek().kind == Kind::Word("schema".into()) {
+            self.take();
+            if kind != ParameterKind::Graph {
+                return Err(self.error("Only graph parameters accept schema constraints"));
+            }
+            let span = (self.peek().start, self.peek().end);
+            Some(SchemaConstraint {
+                name: self.name()?,
+                span,
+            })
+        } else {
+            None
+        };
+        let signature = if kind == ParameterKind::Function && self.peek().kind == Kind::Symbol('(')
+        {
+            self.take();
+            let input = self.function_parameter(true)?;
+            if input.name != "input" {
+                return Err(Diagnostic::new(
+                    "E_FUNCTION_SIGNATURE",
+                    "Callback parameter must be named input",
+                    input.span.0,
+                    input.span.1,
+                ));
+            }
+            self.symbol(')')?;
+            self.word("returns")?;
+            let (output_schema, output_type) = self.function_result()?;
+            Some(CallbackSignature {
+                input: Box::new(input),
+                output_schema,
+                output_type,
+            })
+        } else {
+            None
+        };
+        Ok(FunctionParameter {
+            name,
+            span,
+            kind,
+            schema,
+            callback: signature,
+        })
+    }
+    fn function_result(
         &mut self,
-    ) -> Result<(Vec<Metadata>, BTreeMap<String, serde_json::Value>), Diagnostic> {
+    ) -> Result<(Option<SchemaConstraint>, Option<ValueType>), Diagnostic> {
+        if self.peek().kind == Kind::Word("graph".into()) {
+            self.take();
+            let schema = if self.peek().kind == Kind::Word("schema".into()) {
+                self.take();
+                let span = (self.peek().start, self.peek().end);
+                Some(SchemaConstraint {
+                    name: self.name()?,
+                    span,
+                })
+            } else {
+                None
+            };
+            Ok((schema, None))
+        } else {
+            Ok((None, Some(self.scalar_type()?)))
+        }
+    }
+    fn metadata(&mut self) -> Result<(Vec<Metadata>, BTreeMap<String, LiteralExpr>), Diagnostic> {
         let mut result = Vec::new();
         let mut properties = BTreeMap::new();
         loop {
@@ -843,7 +1100,7 @@ impl Parser {
                 self.word("property")?;
                 let key_token = self.peek().clone();
                 let key = self.string()?;
-                let value = self.literal(0)?;
+                let value = self.template_literal(0)?;
                 if properties.insert(key, value).is_some() {
                     return Err(Diagnostic::new(
                         "E_DUPLICATE",
@@ -1223,6 +1480,15 @@ impl Parser {
                 ));
             }
             match kind.as_str() {
+                "value" => {
+                    let value = self.scalar_expr(0)?;
+                    self.symbol(';')?;
+                    statements.push(Statement::Value {
+                        name,
+                        name_span,
+                        value,
+                    });
+                }
                 "import" => {
                     self.word("module")?;
                     let module_id = self.selector_string()?;
@@ -1526,64 +1792,34 @@ impl Parser {
                     self.symbol('(')?;
                     let mut parameters = Vec::new();
                     while self.peek().kind != Kind::Symbol(')') {
-                        let kind = match self.name()?.as_str() {
-                            "graph" => ParameterKind::Graph,
-                            "string" => ParameterKind::String,
-                            "time" => ParameterKind::Time,
-                            "function" => ParameterKind::Function,
-                            _ => {
-                                return Err(self
-                                    .error("Expected graph, string, time or function parameter"));
-                            }
-                        };
-                        let span = (self.peek().start, self.peek().end);
-                        let name = self.name()?;
-                        let schema = if self.peek().kind == Kind::Word("schema".into()) {
-                            self.take();
-                            let span = (self.peek().start, self.peek().end);
-                            if kind != ParameterKind::Graph {
-                                return Err(Diagnostic::new(
-                                    "E_SCHEMA_PARAMETER",
-                                    "Only graph parameters accept schema constraints",
-                                    span.0,
-                                    span.1,
-                                ));
-                            }
-                            Some(SchemaConstraint {
-                                name: self.name()?,
-                                span,
-                            })
-                        } else {
-                            None
-                        };
-                        parameters.push(FunctionParameter {
-                            name,
-                            span,
-                            kind,
-                            schema,
-                        });
+                        parameters.push(self.function_parameter(false)?);
                         if self.peek().kind != Kind::Symbol(')') {
                             self.symbol(',')?;
                         }
                     }
                     self.symbol(')')?;
-                    let output_schema = if self.peek().kind == Kind::Word("returns".into()) {
-                        self.take();
-                        self.word("graph")?;
-                        self.word("schema")?;
-                        let span = (self.peek().start, self.peek().end);
-                        Some(SchemaConstraint {
-                            name: self.name()?,
-                            span,
-                        })
-                    } else {
-                        None
-                    };
+                    let (output_schema, output_type) =
+                        if self.peek().kind == Kind::Word("returns".into()) {
+                            self.take();
+                            self.function_result()?
+                        } else {
+                            (None, None)
+                        };
                     self.symbol('{')?;
                     let body = self.program(2)?.statements;
                     self.word("return")?;
                     let output_span = (self.peek().start, self.peek().end);
-                    let output = self.name()?;
+                    let (output, scalar_return) = if let Some(value_type) = output_type {
+                        (
+                            String::new(),
+                            Some(ScalarReturn {
+                                value_type,
+                                value: self.scalar_expr(0)?,
+                            }),
+                        )
+                    } else {
+                        (self.name()?, None)
+                    };
                     self.symbol(';')?;
                     self.symbol('}')?;
                     statements.push(Statement::Function {
@@ -1592,6 +1828,7 @@ impl Parser {
                         revision,
                         parameters,
                         output_schema,
+                        scalar_return,
                         body,
                         output,
                         output_span,
@@ -1611,6 +1848,18 @@ impl Parser {
                         let value = match kind.as_str() {
                             "graph" => ArgumentValue::Graph(self.name()?),
                             "function" => ArgumentValue::Function(self.name()?),
+                            "boolean" | "integer" | "decimal" | "quantity" => {
+                                ArgumentValue::Scalar {
+                                    kind: kind.clone(),
+                                    value: self.scalar_expr(0)?,
+                                }
+                            }
+                            "string" if matches!(&self.peek().kind,Kind::Word(v) if v!="param") => {
+                                ArgumentValue::String(StringExpr::Value(self.scalar_expr(0)?))
+                            }
+                            "time" if matches!(&self.peek().kind,Kind::Word(v) if v!="param") => {
+                                ArgumentValue::Time(TimeExpr::Value(self.scalar_expr(0)?))
+                            }
                             "string" => ArgumentValue::String(
                                 if self.peek().kind == Kind::Word("param".into()) {
                                     self.take();
@@ -2027,24 +2276,36 @@ impl Parser {
                                 let host = self.metadata_host()?;
                                 self.word("key")?;
                                 let key = self.string()?;
-                                let live = self.peek().kind == Kind::Word("live".into());
-                                if live {
+                                let mut literal = None;
+                                let value = if self.peek().kind == Kind::Word("literal".into()) {
                                     self.take();
-                                }
-                                self.word("graph")?;
-                                let graph_id = self.selector_string()?;
-                                let value = if live {
-                                    self.word("branch")?;
-                                    let branch_id = self.selector_string()?;
-                                    MetadataValue::LiveGraph {
-                                        graph_id,
-                                        branch_id,
+                                    literal = Some(self.template_literal(0)?);
+                                    MetadataValue::Literal {
+                                        value: serde_json::Value::Null,
                                     }
                                 } else {
-                                    self.word("revision")?;
-                                    let revision = self.selector_string()?;
-                                    MetadataValue::Graph {
-                                        reference: weave_contract::GraphRef { graph_id, revision },
+                                    let live = self.peek().kind == Kind::Word("live".into());
+                                    if live {
+                                        self.take();
+                                    }
+                                    self.word("graph")?;
+                                    let graph_id = self.selector_string()?;
+                                    if live {
+                                        self.word("branch")?;
+                                        let branch_id = self.selector_string()?;
+                                        MetadataValue::LiveGraph {
+                                            graph_id,
+                                            branch_id,
+                                        }
+                                    } else {
+                                        self.word("revision")?;
+                                        let revision = self.selector_string()?;
+                                        MetadataValue::Graph {
+                                            reference: weave_contract::GraphRef {
+                                                graph_id,
+                                                revision,
+                                            },
+                                        }
                                     }
                                 };
                                 self.word("valid")?;
@@ -2081,6 +2342,7 @@ impl Parser {
                                     host,
                                     key,
                                     value,
+                                    literal,
                                     valid_from,
                                     valid_to,
                                     required,
@@ -2247,7 +2509,9 @@ impl Parser {
                                 }
                                 self.word("relation")?;
                                 predicate =
-                                    Some(if self.peek().kind == Kind::Word("param".into()) {
+                                    Some(if self.peek().kind == Kind::Word("value".into()) {
+                                        StringExpr::Value(self.scalar_expr(0)?)
+                                    } else if self.peek().kind == Kind::Word("param".into()) {
                                         self.word("param")?;
                                         StringExpr::Parameter(self.name()?)
                                     } else {
@@ -2273,7 +2537,9 @@ impl Parser {
                                     return Err(self.error("Duplicate valid-time filter"));
                                 }
                                 valid_at =
-                                    Some(if self.peek().kind == Kind::Word("param".into()) {
+                                    Some(if self.peek().kind == Kind::Word("value".into()) {
+                                        TimeExpr::Value(self.scalar_expr(0)?)
+                                    } else if self.peek().kind == Kind::Word("param".into()) {
                                         self.word("param")?;
                                         TimeExpr::Parameter(self.name()?)
                                     } else {
@@ -2312,4 +2578,102 @@ pub fn parse(source: &str) -> Result<Program, Diagnostic> {
         cursor: 0,
     }
     .program(0)
+}
+
+/// Visit only typed source expressions; never interpret user JSON object keys.
+pub(crate) fn scalar_expressions(statement: &mut Statement, f: &mut impl FnMut(&mut ScalarExpr)) {
+    fn literal(v: &mut LiteralExpr, f: &mut impl FnMut(&mut ScalarExpr)) {
+        match v {
+            LiteralExpr::Scalar(e) => f(e),
+            LiteralExpr::Array(v) => {
+                for x in v {
+                    literal(x, f)
+                }
+            }
+            LiteralExpr::Object(v) => {
+                for x in v.values_mut() {
+                    literal(x, f)
+                }
+            }
+            _ => (),
+        }
+    }
+    match statement {
+        Statement::Value { value, .. } => f(value),
+        Statement::Function {
+            scalar_return,
+            body,
+            ..
+        } => {
+            if let Some(r) = scalar_return {
+                f(&mut r.value);
+            }
+            for s in body {
+                scalar_expressions(s, f)
+            }
+        }
+        Statement::Transaction { body, .. } => {
+            for s in body {
+                scalar_expressions(s, f)
+            }
+        }
+        Statement::Apply { arguments, .. } => {
+            for a in arguments {
+                match &mut a.value {
+                    ArgumentValue::Scalar { value, .. }
+                    | ArgumentValue::String(StringExpr::Value(value))
+                    | ArgumentValue::Time(TimeExpr::Value(value)) => f(value),
+                    _ => (),
+                }
+            }
+        }
+        Statement::Lens {
+            predicate,
+            valid_at,
+            ..
+        } => {
+            if let Some(StringExpr::Value(v)) = predicate {
+                f(v)
+            }
+            if let Some(TimeExpr::Value(v)) = valid_at {
+                f(v)
+            }
+        }
+        Statement::Graph { items, .. } => {
+            for i in items {
+                match i {
+                    Item::Node { properties, .. }
+                    | Item::Edge { properties, .. }
+                    | Item::Structural { properties, .. }
+                    | Item::Claim { properties, .. } => {
+                        for v in properties.values_mut() {
+                            literal(v, f)
+                        }
+                    }
+                    Item::Attachment {
+                        literal: Some(v), ..
+                    } => literal(v, f),
+                    _ => (),
+                }
+            }
+        }
+        _ => (),
+    }
+}
+pub(crate) fn callback_constraints(
+    statement: &mut Statement,
+    f: &mut impl FnMut(&mut SchemaConstraint),
+) {
+    if let Statement::Function { parameters, .. } = statement {
+        for p in parameters {
+            if let Some(c) = &mut p.callback {
+                if let Some(s) = &mut c.input.schema {
+                    f(s)
+                }
+                if let Some(s) = &mut c.output_schema {
+                    f(s)
+                }
+            }
+        }
+    }
 }
