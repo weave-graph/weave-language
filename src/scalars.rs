@@ -1,5 +1,9 @@
 //! Bounded compile-time ordinary values. No graph reads or host effects.
+use crate::bytes::Bytes as ByteValue;
 use crate::interval::Interval as TimeInterval;
+use crate::references::{
+    AssertionReference, EdgeReference, NodeReference, ObjectReference, SnapshotReference,
+};
 use crate::syntax::{Diagnostic, Span};
 use crate::vectors::{CheckedVector, VectorDescriptor};
 use serde::{Deserialize, Serialize};
@@ -11,6 +15,12 @@ use weave_contract::{
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ScalarType {
+    Bytes,
+    NodeRef,
+    EdgeRef,
+    AssertionRef,
+    SnapshotRef,
+    ObjectRef,
     Boolean,
     Integer,
     String,
@@ -24,6 +34,12 @@ pub enum ScalarType {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum ScalarValue {
+    Bytes(ByteValue),
+    NodeRef(NodeReference),
+    EdgeRef(EdgeReference),
+    AssertionRef(AssertionReference),
+    SnapshotRef(SnapshotReference),
+    ObjectRef(ObjectReference),
     Boolean(bool),
     Integer(i64),
     String(String),
@@ -36,6 +52,12 @@ pub enum ScalarValue {
 impl ScalarValue {
     pub fn value_type(&self) -> ScalarType {
         match self {
+            Self::Bytes(_) => ScalarType::Bytes,
+            Self::NodeRef(_) => ScalarType::NodeRef,
+            Self::EdgeRef(_) => ScalarType::EdgeRef,
+            Self::AssertionRef(_) => ScalarType::AssertionRef,
+            Self::SnapshotRef(_) => ScalarType::SnapshotRef,
+            Self::ObjectRef(_) => ScalarType::ObjectRef,
             Self::Boolean(_) => ScalarType::Boolean,
             Self::Integer(_) => ScalarType::Integer,
             Self::String(_) => ScalarType::String,
@@ -48,6 +70,12 @@ impl ScalarValue {
     }
     pub(crate) fn size(&self) -> usize {
         match self {
+            Self::Bytes(v) => v.size(),
+            Self::NodeRef(v) => v.size(),
+            Self::EdgeRef(v) => v.size(),
+            Self::AssertionRef(v) => v.size(),
+            Self::SnapshotRef(v) => v.size(),
+            Self::ObjectRef(v) => v.size(),
             Self::String(s) => s.len() + 32,
             Self::Interval(_) => 128,
             Self::Vector(v) => v.size(),
@@ -62,6 +90,12 @@ impl ScalarValue {
     }
     pub fn json(&self) -> serde_json::Value {
         match self {
+            Self::Bytes(v) => serde_json::json!({"kind":"bytes","encoding":"hex","value":v}),
+            Self::NodeRef(v) => serde_json::json!({"kind":"node_ref","reference":v}),
+            Self::EdgeRef(v) => serde_json::json!({"kind":"edge_ref","reference":v}),
+            Self::AssertionRef(v) => serde_json::json!({"kind":"assertion_ref","reference":v}),
+            Self::SnapshotRef(v) => serde_json::json!({"kind":"snapshot_ref","reference":v}),
+            Self::ObjectRef(v) => serde_json::json!({"kind":"object_ref","reference":v}),
             Self::Boolean(v) => serde_json::json!(v),
             Self::Integer(v) | Self::Time(v) => serde_json::json!(v),
             Self::String(v) => serde_json::json!(v),
@@ -187,7 +221,24 @@ impl Budget {
 }
 fn output(operator: &str, args: &[ScalarType], span: Span) -> Result<ScalarType, Diagnostic> {
     use ScalarType::*;
+    let reference = |t: &ScalarType| {
+        matches!(
+            t,
+            NodeRef | EdgeRef | AssertionRef | SnapshotRef | ObjectRef
+        )
+    };
     let expected = match operator {
+        "bytes_len" if args == [Bytes] => Some(Integer),
+        "bytes_equal" if args == [Bytes, Bytes] => Some(Boolean),
+        "bytes_concat" if args == [Bytes, Bytes] => Some(Bytes),
+        "node_ref" if args == [String, String, String] => Some(NodeRef),
+        "edge_ref" if args == [String, String, String] => Some(EdgeRef),
+        "assertion_ref" if args == [String, String, String] => Some(AssertionRef),
+        "snapshot_ref" if args == [String, String] => Some(SnapshotRef),
+        "object_ref" if args.len() == 1 && reference(&args[0]) => Some(ObjectRef),
+        "reference_equal" if args.len() == 2 && args[0] == args[1] && reference(&args[0]) => {
+            Some(Boolean)
+        }
         "vector_equal" if args.len() == 2 && args[0] == args[1] && matches!(args[0], Vector(_)) => {
             Some(Boolean)
         }
@@ -406,7 +457,103 @@ impl ScalarExpr {
                 )?;
                 use ScalarValue::*;
                 let numeric = |message: &str| error("E_NUMERIC", message, self.span);
+                if operator == "object_ref" {
+                    budget.charge(args[0].size() + 128, self.span)?;
+                    return Ok(ObjectRef(match &args[0] {
+                        NodeRef(r) => ObjectReference::Node(r.clone()),
+                        EdgeRef(r) => ObjectReference::Edge(r.clone()),
+                        AssertionRef(r) => ObjectReference::Assertion(r.clone()),
+                        SnapshotRef(r) => ObjectReference::Snapshot(r.clone()),
+                        ObjectRef(r) => r.clone(),
+                        _ => unreachable!("checked object widening"),
+                    }));
+                }
+                if operator == "reference_equal" {
+                    for _ in 0..(args[0].size() + args[1].size()).div_ceil(64) {
+                        budget.step(self.span)?;
+                    }
+                    return Ok(Boolean(args[0] == args[1]));
+                }
+                if ["node_ref", "edge_ref", "assertion_ref", "snapshot_ref"]
+                    .contains(&operator.as_str())
+                {
+                    let strings: Vec<_> = args
+                        .iter()
+                        .map(|v| {
+                            if let String(s) = v {
+                                s.as_str()
+                            } else {
+                                unreachable!("checked reference constructor")
+                            }
+                        })
+                        .collect();
+                    if strings.iter().any(|s| s.is_empty() || s.len() > 512) {
+                        return Err(error(
+                            "E_REFERENCE_VALUE",
+                            "Reference identities require nonempty strings of at most 512 UTF-8 bytes",
+                            self.span,
+                        ));
+                    }
+                    budget.charge(
+                        256 + strings.iter().map(|s| s.len() * 6).sum::<usize>(),
+                        self.span,
+                    )?;
+                    let graph_id = strings[0].to_owned();
+                    let revision = strings[1].to_owned();
+                    return Ok(match operator.as_str() {
+                        "node_ref" => NodeRef(
+                            NodeReference::new(weave_contract::NodeRef {
+                                graph_id,
+                                revision,
+                                node_id: strings[2].into(),
+                            })
+                            .expect("validated identity"),
+                        ),
+                        "edge_ref" => EdgeRef(
+                            EdgeReference::new(weave_contract::StructuralRef {
+                                graph_id,
+                                revision,
+                                edge_id: strings[2].into(),
+                            })
+                            .expect("validated identity"),
+                        ),
+                        "assertion_ref" => AssertionRef(
+                            AssertionReference::new(weave_contract::AssertionRef {
+                                graph_id,
+                                revision,
+                                assertion_id: strings[2].into(),
+                            })
+                            .expect("validated identity"),
+                        ),
+                        _ => SnapshotRef(
+                            SnapshotReference::new(weave_contract::GraphRef { graph_id, revision })
+                                .expect("validated identity"),
+                        ),
+                    });
+                }
                 match args.as_slice() {
+                    [Bytes(a)] => Integer(a.len() as i64),
+                    [Bytes(a), Bytes(b)] => {
+                        for _ in 0..(a.len() + b.len()).div_ceil(64) {
+                            budget.step(self.span)?;
+                        }
+                        if operator == "bytes_equal" {
+                            Boolean(a == b)
+                        } else {
+                            if a.len() + b.len() > crate::bytes::MAX_BYTES {
+                                return Err(error(
+                                    "E_BYTES_BUDGET",
+                                    "Bytes exceed the 256 KiB value bound",
+                                    self.span,
+                                ));
+                            }
+                            budget.charge((a.len() + b.len()) * 2 + 128, self.span)?;
+                            Bytes(
+                                a.concat(b)
+                                    .map_err(|e| error(e.code(), e.to_string(), self.span))?,
+                            )
+                        }
+                    }
                     [Vector(a), Vector(b)] => {
                         for _ in a.values() {
                             budget.step(self.span)?;

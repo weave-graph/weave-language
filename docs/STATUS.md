@@ -2,6 +2,34 @@
 
 As of 2026-09-20, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
 
+## Bytes and typed pinned reference values (source-only, protocol 0.18)
+
+Checked Bytes and distinct NodeRef/structural EdgeRef/AssertionRef/SnapshotRef values
+now participate in pure functions, partial unary callbacks, captured definitions and
+exact pinned source modules. ObjectRef widening is explicit; every kind/revision/ID
+remains part of identity. Bytes normalize hex casing and support empty data,
+length/equality and bounded concatenation. Private wrappers and strict serde enforce
+all value bounds. New metadata/property lowerings are typed Literal envelopes, not
+native traversable references, proof carriers or authority. See
+[the profile](BYTES_AND_REFERENCES.md).
+
+Local verification passed **183 workspace/all-target tests**, including nine new
+Bytes/reference cases, strict workspace Clippy, rustfmt and exact vendor/source
+checks. Actual compiler→unchanged protocol-0.18 engine acceptance preserves canonical
+hex, exact object kinds/pins and fresh-process replay; missing/private named targets
+introduce no traversal or extra input snapshots, and a direct private-node read stays
+denied. A source regression covers the independently found empty-Bytes parser issue
+without weakening identifier validation.
+
+[Executed SDK parity](measurements/2026-09-20-bytes-references.json) produced
+**551,390 identical response bytes across 23 arbitrary native/WASM requests**, including
+all 256 octets, invalid values and literal reference persistence plans. The previous
+fixed specialization fixture remains **20,050 identical bytes**, and all **25 existing
+standalone artifacts** match the preserved SDK compiler exactly. Archive/publication
+evidence follows separately. Runtime Bytes/reference schemas, native resolution,
+strong/weak retention policy, optional unresolved values and the rest of L01–L03
+remain explicit gaps; this adds no runtime or shared protocol fields.
+
 ## Arbitrary-source native and WASM compiler SDK (source-only, protocol 0.18)
 
 The byte API and pointer-free ABI compile bounded caller-supplied source/module units

@@ -1,5 +1,6 @@
 //! Experimental, deterministic front end for the Weave graph language.
 //! No source program can invoke host effects: compilation only emits a plan.
+pub mod bytes;
 pub mod context_axes;
 pub mod decimal;
 mod format;
@@ -7,6 +8,7 @@ mod functions;
 mod graph_types;
 pub mod interval;
 pub mod modules;
+pub mod references;
 pub mod scalars;
 pub mod sdk;
 pub mod syntax;

@@ -900,6 +900,12 @@ impl Parser {
             "integer" => ValueType::Integer,
             "string" => ValueType::String,
             "time" => ValueType::Time,
+            "bytes" => ValueType::Bytes,
+            "node_ref" => ValueType::NodeRef,
+            "edge_ref" => ValueType::EdgeRef,
+            "assertion_ref" => ValueType::AssertionRef,
+            "snapshot_ref" => ValueType::SnapshotRef,
+            "object_ref" => ValueType::ObjectRef,
             "interval" => ValueType::Interval,
             "vector" => {
                 self.word("type")?;
@@ -929,6 +935,22 @@ impl Parser {
             Kind::Number(v) => ScalarExpression::Literal(ScalarValue::Integer(v)),
             Kind::Word(v) if v == "true" || v == "false" => {
                 ScalarExpression::Literal(ScalarValue::Boolean(v == "true"))
+            }
+            Kind::Word(v) if v == "bytes" => {
+                let payload = self.take();
+                let Kind::String(raw) = payload.kind else {
+                    return Err(Diagnostic::new(
+                        "E_BYTES_LITERAL",
+                        "Bytes require a quoted hex literal",
+                        payload.start,
+                        payload.end,
+                    ));
+                };
+                ScalarExpression::Literal(ScalarValue::Bytes(
+                    crate::bytes::Bytes::from_hex(&raw).map_err(|e| {
+                        Diagnostic::new(e.code(), e.to_string(), token.start, payload.end)
+                    })?,
+                ))
             }
             Kind::Word(v) if v == "vector" => {
                 let type_span = (self.peek().start, self.peek().end);
@@ -1009,8 +1031,8 @@ impl Parser {
                 self.symbol('(')?;
                 let mut arguments = Vec::new();
                 while self.peek().kind != Kind::Symbol(')') {
-                    if arguments.len() >= 2 {
-                        return Err(self.error("Scalar builtins accept at most two arguments"));
+                    if arguments.len() >= 3 {
+                        return Err(self.error("Scalar builtins accept at most three arguments"));
                     }
                     arguments.push(self.scalar_expr(depth + 1)?);
                     if self.peek().kind != Kind::Symbol(')') {
@@ -1109,6 +1131,12 @@ impl Parser {
             "function" if !callback => ParameterKind::Function,
             "boolean" => ParameterKind::Scalar(ValueType::Boolean),
             "integer" => ParameterKind::Scalar(ValueType::Integer),
+            "bytes" => ParameterKind::Scalar(ValueType::Bytes),
+            "node_ref" => ParameterKind::Scalar(ValueType::NodeRef),
+            "edge_ref" => ParameterKind::Scalar(ValueType::EdgeRef),
+            "assertion_ref" => ParameterKind::Scalar(ValueType::AssertionRef),
+            "snapshot_ref" => ParameterKind::Scalar(ValueType::SnapshotRef),
+            "object_ref" => ParameterKind::Scalar(ValueType::ObjectRef),
             "interval" => ParameterKind::Scalar(ValueType::Interval),
             "decimal" => ParameterKind::Scalar(ValueType::Decimal),
             "quantity" | "vector" => ParameterKind::Scalar(ValueType::Boolean),
@@ -2188,7 +2216,8 @@ impl Parser {
                             "graph" => ArgumentValue::Graph(self.name()?),
                             "function" => ArgumentValue::Function(self.name()?),
                             "boolean" | "integer" | "decimal" | "quantity" | "interval"
-                            | "vector" => ArgumentValue::Scalar {
+                            | "vector" | "bytes" | "node_ref" | "edge_ref" | "assertion_ref"
+                            | "snapshot_ref" | "object_ref" => ArgumentValue::Scalar {
                                 kind: kind.clone(),
                                 value: self.scalar_expr(0)?,
                             },

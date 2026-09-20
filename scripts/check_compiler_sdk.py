@@ -44,11 +44,11 @@ cases=[('exact-integers',request('value Min -9223372036854775808; value Max 9223
  ('missing-module',request(imp('c','core',core))),
  ('wrong-pin',request(imp('c','core',core).replace(hashlib.sha256(core.encode()).hexdigest(),'0'*64),[unit('core',core)])),
  ('original-module-diagnostic',request(imp('b','bad',bad),[unit('bad',bad)])),
- ('source-error',request('value X integer_div(1,0);')),('invalid-utf8',b'\xff'),('invalid-json',b'{'),
+ ('bad-reference',request('value X node_ref("G","","n");')),('bad-bytes',request('value X bytes "xy";')),('all-octets',request('value B bytes "'+bytes(range(256)).hex()+'";')),( 'source-error',request('value X integer_div(1,0);')),('invalid-utf8',b'\xff'),('invalid-json',b'{'),
  ('duplicate-fields',b'{"format":"weave-compiler-request/1","format":"weave-compiler-request/1","entry_id":"x","source":"","modules":[]}'),
  ('decoded-bound',request(' '*(1048576+1))),
 ]
-fixtures={name:root/'examples'/f'{name}.weave' for name in ['scalars','quantities','intervals','vectors','handlers']}
+fixtures={name:root/'examples'/f'{name}.weave' for name in ['scalars','quantities','intervals','vectors','handlers','bytes_references']}
 fixtures['view-template']=root/'examples/view_services/template.weave'
 b='module "b" revision "1"; import a module "a" revision "1" sha256 "'+('0'*64)+'";'
 a_unit='module "a" revision "1";'+imp('b','b',b)
@@ -106,8 +106,8 @@ with tempfile.TemporaryDirectory(prefix='weave-sdk-') as tmp:
   if name in fixtures:
    expected=json.loads(subprocess.check_output([str(a.compiler.resolve()),'artifacts',str(fixtures[name])]))
    result=json.loads(actual);assert result['ok'] and result['artifacts']==expected['artifacts'] and result['artifact_fingerprint']==expected['artifact_fingerprint'],name
-  if name in ['exact-integers','diamond-modules','near-4MiB-decoded-budget','large-output']:assert json.loads(actual)['ok'],actual
-  expected_errors={'missing-module':'E_MODULE_MISSING','wrong-pin':'E_MODULE_DIGEST','cycle':'E_MODULE_CYCLE','invalid-utf8':'E_SDK_UTF8','invalid-json':'E_SDK_REQUEST','duplicate-fields':'E_SDK_REQUEST','decoded-bound':'E_SDK_BUDGET'}
+  if name in ['exact-integers','diamond-modules','near-4MiB-decoded-budget','large-output','all-octets']:assert json.loads(actual)['ok'],actual
+  expected_errors={'bad-reference':'E_REFERENCE_VALUE','bad-bytes':'E_BYTES_LITERAL','missing-module':'E_MODULE_MISSING','wrong-pin':'E_MODULE_DIGEST','cycle':'E_MODULE_CYCLE','invalid-utf8':'E_SDK_UTF8','invalid-json':'E_SDK_REQUEST','duplicate-fields':'E_SDK_REQUEST','decoded-bound':'E_SDK_BUDGET'}
   if name in expected_errors:assert json.loads(actual)['error']['code']==expected_errors[name],actual
   if name in ['source-error','original-module-diagnostic']:assert json.loads(actual)['ok'] is False,actual
   reports.append({'name':name,'request_bytes':len(raw),'response_bytes':len(actual),'native_abi':timing})

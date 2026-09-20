@@ -155,3 +155,5 @@ fresh-process pinned replay against the engine. [Executed WASM parity](../script
 compares typed results, complete plans, specialization identities and diagnostics
 for a fixed fixture profile with zero WASM host imports. This is compiler-core
 execution evidence, not browser storage or unrestricted application execution.
+
+Checked [Bytes and exact node/edge/assertion/snapshot/ObjectRef values](BYTES_AND_REFERENCES.md) also support pure scalar signatures, partial unary callbacks and literal metadata. They never dereference targets or grant access.

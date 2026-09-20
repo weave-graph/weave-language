@@ -92,6 +92,12 @@ fn argument_scalar(
 fn marker_matches(a: &ArgumentValue, t: &ScalarType) -> bool {
     match a {
         ArgumentValue::Scalar { kind, .. } => match t {
+            ScalarType::Bytes => kind == "bytes",
+            ScalarType::NodeRef => kind == "node_ref",
+            ScalarType::EdgeRef => kind == "edge_ref",
+            ScalarType::AssertionRef => kind == "assertion_ref",
+            ScalarType::SnapshotRef => kind == "snapshot_ref",
+            ScalarType::ObjectRef => kind == "object_ref",
             ScalarType::Boolean => kind == "boolean",
             ScalarType::Integer => kind == "integer",
             ScalarType::Interval => kind == "interval",

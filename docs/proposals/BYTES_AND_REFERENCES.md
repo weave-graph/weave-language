@@ -1,6 +1,6 @@
 # Bytes and pinned object values
 
-Proposed source-only protocol-0.18 profile; no runtime/schema/authority changes.
+Accepted source-only protocol-0.18 profile; see [implemented values](../BYTES_AND_REFERENCES.md). No runtime/schema/authority changes.
 Paper §4 explicitly includes bytes and object references and requires node and edge
 references to be different types. §4.1 requires ordinary pure value functions;
 §9 states a reference/content identifier is not proof of access. This closes the

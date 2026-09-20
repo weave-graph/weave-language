@@ -300,3 +300,5 @@ Protocol 0.16 adds `accepted Name view "view" decision "exact-occurrence";` and 
 Protocol 0.18 adds entry-level `handler Name revision "1" using Function { input event graph "G" branch "main" metadata depth 4; on "graph.accepted", "graph.committed"; output slot "result"; replay pinned; }`. The function must have one remaining unconstrained graph parameter, a graph result and no captured graph values. Compilation emits a separate sealed pure recipe seeded by the actual host event, never a synthetic Query or registration effect. `artifacts` returns complete output; `handler-plan --handler Name` explicitly selects one template. See [syntax, bounds, host mapping and replay semantics](HANDLER_ARTIFACTS.md).
 
 Typed physical and embedding vector declarations, parameters and payloads are documented in [typed vectors](TYPED_VECTORS.md).
+
+[Bytes and reference scalar types](BYTES_AND_REFERENCES.md) add `bytes "00ff"`, explicit `node_ref`/`edge_ref`/`assertion_ref`/`snapshot_ref` constructors and `object_ref` widening; they lower only to literal data without resolving graphs.

@@ -1,0 +1,308 @@
+{
+  "profile": "arbitrary-source-compiler-sdk/1",
+  "cases": [
+    {
+      "name": "exact-integers",
+      "request_bytes": 241,
+      "response_bytes": 487,
+      "native_abi": {
+        "transfer_ms": 0.99,
+        "compile_ms": 4.826
+      },
+      "wasm": {
+        "name": "exact-integers",
+        "total_ms": 39.394
+      }
+    },
+    {
+      "name": "diamond-modules",
+      "request_bytes": 1198,
+      "response_bytes": 1116,
+      "native_abi": {
+        "transfer_ms": 1.095,
+        "compile_ms": 2.322
+      },
+      "wasm": {
+        "name": "diamond-modules",
+        "total_ms": 22.982
+      }
+    },
+    {
+      "name": "missing-module",
+      "request_bytes": 203,
+      "response_bytes": 197,
+      "native_abi": {
+        "transfer_ms": 0.225,
+        "compile_ms": 0.124
+      },
+      "wasm": {
+        "name": "missing-module",
+        "total_ms": 0.452
+      }
+    },
+    {
+      "name": "wrong-pin",
+      "request_bytes": 357,
+      "response_bytes": 221,
+      "native_abi": {
+        "transfer_ms": 0.267,
+        "compile_ms": 0.126
+      },
+      "wasm": {
+        "name": "wrong-pin",
+        "total_ms": 0.566
+      }
+    },
+    {
+      "name": "original-module-diagnostic",
+      "request_bytes": 343,
+      "response_bytes": 269,
+      "native_abi": {
+        "transfer_ms": 0.264,
+        "compile_ms": 0.451
+      },
+      "wasm": {
+        "name": "original-module-diagnostic",
+        "total_ms": 2.503
+      }
+    },
+    {
+      "name": "bad-reference",
+      "request_bytes": 122,
+      "response_bytes": 234,
+      "native_abi": {
+        "transfer_ms": 0.168,
+        "compile_ms": 0.075
+      },
+      "wasm": {
+        "name": "bad-reference",
+        "total_ms": 0.431
+      }
+    },
+    {
+      "name": "bad-bytes",
+      "request_bytes": 108,
+      "response_bytes": 203,
+      "native_abi": {
+        "transfer_ms": 0.146,
+        "compile_ms": 0.054
+      },
+      "wasm": {
+        "name": "bad-bytes",
+        "total_ms": 0.259
+      }
+    },
+    {
+      "name": "all-octets",
+      "request_bytes": 618,
+      "response_bytes": 779,
+      "native_abi": {
+        "transfer_ms": 0.485,
+        "compile_ms": 0.221
+      },
+      "wasm": {
+        "name": "all-octets",
+        "total_ms": 0.65
+      }
+    },
+    {
+      "name": "source-error",
+      "request_bytes": 112,
+      "response_bytes": 204,
+      "native_abi": {
+        "transfer_ms": 0.134,
+        "compile_ms": 0.064
+      },
+      "wasm": {
+        "name": "source-error",
+        "total_ms": 0.111
+      }
+    },
+    {
+      "name": "invalid-utf8",
+      "request_bytes": 1,
+      "response_bytes": 164,
+      "native_abi": {
+        "transfer_ms": 0.076,
+        "compile_ms": 0.025
+      },
+      "wasm": {
+        "name": "invalid-utf8",
+        "total_ms": 0.086
+      }
+    },
+    {
+      "name": "invalid-json",
+      "request_bytes": 1,
+      "response_bytes": 191,
+      "native_abi": {
+        "transfer_ms": 0.083,
+        "compile_ms": 0.033
+      },
+      "wasm": {
+        "name": "invalid-json",
+        "total_ms": 0.747
+      }
+    },
+    {
+      "name": "duplicate-fields",
+      "request_bytes": 113,
+      "response_bytes": 191,
+      "native_abi": {
+        "transfer_ms": 0.125,
+        "compile_ms": 0.038
+      },
+      "wasm": {
+        "name": "duplicate-fields",
+        "total_ms": 0.289
+      }
+    },
+    {
+      "name": "decoded-bound",
+      "request_bytes": 1048664,
+      "response_bytes": 188,
+      "native_abi": {
+        "transfer_ms": 257.175,
+        "compile_ms": 3.102
+      },
+      "wasm": {
+        "name": "decoded-bound",
+        "total_ms": 92.876
+      }
+    },
+    {
+      "name": "cycle",
+      "request_bytes": 558,
+      "response_bytes": 315,
+      "native_abi": {
+        "transfer_ms": 0.281,
+        "compile_ms": 0.21
+      },
+      "wasm": {
+        "name": "cycle",
+        "total_ms": 0.446
+      }
+    },
+    {
+      "name": "large-output",
+      "request_bytes": 524390,
+      "response_bytes": 524558,
+      "native_abi": {
+        "transfer_ms": 242.022,
+        "compile_ms": 51.242
+      },
+      "wasm": {
+        "name": "large-output",
+        "total_ms": 145.479
+      }
+    },
+    {
+      "name": "scalars",
+      "request_bytes": 1934,
+      "response_bytes": 2272,
+      "native_abi": {
+        "transfer_ms": 0.952,
+        "compile_ms": 1.147
+      },
+      "wasm": {
+        "name": "scalars",
+        "total_ms": 13.203
+      }
+    },
+    {
+      "name": "quantities",
+      "request_bytes": 1293,
+      "response_bytes": 1581,
+      "native_abi": {
+        "transfer_ms": 1.557,
+        "compile_ms": 1.07
+      },
+      "wasm": {
+        "name": "quantities",
+        "total_ms": 2.439
+      }
+    },
+    {
+      "name": "intervals",
+      "request_bytes": 1481,
+      "response_bytes": 2889,
+      "native_abi": {
+        "transfer_ms": 1.717,
+        "compile_ms": 1.362
+      },
+      "wasm": {
+        "name": "intervals",
+        "total_ms": 4.103
+      }
+    },
+    {
+      "name": "vectors",
+      "request_bytes": 4143,
+      "response_bytes": 7833,
+      "native_abi": {
+        "transfer_ms": 3.845,
+        "compile_ms": 2.678
+      },
+      "wasm": {
+        "name": "vectors",
+        "total_ms": 9.753
+      }
+    },
+    {
+      "name": "handlers",
+      "request_bytes": 779,
+      "response_bytes": 2498,
+      "native_abi": {
+        "transfer_ms": 0.912,
+        "compile_ms": 2.695
+      },
+      "wasm": {
+        "name": "handlers",
+        "total_ms": 10.902
+      }
+    },
+    {
+      "name": "bytes_references",
+      "request_bytes": 1816,
+      "response_bytes": 3866,
+      "native_abi": {
+        "transfer_ms": 1.525,
+        "compile_ms": 1.164
+      },
+      "wasm": {
+        "name": "bytes_references",
+        "total_ms": 3.113
+      }
+    },
+    {
+      "name": "view-template",
+      "request_bytes": 420,
+      "response_bytes": 898,
+      "native_abi": {
+        "transfer_ms": 0.383,
+        "compile_ms": 0.547
+      },
+      "wasm": {
+        "name": "view-template",
+        "total_ms": 1.568
+      }
+    },
+    {
+      "name": "near-4MiB-decoded-budget",
+      "request_bytes": 4194520,
+      "response_bytes": 236,
+      "native_abi": {
+        "transfer_ms": 1019.455,
+        "compile_ms": 12.675
+      },
+      "wasm": {
+        "name": "near-4MiB-decoded-budget",
+        "total_ms": 319.358
+      }
+    }
+  ],
+  "identical_response_bytes": 551390,
+  "wasm_imports": 0,
+  "status": "passed",
+  "scope": "Arbitrary-source native Rust/native ABI/zero-import WASM compiler responses; timing is one local debug run, not a performance guarantee."
+}

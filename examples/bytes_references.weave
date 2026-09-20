@@ -1,0 +1,29 @@
+// These source values name exact objects; they do not read or authorize them.
+function Keep revision "1" (node_ref input) returns node_ref { return param input; }
+function Append revision "1" (bytes input, bytes suffix) returns bytes {
+  return bytes_concat(param input,param suffix);
+}
+value Empty bytes "";
+value EmptyLength bytes_len(value Empty);
+value N node_ref("unavailable", "revision-λ", "same-id");
+value E edge_ref("unavailable", "revision-λ", "same-id");
+value A assertion_ref("unavailable", "revision-λ", "same-id");
+value S snapshot_ref("unavailable", "revision-λ");
+apply Selected from Keep { node_ref input value N; }
+value O object_ref(value Selected);
+value EdgeObject object_ref(value E);
+value KindsDiffer reference_equal(value O,value EdgeObject);
+value Same reference_equal(value N,value Selected);
+apply AppendFF from Append { bytes suffix bytes "fF"; }
+apply Payload from AppendFF { bytes input bytes "0041"; }
+value Length bytes_len(value Payload);
+graph Values {
+  node "n" entity "e" space "s" property "bytes" value Payload property "pointer" value N;
+  attachment "bytes" on graph key "bytes" literal value Payload valid 0 until infinity;
+  attachment "node" on graph key "node" literal value N valid 0 until infinity;
+  attachment "edge" on graph key "edge" literal value E valid 0 until infinity;
+  attachment "claim" on graph key "claim" literal value A valid 0 until infinity;
+  attachment "snapshot" on graph key "snapshot" literal value S valid 0 until infinity;
+  attachment "object" on graph key "object" literal value O valid 0 until infinity;
+}
+lens Saved from Values { metadata depth 1; }

@@ -40,3 +40,5 @@ Exact source [Interval values](docs/INTERVALS.md) support checked half-open temp
 [Typed source vectors](docs/TYPED_VECTORS.md) retain full physical/embedding descriptors through pure functions and lower to existing native geometry payloads.
 
 The [byte-oriented compiler SDK](docs/COMPILER_SDK.md) accepts arbitrary bounded source and exact module units on native and zero-import WASM. It returns complete artifacts and diagnostics without host effects or JavaScript numeric round-trips.
+
+[Bytes and exact typed references](docs/BYTES_AND_REFERENCES.md) pass through pure scalar functions and literal metadata while preserving kind/revision and granting no runtime access.
