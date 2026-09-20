@@ -52,8 +52,8 @@ impl Bytes {
                 b.to_ascii_lowercase() - b'a' + 10
             }
         };
-        for pair in hex.as_bytes().chunks_exact(2) {
-            bytes.push(digit(pair[0]) * 16 + digit(pair[1]));
+        for &[high, low] in hex.as_bytes().as_chunks::<2>().0 {
+            bytes.push(digit(high) * 16 + digit(low));
         }
         Ok(Self(bytes))
     }
