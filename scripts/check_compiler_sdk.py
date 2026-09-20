@@ -48,7 +48,10 @@ cases=[('exact-integers',request('value Min -9223372036854775808; value Max 9223
  ('duplicate-fields',b'{"format":"weave-compiler-request/1","format":"weave-compiler-request/1","entry_id":"x","source":"","modules":[]}'),
  ('decoded-bound',request(' '*(1048576+1))),
 ]
-fixtures={name:root/'examples'/f'{name}.weave' for name in ['scalars','quantities','intervals','vectors','handlers','bytes_references']}
+temporal_module='module "temporal" revision "1"; function During revision "1" (graph input, interval span){window W from input during param span;return W;}'
+temporal_entry=imp('t','temporal',temporal_module)+'use G graph "observed" revision "exact-r"; apply W from t::During {graph input G;interval span interval_open(time -9223372036854775808);}'
+cases.append(('temporal-pinned-module',request(temporal_entry,[unit('temporal',temporal_module)])))
+fixtures={name:root/'examples'/f'{name}.weave' for name in ['scalars','quantities','intervals','vectors','handlers','bytes_references','temporal']}
 fixtures['view-template']=root/'examples/view_services/template.weave'
 b='module "b" revision "1"; import a module "a" revision "1" sha256 "'+('0'*64)+'";'
 a_unit='module "a" revision "1";'+imp('b','b',b)

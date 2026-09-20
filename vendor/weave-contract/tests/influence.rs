@@ -90,6 +90,7 @@ fn node_only_alternatives_remain_distinct_in_rules_support_and_explanation() {
 fn generated_protection_checks_profile_and_exact_final_byte_bound() {
     let mut source = input();
     source.graph.influence = Some(GraphInfluence {
+        derivations: vec![],
         snapshots: vec![],
         assertions: vec![],
         nodes: vec![NodeRef {
@@ -172,6 +173,7 @@ fn declared_snapshot_gates_survive_empty_projection_selection_and_union_without_
 fn generated_support_explanation_rules_and_graph_attachment_keep_snapshot_gates() {
     let mut source = input();
     source.graph.influence = Some(GraphInfluence {
+        derivations: vec![],
         snapshots: vec![snapshot("empty-source")],
         ..GraphInfluence::default()
     });
@@ -248,6 +250,7 @@ fn empty_support_and_explanation_do_not_invent_assertion_provenance() {
     let mut source = input();
     source.graph = GraphData {
         influence: Some(GraphInfluence {
+            derivations: vec![],
             snapshots: vec![snapshot("empty")],
             ..GraphInfluence::default()
         }),
@@ -295,6 +298,7 @@ fn snapshot_fields_are_bounded_strict_and_part_of_combined_record_limits() {
         "E_BUDGET"
     );
     let malformed = GraphInfluence {
+        derivations: vec![],
         snapshots: vec![GraphRef {
             graph_id: "x".into(),
             revision: String::new(),
@@ -306,6 +310,7 @@ fn snapshot_fields_are_bounded_strict_and_part_of_combined_record_limits() {
         "E_INFLUENCE"
     );
     let a = GraphInfluence {
+        derivations: vec![],
         snapshots: (0..1000).map(|i| snapshot(&format!("g{i}"))).collect(),
         ..GraphInfluence::default()
     };
@@ -318,6 +323,7 @@ fn snapshot_fields_are_bounded_strict_and_part_of_combined_record_limits() {
         1000
     );
     let b = GraphInfluence {
+        derivations: vec![],
         snapshots: vec![snapshot("new")],
         ..GraphInfluence::default()
     };
@@ -341,6 +347,7 @@ fn legacy_graph_host_attachment_gates_are_not_silently_dropped() {
         assertion_id: "a".into(),
     };
     value.graph.influence = Some(GraphInfluence {
+        derivations: vec![],
         assertions: vec![assertion.clone()],
         nodes: vec![node.clone()],
         snapshots: vec![snapshot("gate")],
@@ -369,6 +376,7 @@ fn legacy_graph_host_attachment_gates_are_not_silently_dropped() {
 fn diff_attachments_and_bridge_empty_selection_keep_declared_gates() {
     let mut source = input();
     source.graph.influence = Some(GraphInfluence {
+        derivations: vec![],
         snapshots: vec![snapshot("gate")],
         ..GraphInfluence::default()
     });
@@ -409,6 +417,7 @@ fn collector_caps_union_before_clone_and_generated_precharge_prevents_mutation()
     );
     let mut generated = input();
     generated.graph.influence = Some(GraphInfluence {
+        derivations: vec![],
         snapshots: vec![snapshot("gate")],
         ..GraphInfluence::default()
     });

@@ -120,6 +120,12 @@ with (nullcontext(str(a.work_dir)) if a.work_dir else tempfile.TemporaryDirector
             record.pop('readers', None)
     copy_plan = compile_source('graph Marker {}')
     copy_plan['commands'][0]['data'] = detached
+    # A historical compiler may install its unchanged artifact, but cannot label
+    # newly returned carrier fields as an old wire profile. The trusted copy uses
+    # the current result's declared protocol after verifying old-profile rejection.
+    if copy_plan['version'] != warning['version']:
+        host('run', program=copy_plan, error='E_VERSION')
+    copy_plan['version'] = warning['version']
     host('run', program=copy_plan)
     detached_hidden = result('use W graph "Marker";', outsider=True)
     assert not detached_hidden['graph']['nodes'] and not detached_hidden['graph']['edges'] and not detached_hidden['graph'].get('attachments', [])

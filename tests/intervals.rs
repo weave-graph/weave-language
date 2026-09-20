@@ -248,6 +248,6 @@ function Via revision "1" (function callback(interval input) returns interval) r
 apply R from Via {function callback Keep;}"#;
     assert!(compile_artifacts(mismatch).is_err());
     let result = compile_artifacts(include_str!("../examples/intervals.weave")).unwrap();
-    assert_eq!(result.program.version, "0.18.0");
+    assert_eq!(result.program.version, "0.19.0");
     assert!(result.handler_templates.is_empty() && result.view_templates.is_empty());
 }

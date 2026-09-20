@@ -77,25 +77,39 @@ fn unused_body_types_and_closed_interval_errors_are_checked() {
     assert_eq!(compile(scalar).unwrap_err().code, "E_FUNCTION_EFFECT");
 }
 #[test]
-fn instantiated_operators_fail_explicitly_without_emitting_a_partial_program() {
+fn instantiated_operators_emit_typed_plans_and_complete_sdk_artifacts() {
     let source = "function F revision \"1\" (graph input,interval span){window W from input during param span;return W;} apply Partial from F{interval span interval(time 0,time 10);} graph G{} apply Result from Partial{graph input G;}";
-    let e = compile_artifacts(source).unwrap_err();
-    assert_eq!(e.code, "E_TEMPORAL_PROTOCOL");
-    assert_eq!(&source[e.start..e.end], "W");
-    for suffix in [
-        "window W from G during interval(time 0,time 10);",
-        "sequence S from G to G before during interval(time 0,time 10);",
+    let artifact = compile_artifacts(source).unwrap();
+    assert_eq!(artifact.program.version, "0.19.0");
+    assert!(
+        serde_json::to_string(&artifact.program)
+            .unwrap()
+            .contains("\"kind\":\"window\"")
+    );
+    for (suffix, kind) in [
+        ("window W from G during interval(time 0,time 10);", "window"),
+        (
+            "sequence S from G to G before during interval(time 0,time 10);",
+            "sequence",
+        ),
     ] {
         let source = format!("graph G{{}} {suffix}");
-        assert_eq!(compile(&source).unwrap_err().code, "E_TEMPORAL_PROTOCOL");
+        let program = compile(&source).unwrap();
+        let encoded = serde_json::to_value(&program).unwrap();
+        let expression = &encoded["commands"].as_array().unwrap().last().unwrap()["value"];
+        assert_eq!(expression["kind"], kind);
+        assert_eq!(
+            expression["window"],
+            serde_json::json!({"start":0,"end":10})
+        );
         let bytes=weave_language::sdk::compile_request(&serde_json::to_vec(&serde_json::json!({"format":"weave-compiler-request/1","entry_id":"main","source":source,"modules":[]})).unwrap());
         let response: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(response["ok"], false);
-        assert!(response.get("artifacts").is_none());
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["artifacts"]["program"], encoded);
     }
 }
 #[test]
-fn exact_schema_transfer_and_mismatch_are_checked_without_protocol_lowering() {
+fn exact_schema_transfer_and_mismatch_are_checked_in_unused_definitions() {
     let schema = "schema S revision \"1\"{node N space \"s\" {}}";
     let source = format!(
         "{schema} function W revision \"1\"(graph input schema S,interval span) returns graph schema S{{window X from input during param span;return X;}} function Q revision \"1\"(graph input schema S,graph other schema S,interval span) returns graph schema S{{sequence X from input to other within during param span;return X;}}"
@@ -143,7 +157,7 @@ fn formatter_and_function_identities_ignore_layout_but_preserve_literals() {
     let mut outputs = vec![];
     for alias in ["first", "renamed"] {
         let source = format!(
-            "import {alias} module \"temporal\" revision \"1\" sha256 {:?}; apply Bound from {alias}::W {{interval span interval(time 0,time 10);}} graph G{{node \"n\" entity \"first::W\" space \"s\" property \"relation_span\" \"first::W\";}}",
+            "import {alias} module \"temporal\" revision \"1\" sha256 {:?}; apply Bound from {alias}::W {{interval span interval(time 0,time 10);}} graph G{{node \"n\" entity \"first::W\" space \"s\" property \"relation_span\" \"first::W\";}} apply Result from Bound {{graph input G;}}",
             content_digest(module)
         );
         outputs.push(
@@ -166,5 +180,36 @@ fn formatter_and_function_identities_ignore_layout_but_preserve_literals() {
     assert_eq!(
         json["commands"][0]["data"]["nodes"][0]["properties"]["relation_span"],
         "first::W"
+    );
+}
+
+#[test]
+fn temporal_handler_recipe_is_inert_and_artifact_complete() {
+    let source = r#"function Clip revision "1" (graph input){
+        window W from input during interval(time -9223372036854775808,time 9223372036854775807);
+        return W;
+    }
+    handler ClipEvent revision "1" using Clip {
+        input event graph "Events" branch "main" metadata depth 2;
+        on "graph.accepted", "graph.committed";
+        output slot "clipped";
+        replay pinned;
+    }"#;
+    let artifacts = compile_artifacts(source).unwrap();
+    assert!(artifacts.program.commands.is_empty());
+    let handler = &artifacts.handler_templates["ClipEvent"];
+    assert_eq!(handler.protocol, "0.19.0");
+    assert!(
+        handler
+            .recipe
+            .bindings
+            .iter()
+            .any(|b| matches!(b.value, weave_contract::GraphExpression::Window { .. }))
+    );
+    assert!(compile(source).is_err());
+    let formatted = format_source(source).unwrap();
+    assert_eq!(
+        serde_json::to_value(&artifacts).unwrap(),
+        serde_json::to_value(compile_artifacts(&formatted).unwrap()).unwrap()
     );
 }

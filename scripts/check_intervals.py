@@ -14,7 +14,7 @@ compiler, engine = str(a.compiler.resolve()), str(a.engine.resolve())
 source = Path(__file__).resolve().parents[1] / 'examples/intervals.weave'
 plan = json.loads(subprocess.check_output([compiler, 'plan', str(source)]))
 values = json.loads(subprocess.check_output([compiler, 'values', str(source)]))['values']
-assert plan['version'] == '0.18.0'
+assert plan['version'] == '0.19.0'
 assert values['Window'] == {'type':'interval','value':{'start':15,'end':20}}
 assert values['Start'] == {'type':'time','value':15}
 assert values['End'] == {'type':'time','value':20}

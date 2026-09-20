@@ -1,0 +1,48 @@
+// Interval values specialize purely; temporal operators consume explicit graph values.
+function During revision "1" (graph input, interval span) {
+  window Result from input during param span;
+  return Result;
+}
+function Before revision "1" (graph input, graph next, interval span) {
+  sequence Result from input to next before during param span;
+  return Result;
+}
+apply WithinDay from During { interval span interval(time 2, time 13); }
+transaction temporal_seed {
+graph EmptyNotes {}
+graph Notes {
+  node "note" entity "note" space "documentation" property "text" "λ begin";
+}
+graph Started {
+  node "a" entity "start" space "events";
+  node "b" entity "handoff" space "events";
+  node "isolated" entity "inventory" space "events";
+  edge "begin" from "a" to "b" relation "phase" valid 0 until 5;
+  attachment "empty-note" on graph key "empty" graph "EmptyNotes" revision "logical:temporal_seed:EmptyNotes" valid 0 until 30;
+  attachment "description" on graph key "description" graph "Notes" revision "logical:temporal_seed:Notes" valid 0 until 30;
+  attachment "node-note" on node "a" key "node-note" graph "Notes" revision "logical:temporal_seed:Notes" valid 0 until 30;
+  attachment "edge-note" on edge "begin" key "edge-note" literal "step" valid 0 until 30;
+}
+}
+graph Finished {
+  node "b" entity "handoff" space "events";
+  node "c" entity "finish" space "events";
+  edge "finish" from "b" to "c" relation "phase" valid 10 until 15;
+}
+lens StartedWithMetadata from Started {metadata depth 2;}
+apply Clipped from WithinDay { graph input StartedWithMetadata; }
+window ClippedAgain from Clipped during interval(time 2, time 13);
+apply Ordered from Before {
+  graph input StartedWithMetadata;
+  graph next Finished;
+  interval span interval(time 2, time 13);
+}
+sequence Meets from Started to Finished meets during interval(time 0, time 20);
+sequence Overlaps from Started to Finished overlaps during interval(time 0, time 20);
+metadata Description from Ordered on graph key "description";
+metadata EmptyMetadata from Ordered on graph key "empty";
+support EmptyState from EmptyMetadata relation "absent"
+  from entity "start" space "events" to entity "finish" space "events" at 3;
+explain Proof from Ordered;
+union Reused from Ordered with Ordered;
+project Empty from Ordered {}

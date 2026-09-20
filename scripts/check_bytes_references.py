@@ -17,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix='weave-bytes-refs-') as temporary:
   path=root/(name+'.weave');path.write_bytes(source_text.encode('utf-8'))
   return json.loads(subprocess.check_output([compiler,'artifacts',str(path)]))['artifacts']
  def check(artifact,name):
-  plan=artifact['program'];assert plan['version']=='0.18.0'
+  plan=artifact['program'];assert plan['version']=='0.19.0'
   graph=plan['commands'][0]['graph_id'];outputs=run(plan,name,writes=[graph]);revision=outputs[0]['revision']
   actual=outputs[-1]['result'];data=actual['graph']
   assert len(data['attachments'])==6 and len(data['nodes'])==1, actual

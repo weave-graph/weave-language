@@ -386,12 +386,96 @@ fn lower_artifacts(
             ));
         }
         match statement {
-            Statement::Temporal { name_span, .. } => {
-                return Err(diagnostic(
-                    "E_TEMPORAL_PROTOCOL",
-                    "Temporal syntax is under development; no executable protocol operator is installed",
-                    name_span,
-                ));
+            Statement::Temporal {
+                name,
+                name_span,
+                source,
+                source_span,
+                window,
+                sequence,
+            } => {
+                let get = |name: &str, span| -> Result<&Lens, Diagnostic> {
+                    let lens = names.get(name).ok_or_else(|| {
+                        diagnostic(
+                            "E_UNKNOWN_GRAPH",
+                            format!("Unknown graph/lens '{name}'"),
+                            span,
+                        )
+                    })?;
+                    if lens.relation.is_some() || lens.time.is_some() {
+                        return Err(diagnostic(
+                            "E_UNBOUND_PARAMETER",
+                            "Temporal inputs must be fully bound",
+                            span,
+                        ));
+                    }
+                    Ok(lens)
+                };
+                let scalars::ScalarExpression::Literal(scalars::ScalarValue::Interval(bounds)) =
+                    &window.expression
+                else {
+                    return Err(diagnostic(
+                        "E_SCALAR_TYPE",
+                        "Temporal window requires a specialized Interval",
+                        window.span,
+                    ));
+                };
+                let bounds = Interval {
+                    start: bounds.start(),
+                    end: bounds.end(),
+                };
+                let left = get(&source, source_span)?;
+                let mut typed = left.typed;
+                let expression = match sequence {
+                    None => GraphExpression::Window {
+                        input: Box::new(left.expression()),
+                        window: bounds,
+                    },
+                    Some(selection) => {
+                        let right = get(&selection.right, selection.right_span)?;
+                        if left.typed.is_some()
+                            && right.typed.is_some()
+                            && left.typed != right.typed
+                        {
+                            return Err(diagnostic(
+                                "E_SCHEMA_MISMATCH",
+                                "Temporal sequence requires equal complete graph schemas",
+                                name_span,
+                            ));
+                        }
+                        typed = if left.typed == right.typed {
+                            left.typed
+                        } else {
+                            None
+                        };
+                        let relation = match selection.relation {
+                            syntax::TemporalRelation::Before => {
+                                weave_contract::TemporalRelation::Before
+                            }
+                            syntax::TemporalRelation::Meets => {
+                                weave_contract::TemporalRelation::Meets
+                            }
+                            syntax::TemporalRelation::Overlaps => {
+                                weave_contract::TemporalRelation::Overlaps
+                            }
+                            syntax::TemporalRelation::Within => {
+                                weave_contract::TemporalRelation::Within
+                            }
+                        };
+                        GraphExpression::Sequence {
+                            left: Box::new(left.expression()),
+                            right: Box::new(right.expression()),
+                            window: bounds,
+                            relation,
+                            match_on: JoinMatch::EntitySpaceToFrom,
+                        }
+                    }
+                };
+                let mut lens = Lens::concrete(base_query(String::new(), None));
+                lens.input = Some(expression);
+                lens.typed = typed;
+                lens.emit(&name, &mut commands);
+                names.insert(name, lens);
             }
             Statement::LiveHandle {
                 name,
@@ -889,6 +973,7 @@ fn lower_artifacts(
                                 ));
                             }
                             data.attachments.push(MetadataAttachment {
+                                derivations: Vec::new(),
                                 derived_snapshots: Vec::new(),
                                 derived_from: Vec::new(),
                                 derived_nodes: Vec::new(),
@@ -913,6 +998,7 @@ fn lower_artifacts(
                             metadata,
                             properties,
                         } => data.nodes.push(Node {
+                            derivations: Vec::new(),
                             derived_snapshots: Vec::new(),
                             derived_nodes: Vec::new(),
                             derived_from: Vec::new(),

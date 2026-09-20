@@ -1,9 +1,8 @@
 # Graph windows and temporal sequence witnesses
 
-Accepted design with parser/type groundwork only. Canonical protocol 0.19 is
-being coordinated with the engine owner; this source checkpoint still emits
-protocol 0.18 and cannot execute temporal operators. This is the next bounded
-L05 slice after scalar Interval. The language paper §5 requires
+Historical accepted design for the bounded protocol 0.19 implementation. See
+[the implemented profile](../TEMPORAL_QUERIES.md) for current semantics and limits.
+This is a bounded L05 slice after scalar Interval. The language paper §5 requires
 simultaneous conclusions to intersect supporting intervals and the query window,
 but requires sequence queries to use an explicit temporal relation instead.
 It also distinguishes valid time, replica-local recorded time, revision ancestry

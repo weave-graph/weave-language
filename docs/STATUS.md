@@ -2,6 +2,43 @@
 
 As of 2026-09-20, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
 
+## Bounded graph temporal values (protocol 0.19)
+
+Window and Sequence now lower from ordinary source/functions/pinned modules into
+canonical pure graph operators. Window clips signed occurrences and metadata;
+unchanged intervals preserve full record identity after normal validation.
+Sequence compares original intervals using strict before, meets, symmetric overlaps
+or within, then emits separate clipped occurrences with pair-conditioned proofs.
+It creates no hull fact. Exact schema/context checks, current wrapper metadata IDs,
+empty-value carriers and per-record alternatives remain explicit.
+
+The exact 33-file contract and versioned documentation are vendored from engine
+`a6adb949de08284dc9f7e8d013e38c1380416e12`. Portable checks cover Boolean carrier
+truth tables, raw proof bounds, temporal finite-set relations, detached proofs,
+metadata hosts, unchanged Window identity and indexed endpoint/host work. The native
+owner separately executes the portable kernel in native/WASM and tests current
+visibility and historical store migration; compiler parity alone is not that proof.
+
+Actual compiler→native acceptance passes 22 fresh processes, including exact pinned
+replay, a later source correction, old-profile atomic rejection, real graph-valued
+metadata via returned wrapper IDs and empty metadata→Support→detached scalar privacy.
+Current and preserved protocol-0.18 view/handler artifacts install and replay through
+the trusted host APIs. Copying a new result's carrier fields into an old-profile
+Program is explicitly rejected; the trusted copy uses the result's current profile.
+All 25 preexisting non-handler top-level examples preserve exact commands, values
+and source manifests after normalizing only the declared Program protocol version.
+The source workspace passes 191 tests, formatting and strict all-target lint.
+Executed safe Rust/native ABI/zero-import WASM compiler parity covers 25 arbitrary
+requests (including a pinned temporal module), with 558,761 identical response bytes;
+the fixed scalar profile additionally matches 20,050 bytes. All 17 existing and new
+source/runtime workflow suites pass, plus current/historical view and handler
+compatibility. These compiler checks remain distinct from executed temporal-kernel
+parity and browser persistence evidence owned by the native project.
+
+See [Temporal queries](TEMPORAL_QUERIES.md) for semantics and limits. This closes a
+bounded valid-time subset of L05. Calendar/recorded-time queries, general event
+patterns, rolling incremental windows and the rest of the full gate remain open.
+
 ## Bytes and typed pinned reference values (source-only, protocol 0.18)
 
 Checked Bytes and distinct NodeRef/structural EdgeRef/AssertionRef/SnapshotRef values
@@ -115,8 +152,10 @@ end-exclusive edge/metadata filtering, canonical literal persistence, a fresh-pr
 pinned read and failed-specialization/no-plan behavior. Source archive and hosted
 publication evidence are recorded separately.
 
-General graph temporal windows/sequences, calendar and recorded-time correction
-semantics, runtime interval schemas and full L05 remain open.
+At this scalar checkpoint graph windows/sequences remained open; the later bounded
+protocol 0.19 profile is documented in [TEMPORAL_QUERIES.md](TEMPORAL_QUERIES.md).
+General temporal patterns, calendar and recorded-time correction semantics, runtime
+interval schemas and full L05 remain open.
 
 ## Compiled event handlers (protocol 0.18)
 
@@ -253,7 +292,7 @@ recorded in the final orchestrator handoff; publication remains orchestrator-own
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.18 sealed handlers plus exact snapshot/attachment influence and accepted/view artifacts plus schema/metadata/algebra/assertion/rule/context/geometry and graph-influence implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.19 Window/Sequence and conditional carriers plus sealed handlers plus exact snapshot/attachment influence and accepted/view artifacts plus schema/metadata/algebra/assertion/rule/context/geometry and graph-influence implementation addresses documented model gaps. Full semantic conformance remains open. |
 | L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; ordinary scalar specialization and complete host-artifact output now covered. A bounded token-preserving formatter now provides syntax-only stdout/check/write modes. Rich graph/vector/quantity types and effects remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. Typed total contextual assignments now preserve exact descriptor witnesses; general higher-order lenses/joins and explicit context compatibility remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity resolution now executes with explicit policy/mapping pins; general alignment, stratified absence and richer scenarios remain. |

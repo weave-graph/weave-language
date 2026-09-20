@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(prefix="weave-schema-functions-") as directory:
         return json.loads(result.stdout)
     annotated = compile_source(source, "annotated")
     plain = compile_source(source.replace("graph input schema Infrastructure", "graph input").replace("returns graph schema Infrastructure", ""), "plain")
-    assert annotated["version"] == plain["version"] == "0.18.0"
+    assert annotated["version"] == plain["version"] == "0.19.0"
     assert annotated["commands"] == plain["commands"], "Static annotations must not introduce reads or effects"
     actual = run(annotated, "annotated")
     oracle = run(plain, "plain")

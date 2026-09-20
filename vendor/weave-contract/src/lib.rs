@@ -16,8 +16,11 @@ pub mod decimal;
 pub mod quantity;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-pub const VERSION: &str = "0.18.0";
+pub const VERSION: &str = "0.19.0";
+pub mod carrier_algebra;
+pub mod carrier_profile;
 pub mod influence;
+pub mod temporal;
 pub use influence::GraphInfluence;
 pub mod counterpart;
 mod geometry_types;
@@ -29,8 +32,6 @@ pub mod rules;
 mod rules_types;
 pub use rules_types::*;
 pub mod algebra;
-// Development handoff: bounded pure carrier algebra, without wire integration.
-pub mod carrier_algebra;
 pub mod identity;
 pub use identity::SourceRevision;
 mod algebra_types;
@@ -83,6 +84,14 @@ pub enum Polarity {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Node {
+    /// Record-local OR alternatives, conjunctive with the declared flat gates.
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "crate::carrier_profile::bounded_derivations"
+    )]
+    pub derivations: Vec<Derivation>,
+
     /// Conservative whole-snapshot AND gates, independent of record readers.
     #[serde(
         default,
@@ -240,6 +249,17 @@ pub struct CounterpartSelection {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum GraphExpression {
+    Window {
+        input: Box<GraphExpression>,
+        window: Interval,
+    },
+    Sequence {
+        left: Box<GraphExpression>,
+        right: Box<GraphExpression>,
+        window: Interval,
+        relation: TemporalRelation,
+        match_on: JoinMatch,
+    },
     AcceptedGraph {
         selection: AcceptedGraphSelection,
     },
@@ -320,6 +340,15 @@ pub enum GraphExpression {
         output_predicate: String,
         match_on: JoinMatch,
     },
+}
+/// Pure valid-time relation; does not select or authorize a recorded-time observation.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TemporalRelation {
+    Before,
+    Meets,
+    Overlaps,
+    Within,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -452,6 +481,14 @@ pub enum MetadataValue {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct MetadataAttachment {
+    /// Record-local OR alternatives, conjunctive with the declared flat gates.
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "crate::carrier_profile::bounded_derivations"
+    )]
+    pub derivations: Vec<Derivation>,
+
     /// Conservative assertion influence, independent of origin and host placement.
     #[serde(
         default,

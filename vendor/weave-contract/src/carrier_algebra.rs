@@ -1,7 +1,6 @@
-//! Experimental, bounded restriction algebra for canonical handoff.
-//! These local types are not executable wire DTOs and never authorize references.
+//! Bounded restriction algebra. Composition never authorizes references.
 //! Existing stored Edge/Assertion derivations retain their historical validators.
-use crate::{Derivation, Diagnostic, GraphInfluence, GraphRef};
+use crate::{AssertionRef, Derivation, Diagnostic, GraphRef, NodeRef};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::io::{self, Write};
@@ -12,17 +11,18 @@ const MAX_REFS: usize = 1000;
 const MAX_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DEPTH: usize = 32;
 
-/// Proposed explicit alternative-local snapshot premises. Descriptive
-/// derivation.input_snapshots are deliberately a separate field.
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct Alternative {
-    pub derivation: Derivation,
-    pub snapshot_premises: Vec<GraphRef>,
+/// Flat global AND gates; deliberately nonrecursive.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct RefSet {
+    pub assertions: Vec<AssertionRef>,
+    pub nodes: Vec<NodeRef>,
+    pub snapshots: Vec<GraphRef>,
 }
+pub type Alternative = Derivation;
 /// all(flat) AND any(alternatives); empty alternatives mean no extra condition.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct Carrier {
-    pub flat: GraphInfluence,
+    pub flat: RefSet,
     pub alternatives: Vec<Alternative>,
 }
 #[derive(Clone, Copy, Debug)]
@@ -102,7 +102,7 @@ fn id(value: &str) -> bool {
 fn graph_key(r: &GraphRef) -> (&str, &str) {
     (&r.graph_id, &r.revision)
 }
-fn refs_count(flat: &GraphInfluence) -> usize {
+fn refs_count(flat: &RefSet) -> usize {
     flat.assertions
         .len()
         .saturating_add(flat.nodes.len())
@@ -110,13 +110,12 @@ fn refs_count(flat: &GraphInfluence) -> usize {
 }
 fn group_count(group: &Alternative) -> usize {
     group
-        .derivation
         .premises
         .len()
-        .saturating_add(group.derivation.node_premises.len())
+        .saturating_add(group.node_premises.len())
         .saturating_add(group.snapshot_premises.len())
 }
-fn flat_empty(flat: &GraphInfluence) -> bool {
+fn flat_empty(flat: &RefSet) -> bool {
     refs_count(flat) == 0
 }
 fn unconditional(value: &Carrier) -> bool {
@@ -148,7 +147,11 @@ pub fn validate(value: &Carrier, budget: &mut Budget) -> Result<()> {
         return Err(limit());
     }
     let mut count = refs_count(&value.flat);
-    crate::influence::validate(&value.flat)?;
+    crate::influence::validate_record_refs(
+        &value.flat.assertions,
+        &value.flat.nodes,
+        &value.flat.snapshots,
+    )?;
     for group in &value.alternatives {
         budget.step()?;
         let n = group_count(group);
@@ -162,7 +165,7 @@ pub fn validate(value: &Carrier, budget: &mut Budget) -> Result<()> {
         if count > budget.limits.references {
             return Err(limit());
         }
-        let d = &group.derivation;
+        let d = &group;
         if !id(&d.operator) {
             return Err(error("E_INFLUENCE", "A bounded operator label is required"));
         }
@@ -188,31 +191,29 @@ pub fn validate(value: &Carrier, budget: &mut Budget) -> Result<()> {
     budget.charge(value)
 }
 fn normalize_group(group: &mut Alternative) {
-    group.derivation.premises.sort_by(|a, b| {
+    group.premises.sort_by(|a, b| {
         crate::influence::assertion_key(a).cmp(&crate::influence::assertion_key(b))
     });
-    group.derivation.premises.dedup();
+    group.premises.dedup();
     group
-        .derivation
         .node_premises
         .sort_by(|a, b| crate::influence::node_key(a).cmp(&crate::influence::node_key(b)));
-    group.derivation.node_premises.dedup();
+    group.node_premises.dedup();
     group
         .snapshot_premises
         .sort_by(|a, b| graph_key(a).cmp(&graph_key(b)));
     group.snapshot_premises.dedup();
     group
-        .derivation
         .input_snapshots
         .sort_by(|a, b| graph_key(a).cmp(&graph_key(b)));
-    group.derivation.input_snapshots.dedup();
+    group.input_snapshots.dedup();
 }
 /// Canonicalize a new result; callers must not rewrite immutable stored records.
 pub fn canonicalize(value: &Carrier, budget: &mut Budget) -> Result<Carrier> {
     validate(value, budget)?;
     budget.charge(value)?;
     let mut out = value.clone();
-    crate::influence::canonicalize(&mut out.flat);
+    normalize_refs(&mut out.flat);
     let mut groups = BTreeMap::new();
     for mut group in out.alternatives {
         budget.step()?;
@@ -224,28 +225,40 @@ pub fn canonicalize(value: &Carrier, budget: &mut Budget) -> Result<Carrier> {
     out.alternatives = groups.into_values().collect();
     Ok(out)
 }
-fn combine_refs(
-    a: &GraphInfluence,
-    b: &GraphInfluence,
-    budget: &mut Budget,
-) -> Result<GraphInfluence> {
+fn normalize_refs(value: &mut RefSet) {
+    value.assertions.sort_by(|a, b| {
+        crate::influence::assertion_key(a).cmp(&crate::influence::assertion_key(b))
+    });
+    value.assertions.dedup();
+    value
+        .nodes
+        .sort_by(|a, b| crate::influence::node_key(a).cmp(&crate::influence::node_key(b)));
+    value.nodes.dedup();
+    crate::influence::canonicalize_snapshots(&mut value.snapshots);
+}
+fn combine_refs(a: &RefSet, b: &RefSet, budget: &mut Budget) -> Result<RefSet> {
     if refs_count(a).saturating_add(refs_count(b)) > budget.limits.references {
         return Err(limit());
     }
     budget.charge(&(a, b))?;
-    Ok(crate::influence::merge(Some(a), Some(b))?.unwrap_or_default())
+    let mut out = a.clone();
+    out.assertions.extend(b.assertions.iter().cloned());
+    out.nodes.extend(b.nodes.iter().cloned());
+    out.snapshots.extend(b.snapshots.iter().cloned());
+    normalize_refs(&mut out);
+    Ok(out)
 }
-fn group_refs(group: &Alternative, budget: &mut Budget) -> Result<GraphInfluence> {
+fn group_refs(group: &Alternative, budget: &mut Budget) -> Result<RefSet> {
     budget.charge(group)?;
-    Ok(GraphInfluence {
-        assertions: group.derivation.premises.clone(),
-        nodes: group.derivation.node_premises.clone(),
+    Ok(RefSet {
+        assertions: group.premises.clone(),
+        nodes: group.node_premises.clone(),
         snapshots: group.snapshot_premises.clone(),
     })
 }
 fn make_group(
     operator: &str,
-    gates: GraphInfluence,
+    gates: RefSet,
     parents: &impl Serialize,
     budget: &mut Budget,
 ) -> Result<Alternative> {
@@ -273,17 +286,15 @@ fn make_group(
         .collect();
     snapshots.sort_by(|a, b| graph_key(a).cmp(&graph_key(b)));
     snapshots.dedup();
-    Ok(Alternative {
-        derivation: Derivation {
-            operator: operator.into(),
-            premises: gates.assertions,
-            node_premises: gates.nodes,
-            parameters: BTreeMap::from([(
-                "inputs".into(),
-                serde_json::to_value(parents).expect("carrier serialization"),
-            )]),
-            input_snapshots: snapshots,
-        },
+    Ok(Derivation {
+        operator: operator.into(),
+        premises: gates.assertions,
+        node_premises: gates.nodes,
+        parameters: BTreeMap::from([(
+            "inputs".into(),
+            serde_json::to_value(parents).expect("carrier serialization"),
+        )]),
+        input_snapshots: snapshots,
         snapshot_premises: gates.snapshots,
     })
 }
@@ -291,6 +302,9 @@ fn make_group(
 pub fn conjunction(a: &Carrier, b: &Carrier, budget: &mut Budget) -> Result<Carrier> {
     let a = canonicalize(a, budget)?;
     let b = canonicalize(b, budget)?;
+    if a == b {
+        return Ok(a);
+    }
     let flat = combine_refs(&a.flat, &b.flat, budget)?;
     let alternatives = if a.alternatives.is_empty() {
         budget.charge(&b.alternatives)?;
@@ -348,6 +362,13 @@ pub fn conjunction(a: &Carrier, b: &Carrier, budget: &mut Budget) -> Result<Carr
     canonicalize(&Carrier { flat, alternatives }, budget)
 }
 fn branches(value: &Carrier, budget: &mut Budget) -> Result<Vec<Alternative>> {
+    let raw = refs_count(&value.flat)
+        .checked_mul(value.alternatives.len().max(1))
+        .and_then(|n| n.checked_add(value.alternatives.iter().map(group_count).sum::<usize>()))
+        .ok_or_else(limit)?;
+    if raw > budget.limits.references {
+        return Err(limit());
+    }
     if value.alternatives.is_empty() {
         budget.charge(&value.flat)?;
         return Ok(vec![make_group(
@@ -369,6 +390,18 @@ fn branches(value: &Carrier, budget: &mut Budget) -> Result<Vec<Alternative>> {
         )?);
     }
     Ok(out)
+}
+/// Distribute global gates into each existing branch without interpreting descriptive pins.
+pub fn distribute(branch: &Carrier, flat: &Carrier, budget: &mut Budget) -> Result<Carrier> {
+    let joined = conjunction(branch, flat, budget)?;
+    let alternatives = branches(&joined, budget)?;
+    canonicalize(
+        &Carrier {
+            flat: RefSet::default(),
+            alternatives,
+        },
+        budget,
+    )
 }
 /// Restricted alternatives for one identical value only. There is deliberately
 /// no true OR restricted simplification: that would discard explanation traces.
@@ -408,11 +441,83 @@ pub fn disjunction(a: &Carrier, b: &Carrier, budget: &mut Budget) -> Result<Carr
     alternatives.extend(branches(&b, budget)?);
     canonicalize(
         &Carrier {
-            flat: GraphInfluence::default(),
+            flat: RefSet::default(),
             alternatives,
         },
         budget,
     )
+}
+
+/// Copy a borrowed record carrier only after its counts and serialized size are charged.
+pub fn from_parts(
+    assertions: &[AssertionRef],
+    nodes: &[NodeRef],
+    snapshots: &[GraphRef],
+    groups: &[Derivation],
+    budget: &mut Budget,
+) -> Result<Carrier> {
+    if groups.len() > budget.limits.groups
+        || assertions
+            .len()
+            .saturating_add(nodes.len())
+            .saturating_add(snapshots.len())
+            .saturating_add(
+                groups
+                    .iter()
+                    .map(|g| {
+                        g.premises
+                            .len()
+                            .saturating_add(g.node_premises.len())
+                            .saturating_add(g.snapshot_premises.len())
+                    })
+                    .sum::<usize>(),
+            )
+            > budget.limits.references
+    {
+        return Err(limit());
+    }
+    budget.charge(&(assertions, nodes, snapshots, groups))?;
+    let out = Carrier {
+        flat: RefSet {
+            assertions: assertions.to_vec(),
+            nodes: nodes.to_vec(),
+            snapshots: snapshots.to_vec(),
+        },
+        alternatives: groups.to_vec(),
+    };
+    validate(&out, budget)?;
+    Ok(out)
+}
+pub fn from_influence(value: &crate::GraphInfluence, budget: &mut Budget) -> Result<Carrier> {
+    from_parts(
+        &value.assertions,
+        &value.nodes,
+        &value.snapshots,
+        &value.derivations,
+        budget,
+    )
+}
+pub fn into_influence(value: Carrier) -> crate::GraphInfluence {
+    crate::GraphInfluence {
+        assertions: value.flat.assertions,
+        nodes: value.flat.nodes,
+        snapshots: value.flat.snapshots,
+        derivations: value.alternatives,
+    }
+}
+/// All assertion leaves for descriptive indexes, never a conjunctive carrier.
+pub fn assertion_index(value: &crate::GraphInfluence) -> Vec<AssertionRef> {
+    let mut refs: Vec<_> = value
+        .assertions
+        .iter()
+        .chain(value.derivations.iter().flat_map(|g| &g.premises))
+        .cloned()
+        .collect();
+    refs.sort_by(|a, b| {
+        crate::influence::assertion_key(a).cmp(&crate::influence::assertion_key(b))
+    });
+    refs.dedup();
+    refs
 }
 
 #[cfg(test)]
@@ -429,8 +534,8 @@ mod tests {
             assertion_id: id.into(),
         }
     }
-    fn refs(bits: u8) -> GraphInfluence {
-        let mut out = GraphInfluence::default();
+    fn refs(bits: u8) -> RefSet {
+        let mut out = RefSet::default();
         if bits & 1 != 0 {
             out.assertions.push(assertion("A"));
         }
@@ -454,17 +559,15 @@ mod tests {
     }
     fn alt(bits: u8, label: &str) -> Alternative {
         let gates = refs(bits);
-        Alternative {
-            derivation: Derivation {
-                operator: label.into(),
-                premises: gates.assertions,
-                node_premises: gates.nodes,
-                parameters: BTreeMap::new(),
-                input_snapshots: vec![GraphRef {
-                    graph_id: "descriptive-only".into(),
-                    revision: "not-authority".into(),
-                }],
-            },
+        Derivation {
+            operator: label.into(),
+            premises: gates.assertions,
+            node_premises: gates.nodes,
+            parameters: BTreeMap::new(),
+            input_snapshots: vec![GraphRef {
+                graph_id: "descriptive-only".into(),
+                revision: "not-authority".into(),
+            }],
             snapshot_premises: gates.snapshots,
         }
     }
@@ -500,8 +603,8 @@ mod tests {
             && snapshots_ok(&flat.snapshots, mask)
             && (value.alternatives.is_empty()
                 || value.alternatives.iter().any(|g| {
-                    assertions_ok(&g.derivation.premises, mask)
-                        && nodes_ok(&g.derivation.node_premises, mask)
+                    assertions_ok(&g.premises, mask)
+                        && nodes_ok(&g.node_premises, mask)
                         && snapshots_ok(&g.snapshot_premises, mask)
                 }))
     }
@@ -554,7 +657,7 @@ mod tests {
         let mut value = carrier(0, &[1]);
         assert!(!evaluate(&value, 0));
         assert!(evaluate(&value, 1));
-        value.alternatives[0].derivation.premises.clear();
+        value.alternatives[0].premises.clear();
         assert_eq!(
             validate(&value, &mut budget()).unwrap_err().code,
             "E_INFLUENCE_EMPTY_GROUP"
@@ -569,14 +672,15 @@ mod tests {
         let a = alt(1, "first");
         let b = alt(1, "other-explanation");
         let value = Carrier {
-            flat: GraphInfluence::default(),
+            flat: RefSet::default(),
             alternatives: vec![a.clone(), a.clone(), b],
         };
         let out = canonicalize(&value, &mut budget()).unwrap();
         assert_eq!(out.alternatives.len(), 2);
         assert_eq!(canonicalize(&out, &mut budget()).unwrap(), out);
+        assert_eq!(conjunction(&out, &out, &mut budget()).unwrap(), out);
         let excessive = Carrier {
-            flat: GraphInfluence::default(),
+            flat: RefSet::default(),
             alternatives: vec![a; 129],
         };
         assert_eq!(
@@ -584,9 +688,9 @@ mod tests {
             "E_INFLUENCE_BUDGET"
         );
         let excessive = Carrier {
-            flat: GraphInfluence {
+            flat: RefSet {
                 assertions: vec![assertion("A"); 1001],
-                ..GraphInfluence::default()
+                ..RefSet::default()
             },
             alternatives: vec![],
         };
@@ -595,13 +699,17 @@ mod tests {
     #[test]
     fn bounded_product_and_repeated_flat_expansion_reject_before_retention() {
         let groups = |count| Carrier {
-            flat: GraphInfluence::default(),
+            flat: RefSet::default(),
             alternatives: (0..count)
                 .map(|i| alt(1, &format!("different{i}")))
                 .collect(),
         };
+        let mut other = groups(12);
+        for g in &mut other.alternatives {
+            g.operator = format!("other-{}", g.operator);
+        }
         assert_eq!(
-            conjunction(&groups(12), &groups(12), &mut budget())
+            conjunction(&groups(12), &other, &mut budget())
                 .unwrap_err()
                 .code,
             "E_INFLUENCE_BUDGET"
@@ -640,7 +748,6 @@ mod tests {
     fn unconditional_disjunction_never_silently_erases_parent_trace() {
         let mut proof = carrier(0, &[1]);
         proof.alternatives[0]
-            .derivation
             .parameters
             .insert("important".into(), serde_json::json!({"source":"original"}));
         let original = proof.clone();
@@ -653,8 +760,8 @@ mod tests {
         assert_eq!(proof, original);
         let out = conjunction(&Carrier::default(), &proof, &mut budget()).unwrap();
         assert_eq!(
-            out.alternatives[0].derivation.parameters,
-            proof.alternatives[0].derivation.parameters
+            out.alternatives[0].parameters,
+            proof.alternatives[0].parameters
         );
     }
     #[test]
@@ -665,11 +772,8 @@ mod tests {
         crate::influence::validate_graph(&legacy).unwrap();
         validate(&Carrier::default(), &mut budget()).unwrap();
         let new = Carrier {
-            flat: GraphInfluence::default(),
-            alternatives: vec![Alternative {
-                derivation: legacy.edges[0].derivations[0].clone(),
-                snapshot_premises: vec![],
-            }],
+            flat: RefSet::default(),
+            alternatives: vec![legacy.edges[0].derivations[0].clone()],
         };
         assert_eq!(
             validate(&new, &mut budget()).unwrap_err().code,

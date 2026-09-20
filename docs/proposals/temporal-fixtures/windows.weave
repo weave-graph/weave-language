@@ -1,4 +1,4 @@
-// Parser/type fixture only: these graph operators have no executable protocol yet.
+// Accepted syntax fixture; executable protocol 0.19 semantics: docs/TEMPORAL_QUERIES.md.
 function During revision "1" (graph input, interval span) {
   window Result from input during param span;
   return Result;
