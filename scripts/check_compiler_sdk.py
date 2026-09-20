@@ -54,7 +54,7 @@ b='module "b" revision "1"; import a module "a" revision "1" sha256 "'+('0'*64)+
 a_unit='module "a" revision "1";'+imp('b','b',b)
 cases.append(('cycle',request(imp('a','a',a_unit),[unit('a',a_unit),unit('b',b)])))
 cases.append(('large-output',request('value Big "'+('x'*524288)+'";')))
-for name,path in fixtures.items():cases.append((name,request(path.read_text())))
+for name,path in fixtures.items():cases.append((name,request(path.read_bytes().decode('utf-8'))))
 # Exercise near the complete decoded aggregate bound, with exact 1 MiB units.
 large_source='//'+('x'*(1048576-3))+'\n'
 large_units=[unit(f'm{i}',f'module "m{i}" revision "1"; //'.ljust(1048576,'x')) for i in range(3)]
