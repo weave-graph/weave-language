@@ -358,6 +358,9 @@ fn lower_artifacts(
             | Statement::Bind {
                 name, name_span, ..
             }
+            | Statement::Temporal {
+                name, name_span, ..
+            }
             | Statement::Join {
                 name, name_span, ..
             }
@@ -383,6 +386,13 @@ fn lower_artifacts(
             ));
         }
         match statement {
+            Statement::Temporal { name_span, .. } => {
+                return Err(diagnostic(
+                    "E_TEMPORAL_PROTOCOL",
+                    "Temporal syntax is under development; no executable protocol operator is installed",
+                    name_span,
+                ));
+            }
             Statement::LiveHandle {
                 name,
                 graph,

@@ -205,6 +205,9 @@ pub(crate) fn declaration(statement: &Statement) -> (&str, Span) {
         | Statement::Schema {
             name, name_span, ..
         }
+        | Statement::Temporal {
+            name, name_span, ..
+        }
         | Statement::Join {
             name, name_span, ..
         }
@@ -440,6 +443,21 @@ impl Expander {
     }
     fn resolve_statement(&mut self, s: &mut Statement) -> Result<(), Diagnostic> {
         match s {
+            Statement::Temporal { window, .. } => {
+                let value = window.evaluate(
+                    &BTreeMap::new(),
+                    &self.scalar_values,
+                    &mut self.scalar_budget,
+                )?;
+                if !matches!(value, ScalarValue::Interval(_)) {
+                    return Err(error(
+                        "E_SCALAR_TYPE",
+                        "Temporal window requires Interval",
+                        window.span,
+                    ));
+                }
+                window.expression = ScalarExpression::Literal(value);
+            }
             Statement::Lens {
                 predicate,
                 valid_at,
@@ -1127,6 +1145,21 @@ fn specialize(
             *n = name.into();
             *source = renamed(source, scope, *source_span)?;
         }
+        Statement::Temporal {
+            name: n,
+            source,
+            source_span,
+            window,
+            sequence,
+            ..
+        } => {
+            *n = name.into();
+            *source = renamed(source, scope, *source_span)?;
+            if let Some(selection) = sequence {
+                selection.right = renamed(&selection.right, scope, selection.right_span)?;
+            }
+            substitute(window, scope, values, budget)?;
+        }
         Statement::Join {
             name: n,
             left,
@@ -1394,6 +1427,15 @@ fn validate_definition(definition: &Definition, budget: &mut Budget) -> Result<(
                 }
             }
         }
+        if let Statement::Temporal { window, .. } = statement
+            && window.infer(&scalar_params, &scalar_values)? != ScalarType::Interval
+        {
+            return Err(error(
+                "E_SCALAR_TYPE",
+                "Temporal window requires Interval",
+                window.span,
+            ));
+        }
         let require_graph = |name: &str, span| {
             if graphs.contains(name) {
                 Ok(())
@@ -1537,6 +1579,26 @@ fn validate_definition(definition: &Definition, budget: &mut Budget) -> Result<(
                 ..
             } => {
                 require_graph(source, *source_span)?;
+                graphs.insert(name.clone());
+            }
+            Statement::Temporal {
+                source,
+                source_span,
+                sequence,
+                ..
+            } => {
+                require_graph(source, *source_span)?;
+                if let Some(selection) = sequence {
+                    require_graph(&selection.right, selection.right_span)?;
+                    graph_types::temporal_schema(
+                        &graph_schemas.get(source).cloned().unwrap_or_default(),
+                        &graph_schemas
+                            .get(&selection.right)
+                            .cloned()
+                            .unwrap_or_default(),
+                        selection.right_span,
+                    )?;
+                }
                 graphs.insert(name.clone());
             }
             Statement::Join {
@@ -1695,6 +1757,13 @@ fn normalized_statement(statement: &Statement) -> serde_json::Value {
         {
             operation.remove("right_span");
         }
+        if let Some(sequence) = map
+            .get_mut("sequence")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            sequence.remove("right_span");
+            sequence.remove("relation_span");
+        }
         if let Some(body) = map
             .get_mut("body")
             .and_then(serde_json::Value::as_array_mut)
@@ -1818,4 +1887,76 @@ pub(crate) fn source_revisions(
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod temporal_expansion_tests {
+    use super::*;
+    #[test]
+    fn temporal_specialization_renames_both_graph_inputs_and_resolves_intervals() {
+        let source = r#"function F revision "1" (graph input,graph next,interval span){
+            window W from input during param span;
+            sequence Q from W to next before during param span;
+            return Q;
+        }
+        apply Partial from F {interval span interval(time 2,time 8);}
+        graph G{} graph H{}
+        apply Output from Partial {graph input G;graph next H;}
+        "#;
+        let expanded = expand(crate::parse(source).unwrap()).unwrap();
+        let temporals: Vec<_> = expanded
+            .program
+            .statements
+            .iter()
+            .filter(|s| matches!(s, Statement::Temporal { .. }))
+            .collect();
+        assert_eq!(temporals.len(), 2);
+        let Statement::Temporal {
+            name,
+            source: input,
+            window,
+            sequence,
+            ..
+        } = temporals[0]
+        else {
+            unreachable!()
+        };
+        let captured_from = |binding: &str| {
+            expanded.program.statements.iter().find_map(|s| match s {
+                Statement::Lens {
+                    name,
+                    source,
+                    predicate: None,
+                    valid_at: None,
+                    ..
+                } if name == binding => Some(source.as_str()),
+                _ => None,
+            })
+        };
+        assert_eq!(captured_from(input), Some("G"));
+        assert!(sequence.is_none());
+        assert!(
+            matches!(&window.expression,ScalarExpression::Literal(ScalarValue::Interval(v)) if v.start()==2 && v.end()==Some(8))
+        );
+        let Statement::Temporal {
+            source: input,
+            sequence: Some(selection),
+            window: other,
+            ..
+        } = temporals[1]
+        else {
+            unreachable!()
+        };
+        assert_eq!(input, name);
+        assert_eq!(captured_from(&selection.right), Some("H"));
+        assert_eq!(other.expression, window.expression);
+        assert_eq!(
+            &source[selection.relation_span.0..selection.relation_span.1],
+            "before"
+        );
+        assert!(!expanded.program.statements.iter().any(|s| matches!(
+            s,
+            Statement::Use { .. } | Statement::Pin { .. } | Statement::NativeService { .. }
+        )));
+    }
 }

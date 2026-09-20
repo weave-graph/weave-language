@@ -257,6 +257,17 @@ impl<'a> Resolver<'a> {
                 Self::local_graph(source, *source_span)?;
                 self.reference(rule_set, *rule_span, Kind::Rules, &BTreeSet::new())?;
             }
+            Statement::Temporal {
+                source,
+                source_span,
+                sequence,
+                ..
+            } => {
+                Self::local_graph(source, *source_span)?;
+                if let Some(selection) = sequence {
+                    Self::local_graph(&selection.right, selection.right_span)?;
+                }
+            }
             Statement::Join {
                 left,
                 left_span,
@@ -344,6 +355,16 @@ pub(super) fn shift(statement: &mut Statement, base: usize) {
         ] {
             if let Some(v) = map.get_mut(key) {
                 span(v, base);
+            }
+        }
+        if let Some(sequence) = map
+            .get_mut("sequence")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            for key in ["right_span", "relation_span"] {
+                if let Some(value) = sequence.get_mut(key) {
+                    span(value, base);
+                }
             }
         }
         if let Some(body) = map

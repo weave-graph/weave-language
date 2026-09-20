@@ -1,0 +1,12 @@
+// Parser/type fixture only: these graph operators have no executable protocol yet.
+function During revision "1" (graph input, interval span) {
+  window Result from input during param span;
+  return Result;
+}
+function FollowedBy revision "1" (graph input, graph next, interval span) {
+  sequence Result from input to next before during param span;
+  return Result;
+}
+apply September from During {
+  interval span interval(time 10, time 30);
+}

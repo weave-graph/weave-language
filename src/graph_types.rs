@@ -93,6 +93,19 @@ impl State {
                 };
                 self.graphs.insert(name.clone(), knowledge);
             }
+            Statement::Temporal {
+                name,
+                source,
+                sequence: Some(selection),
+                ..
+            } => {
+                let knowledge = temporal_schema(
+                    &self.get(source),
+                    &self.get(&selection.right),
+                    selection.right_span,
+                )?;
+                self.graphs.insert(name.clone(), knowledge);
+            }
             Statement::ContextValue { name, .. } => {
                 self.graphs.insert(name.clone(), Knowledge::Untyped);
             }
@@ -105,11 +118,47 @@ impl State {
         Ok(())
     }
 }
+/// Exact descriptor equality only; no coercion or implicit schema erasure.
+pub(crate) fn temporal_schema(
+    left: &Knowledge,
+    right: &Knowledge,
+    span: Span,
+) -> Result<Knowledge, Diagnostic> {
+    match (left, right) {
+        (Knowledge::Unknown, _) | (_, Knowledge::Unknown) => Ok(Knowledge::Unknown),
+        (Knowledge::Untyped, Knowledge::Untyped) => Ok(Knowledge::Untyped),
+        (Knowledge::Exact(a), Knowledge::Exact(b)) if a == b => Ok(left.clone()),
+        _ => Err(Diagnostic::new(
+            "E_SCHEMA_MISMATCH",
+            "Temporal sequence requires equal complete graph schemas",
+            span.0,
+            span.1,
+        )),
+    }
+}
 pub(crate) fn transfer<'a>(
     statement: &'a Statement,
     graphs: &BTreeMap<String, Knowledge>,
 ) -> Option<(&'a str, Knowledge)> {
     let (name, source) = match statement {
+        Statement::Temporal {
+            name,
+            source,
+            sequence,
+            ..
+        } => {
+            let left = graphs.get(source).cloned().unwrap_or_default();
+            let knowledge = match sequence {
+                None => left,
+                Some(selection) => temporal_schema(
+                    &left,
+                    &graphs.get(&selection.right).cloned().unwrap_or_default(),
+                    selection.right_span,
+                )
+                .unwrap_or_default(),
+            };
+            return Some((name, knowledge));
+        }
         Statement::Lens { name, source, .. }
         | Statement::Bind { name, source, .. }
         | Statement::TypedContext { name, source, .. } => (name, Some(source)),

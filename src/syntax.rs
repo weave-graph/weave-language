@@ -38,9 +38,33 @@ pub struct HandlerEvent {
     pub event_type: String,
     pub span: Span,
 }
+/// Parsed temporal syntax; executable protocol support is not yet installed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TemporalRelation {
+    Before,
+    Meets,
+    Overlaps,
+    Within,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TemporalSequence {
+    pub right: String,
+    pub right_span: Span,
+    pub relation: TemporalRelation,
+    pub relation_span: Span,
+}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
+    Temporal {
+        name: String,
+        name_span: Span,
+        source: String,
+        source_span: Span,
+        window: ScalarExpr,
+        sequence: Option<TemporalSequence>,
+    },
     VectorType {
         name: String,
         name_span: Span,
@@ -2812,6 +2836,50 @@ impl Parser {
                         revision,
                     });
                 }
+                "window" | "sequence" => {
+                    self.word("from")?;
+                    let source_span = (self.peek().start, self.peek().end);
+                    let source = self.name()?;
+                    let sequence = if kind == "sequence" {
+                        self.word("to")?;
+                        let right_span = (self.peek().start, self.peek().end);
+                        let right = self.name()?;
+                        let relation_span = (self.peek().start, self.peek().end);
+                        let relation = match self.name()?.as_str() {
+                            "before" => TemporalRelation::Before,
+                            "meets" => TemporalRelation::Meets,
+                            "overlaps" => TemporalRelation::Overlaps,
+                            "within" => TemporalRelation::Within,
+                            _ => {
+                                return Err(Diagnostic::new(
+                                    "E_TEMPORAL_RELATION",
+                                    "Expected before, meets, overlaps or within",
+                                    relation_span.0,
+                                    relation_span.1,
+                                ));
+                            }
+                        };
+                        Some(TemporalSequence {
+                            right,
+                            right_span,
+                            relation,
+                            relation_span,
+                        })
+                    } else {
+                        None
+                    };
+                    self.word("during")?;
+                    let window = self.scalar_expr(0)?;
+                    self.symbol(';')?;
+                    statements.push(Statement::Temporal {
+                        name,
+                        name_span,
+                        source,
+                        source_span,
+                        window,
+                        sequence,
+                    });
+                }
                 "join" => {
                     self.word("from")?;
                     let left_span = (self.peek().start, self.peek().end);
@@ -2977,6 +3045,7 @@ pub(crate) fn scalar_expressions(statement: &mut Statement, f: &mut impl FnMut(&
     }
     match statement {
         Statement::Value { value, .. } => f(value),
+        Statement::Temporal { window, .. } => f(window),
         Statement::Function {
             scalar_return,
             body,

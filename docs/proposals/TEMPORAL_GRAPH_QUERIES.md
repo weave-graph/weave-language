@@ -1,7 +1,9 @@
 # Graph windows and temporal sequence witnesses
 
-Design for review; not implemented and no protocol version reserved. This is the
-next bounded L05 slice after scalar Interval. The language paper §5 requires
+Accepted design with parser/type groundwork only. Canonical protocol 0.19 is
+being coordinated with the engine owner; this source checkpoint still emits
+protocol 0.18 and cannot execute temporal operators. This is the next bounded
+L05 slice after scalar Interval. The language paper §5 requires
 simultaneous conclusions to intersect supporting intervals and the query window,
 but requires sequence queries to use an explicit temporal relation instead.
 It also distinguishes valid time, replica-local recorded time, revision ancestry
@@ -212,3 +214,30 @@ This advances L05 valid-time windows and bounded binary sequence selection.
 Recorded-time range queries/corrections, authenticated cross-replica observation,
 calendar literals, arbitrary sequence patterns and incrementally maintained rolling
 windows remain explicit gaps.
+
+## Parser checkpoint (not executable temporal support)
+
+The source AST accepts `window W from G during interval(time 0, time 10);`
+and `sequence S from L to R before during param span;`, with `meets`, `overlaps`
+and `within` as the other relation tokens. Scalar Interval inference and checked
+constant validation apply even inside unused functions. Graph function expansion
+captures both operands through the existing pure bindings, substitutes Interval
+parameters and renames local results hygienically. Window preserves known schema;
+Sequence requires exact complete descriptors when both inputs are statically known.
+Module diagnostics retain the original file and operand/relation spans.
+
+Fully instantiated temporal operations currently return `E_TEMPORAL_PROTOCOL`;
+no plan or SDK success artifact is returned. Unused definitions and partial
+applications are inspectable and do not read a store. The parser fixture is
+[windows.weave](temporal-fixtures/windows.weave), deliberately outside executable
+examples. Six integration tests plus an internal expansion test cover these
+boundaries, alias/whitespace identity, literal preservation and formatter
+idempotence. The focused module/formatter/Interval regression batch passed 33
+checks; the additional expansion test passed separately. Strict workspace/all-target
+Clippy and formatting checks passed. No runtime or temporal execution claim follows
+from this syntax evidence.
+
+Temporal metadata acceptance will use current returned wrapper IDs. Derived
+node, edge and attachment IDs do not create aliases for original local IDs or
+entity/space identity. A native fixture may inspect the returned ID and then issue
+explicit navigation; the existing narrow original-node shorthand is unchanged.
