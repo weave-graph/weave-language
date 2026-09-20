@@ -23,3 +23,5 @@ For an entry unit without changed module bytes, plan, typed value and complete h
 ## Scope
 
 This implements the formatter portion of the approved L29 tooling plan. Runtime schema discovery, richer repair/tooling workflows and broader language semantics remain separate requirements. Source formatting is not host execution or installation of a view/reactor.
+
+Independent orchestrator verification of `3ea25e3` passed the actual CLI against Unicode and CRLF comments, escaped URL/string literals, scalar result and fingerprint equivalence, repeated formatting, nonmutating stdout/check, explicit writes preserving permission bits, symlink rejection, and unchanged files after malformed/oversized input. Temporary files were removed. The implementation owner also passed all 142 tests, strict lint, WASM library compilation, and exact vendor/source checks. Hosted publication is verified separately.
