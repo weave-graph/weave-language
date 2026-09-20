@@ -6,8 +6,8 @@ This checklist concerns distribution of the current experimental source, not ful
 
 - Repository includes MIT license, contribution and security guidance, source, tests, examples, lockfile and a standalone vendored contract.
 - Contract verifier checks the exact vendored file set, license, Cargo version, protocol constant and current documentation hash.
-- Source grammar and public API are documented as provisional; current protocol is v0.17.0. Historical contract notes are labeled historical.
-- `check`, `ast`, `plan`, `fingerprint`, `values`, `artifacts`, `view-plan`, source-schema `describe` and token-preserving `fmt` are implemented CLI subcommands. Host registration/execution remains explicit and separate. No language runner, remote privileged discovery or LSP is advertised as implemented.
+- Source grammar and public API are documented as provisional; current protocol is v0.18.0. Historical contract notes are labeled historical.
+- `check`, `ast`, `plan`, `fingerprint`, `values`, `artifacts`, `view-plan`, `handler-plan`, source-schema `describe` and token-preserving `fmt` are implemented CLI subcommands. Host registration/execution remains explicit and separate. No language runner, remote privileged discovery or LSP is advertised as implemented.
 - `publish = false` prevents accidental registry publication before the separate contract package has an approved distribution path. Git source distribution remains available.
 
 ## Distribution procedure

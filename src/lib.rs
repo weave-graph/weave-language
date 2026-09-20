@@ -147,16 +147,16 @@ pub(crate) fn specialize_parsed(parsed: syntax::Program) -> Result<SpecializedPr
     })
 }
 pub(crate) fn reject_artifacts(parsed: &syntax::Program) -> Result<(), Diagnostic> {
-    if let Some(Statement::ViewTemplate { name_span, .. }) = parsed
-        .statements
-        .iter()
-        .find(|s| matches!(s, Statement::ViewTemplate { .. }))
-    {
-        return Err(diagnostic(
-            "E_HOST_ARTIFACT_REQUIRED",
-            "View templates require the complete artifact API or view-plan",
-            *name_span,
-        ));
+    for statement in &parsed.statements {
+        if let Statement::ViewTemplate { name_span, .. }
+        | Statement::HandlerTemplate { name_span, .. } = statement
+        {
+            return Err(diagnostic(
+                "E_HOST_ARTIFACT_REQUIRED",
+                "Host templates require the complete artifact API or explicit artifact selection",
+                *name_span,
+            ));
+        }
     }
     Ok(())
 }
@@ -165,11 +165,13 @@ pub struct CompiledArtifacts {
     pub program: Program,
     pub values: BTreeMap<String, scalars::ScalarValue>,
     pub view_templates: BTreeMap<String, weave_contract::CompiledViewTemplate>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub handler_templates: BTreeMap<String, weave_contract::CompiledHandlerTemplate>,
 }
 impl CompiledArtifacts {
     pub fn fingerprint(&self) -> Result<String, Diagnostic> {
         weave_contract::identity::source_fingerprint(
-            &serde_json::json!({"profile":"weave-compiled-artifacts-v1","artifacts":self}),
+            &serde_json::json!({"profile":if self.handler_templates.is_empty() { "weave-compiled-artifacts-v1" } else { "weave-compiled-artifacts-v2" },"artifacts":self}),
         )
         .map_err(|e| diagnostic(&e.code, e.message, (0, 0)))
     }
@@ -192,10 +194,29 @@ pub(crate) fn compile_artifacts_parsed(
         }
     }
     let source_revisions = functions::source_revisions(&parsed)?;
-    let (ast, scalar_values) = functions::expand(parsed)?;
+    let expansion = functions::expand(parsed)?;
+    lower_artifacts(expansion, source_revisions, false)
+}
+fn lower_artifacts(
+    expansion: functions::Expansion,
+    source_revisions: Vec<weave_contract::SourceRevision>,
+    seeded_event: bool,
+) -> Result<CompiledArtifacts, Diagnostic> {
+    let ast = expansion.program;
+    let scalar_values = expansion.values;
+    let mut handler_expansions = expansion.handlers;
     let mut names: BTreeMap<String, Lens> = BTreeMap::new();
+    if seeded_event {
+        let mut event = Lens::concrete(base_query(String::new(), None));
+        event.input = Some(GraphExpression::Reference {
+            name: "$event".into(),
+        });
+        names.insert("$event".into(), event);
+    }
     let mut commands = Vec::new();
     let mut view_templates = BTreeMap::new();
+    let mut handler_templates = BTreeMap::new();
+    let mut recipe_declarations = Vec::new();
     let mut artifact_charge = 0usize;
     let mut declared = BTreeSet::new();
     let mut schemas: BTreeMap<String, GraphSchema> = BTreeMap::new();
@@ -231,6 +252,12 @@ pub(crate) fn compile_artifacts_parsed(
             active_batch = Some((name, count, Vec::new()));
         }
 
+        if matches!(
+            &statement,
+            Statement::Schema { .. } | Statement::ContextSchema { .. } | Statement::Rules { .. }
+        ) {
+            recipe_declarations.push(statement.clone());
+        }
         if let Statement::ContextSchema {
             name,
             name_span,
@@ -286,6 +313,9 @@ pub(crate) fn compile_artifacts_parsed(
         }
         let (name, name_span) = match &statement {
             Statement::ViewTemplate {
+                name, name_span, ..
+            }
+            | Statement::HandlerTemplate {
                 name, name_span, ..
             }
             | Statement::LiveHandle {
@@ -355,6 +385,112 @@ pub(crate) fn compile_artifacts_parsed(
                 query.branch_id = branch;
                 handles.insert(name, query);
             }
+            Statement::HandlerTemplate {
+                name,
+                name_span,
+                revision,
+                input_graph,
+                input_branch,
+                metadata_depth,
+                output_slot,
+                ..
+            } => {
+                let expanded = handler_expansions.remove(&name).ok_or_else(|| {
+                    diagnostic(
+                        "E_HANDLER_RECIPE",
+                        "Handler expansion is missing",
+                        name_span,
+                    )
+                })?;
+                let mut statements = recipe_declarations.clone();
+                statements.extend(expanded.statements);
+                let lowered = lower_artifacts(
+                    functions::Expansion {
+                        program: syntax::Program { statements },
+                        values: BTreeMap::new(),
+                        handlers: BTreeMap::new(),
+                    },
+                    Vec::new(),
+                    true,
+                )?;
+                let bindings = lowered
+                    .program
+                    .commands
+                    .into_iter()
+                    .map(|command| match command {
+                        Command::Bind { name, value } => {
+                            Ok(weave_contract::HandlerBinding { name, value })
+                        }
+                        _ => Err(diagnostic(
+                            "E_HANDLER_READ",
+                            "Handler recipes require pure graph bindings",
+                            name_span,
+                        )),
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let recipe = weave_contract::HandlerRecipe {
+                    bindings,
+                    output: expanded.output,
+                };
+                weave_contract::handler_registration::validate_handler_recipe(&recipe)
+                    .map_err(|e| diagnostic(&e.code, e.message, name_span))?;
+                let charge = serde_json::to_vec(&recipe)
+                    .expect("recipe serializes")
+                    .len()
+                    .saturating_add(
+                        8192 + 6
+                            * (name.len()
+                                + revision.len()
+                                + input_graph.len()
+                                + input_branch.len()
+                                + output_slot.len()),
+                    )
+                    .saturating_add(
+                        source_revisions
+                            .iter()
+                            .map(|r| {
+                                256usize.saturating_add(
+                                    6 * (r.name.len() + r.revision.len() + r.digest.len()),
+                                )
+                            })
+                            .sum::<usize>(),
+                    );
+                artifact_charge = artifact_charge.saturating_add(charge);
+                if handler_templates.len() + view_templates.len() >= 16
+                    || charge > 1024 * 1024
+                    || artifact_charge > 4 * 1024 * 1024
+                {
+                    return Err(diagnostic(
+                        "E_BUDGET",
+                        "Compiled host artifact budget exceeded",
+                        name_span,
+                    ));
+                }
+                let template = weave_contract::handler_registration::seal_handler_template(
+                    weave_contract::CompiledHandlerTemplate {
+                        format: weave_contract::handler_registration::HANDLER_TEMPLATE_FORMAT
+                            .into(),
+                        protocol: VERSION.into(),
+                        name: name.clone(),
+                        revision,
+                        input: weave_contract::HandlerInput {
+                            graph_id: input_graph,
+                            branch_id: input_branch,
+                            metadata_depth,
+                        },
+                        event_types: vec![
+                            weave_contract::HandlerEventType::GraphAccepted,
+                            weave_contract::HandlerEventType::GraphCommitted,
+                        ],
+                        recipe,
+                        output_slot,
+                        source_revisions: source_revisions.clone(),
+                        definition_digest: String::new(),
+                    },
+                )
+                .map_err(|e| diagnostic(&e.code, e.message, name_span))?;
+                handler_templates.insert(name, template);
+            }
             Statement::ViewTemplate {
                 name,
                 name_span,
@@ -413,7 +549,7 @@ pub(crate) fn compile_artifacts_parsed(
                             .sum::<usize>(),
                     );
                 artifact_charge = artifact_charge.saturating_add(charge);
-                if view_templates.len() >= 16
+                if view_templates.len() + handler_templates.len() >= 16
                     || charge > 1024 * 1024
                     || artifact_charge > 4 * 1024 * 1024
                 {
@@ -1346,6 +1482,7 @@ pub(crate) fn compile_artifacts_parsed(
         }
     }
     Ok(CompiledArtifacts {
+        handler_templates,
         view_templates,
         values: scalar_values,
         program: Program {

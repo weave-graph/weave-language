@@ -1,6 +1,6 @@
 # Compiled handler interface for implementation review
 
-Design only, 2026-09-20. This refines [the approved boundary](REACTOR_ARTIFACTS.md) against language `3ea25e3` and current native dispatch after engine `4e93ae0`. Signed export has since reached its native checkpoint. The approved prerequisite is protocol 0.17 exact snapshot/attachment influence; no **handler** protocol number or canonical handler DTO is reserved by this proposal, and no executable reactor is claimed here.
+Design only, 2026-09-20. This refines [the approved boundary](REACTOR_ARTIFACTS.md) against language `3ea25e3` and current native dispatch after engine `4e93ae0`. Signed export has since reached its native checkpoint. The prerequisite protocol 0.17 exact snapshot/attachment influence is published. The approved implementation now uses the engine-owned protocol 0.18 interface checkpoint `4e81a168`; see [handler artifacts](../HANDLER_ARTIFACTS.md) for the implementation boundary and acceptance status. This proposal remains design history, not independent runtime evidence.
 
 ## Proposed canonical artifact
 

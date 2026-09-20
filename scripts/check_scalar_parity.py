@@ -19,4 +19,4 @@ process.stdout.write(Buffer.from(e.memory.buffer,pointer,length));
 '''
 wasm=subprocess.check_output(['node','-e',node,str(a.wasm.resolve())])
 assert native==wasm,'native/WASM typed values, plans, identities or diagnostics differ'
-print(f'Scalar specialization parity passed: {len(native):,} identical JSON bytes; four scalar cases, three scalar errors, one complete artifact and its rejection diagnostic; zero WASM host imports')
+print(f'Scalar specialization parity passed: {len(native):,} identical JSON bytes; four scalar cases, three scalar errors, view and handler artifacts with rejection diagnostics; zero WASM host imports')

@@ -1,6 +1,6 @@
 # Source handler lowering: implementation preparation
 
-Design inspection only, against current source branch after formatter `3ea25e3` and the approved [handler proposal](REACTOR_INTERFACE.md). The compiler still vendors protocol 0.16 while the engine's 0.17 carrier is being reviewed. No new canonical handler DTO, wire version, parser production or executable behavior is introduced here.
+Design inspection only, against current source branch after formatter `3ea25e3` and the approved [handler proposal](REACTOR_INTERFACE.md). This historical preparation is now being implemented against the published 0.17 carrier and canonical 0.18 handler interface. See [handler artifacts](../HANDLER_ARTIFACTS.md) for current implementation and acceptance status.
 
 ## Exact existing seams
 
@@ -40,4 +40,4 @@ Whole-source manifests continue to come from `functions::source_revisions`; link
 
 ## Prerequisites still open
 
-The 0.17 carrier must pass native review and exact source vendoring first. The engine must then publish the canonical bounded handler DTO/sealing/recursive-validation API and the explicit install/prepare/complete/storage semantics. Until that interface is agreed, source grammar and runtime handler version remain unimplemented. This preparation does not claim adapter isolation, automatic effects, release/declassification or full reactive gate completion.
+The 0.17 carrier and canonical 0.18 handler interface prerequisites are complete. Native install/prepare/complete integration and final cross-project acceptance remain required before publication. This preparation does not claim adapter isolation, automatic effects, release/declassification or full reactive gate completion.

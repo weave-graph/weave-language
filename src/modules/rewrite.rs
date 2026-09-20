@@ -209,6 +209,13 @@ impl<'a> Resolver<'a> {
                     self.statement(child, true, locals)?;
                 }
             }
+            Statement::HandlerTemplate {
+                function,
+                function_span,
+                ..
+            } => {
+                self.reference(function, *function_span, Kind::Function, locals)?;
+            }
             Statement::Apply {
                 function,
                 function_span,
@@ -333,7 +340,7 @@ pub(super) fn shift(statement: &mut Statement, base: usize) {
                 ast(child, base);
             }
         }
-        for key in ["parameters", "arguments", "bindings"] {
+        for key in ["parameters", "arguments", "bindings", "event_types"] {
             if let Some(values) = map.get_mut(key).and_then(serde_json::Value::as_array_mut) {
                 for value in values {
                     if let Some(fields) = value.as_object_mut() {

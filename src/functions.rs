@@ -149,6 +149,9 @@ pub(crate) fn declaration(statement: &Statement) -> (&str, Span) {
         | Statement::ViewTemplate {
             name, name_span, ..
         }
+        | Statement::HandlerTemplate {
+            name, name_span, ..
+        }
         | Statement::LiveHandle {
             name, name_span, ..
         }
@@ -255,6 +258,63 @@ fn time_value(
     }
     Ok(())
 }
+/// Source-internal recipe expansion; no store lookup or shared artifact DTO here.
+pub(crate) struct ExpandedHandler {
+    pub statements: Vec<Statement>,
+    pub output: String,
+}
+pub(crate) struct Expansion {
+    pub program: Program,
+    pub values: BTreeMap<String, ScalarValue>,
+    pub handlers: BTreeMap<String, ExpandedHandler>,
+}
+fn handler_captures(
+    closure: &Arc<Closure>,
+    span: Span,
+    depth: usize,
+    seen: &mut BTreeSet<usize>,
+    budget: &mut Budget,
+) -> Result<(), Diagnostic> {
+    budget.step(span)?;
+    if depth > 32 {
+        return Err(error(
+            "E_EXPANSION_BUDGET",
+            "Handler function capture depth exceeds 32",
+            span,
+        ));
+    }
+    if !seen.insert(Arc::as_ptr(closure) as usize) {
+        return Ok(());
+    }
+    for statement in &closure.definition.body {
+        if let Statement::TypedContext { name_span, .. } = statement {
+            let mut e = error(
+                "E_HANDLER_READ",
+                "Typed context selection requires a store read and cannot appear in an event recipe",
+                *name_span,
+            );
+            e.trace.push(span);
+            return Err(e);
+        }
+    }
+    for value in closure.bound.values() {
+        match value {
+            Value::Graph(_) => {
+                return Err(error(
+                    "E_HANDLER_CAPTURE",
+                    "Handler functions cannot capture pre-bound graph values",
+                    span,
+                ));
+            }
+            Value::Function(callback) => handler_captures(callback, span, depth + 1, seen, budget)?,
+            Value::Scalar(_) => (),
+        }
+    }
+    for captured in closure.definition.captured.values() {
+        handler_captures(captured, span, depth + 1, seen, budget)?;
+    }
+    Ok(())
+}
 struct Expander {
     scalar_values: BTreeMap<String, ScalarValue>,
     scalar_budget: Budget,
@@ -266,8 +326,98 @@ struct Expander {
     output: Vec<Statement>,
     counter: usize,
     bytes: usize,
+    emitted: usize,
+    handlers: BTreeMap<String, ExpandedHandler>,
 }
 impl Expander {
+    fn handler(&mut self, function: &str, span: Span) -> Result<ExpandedHandler, Diagnostic> {
+        let closure = self.functions.get(function).cloned().ok_or_else(|| {
+            error(
+                "E_UNKNOWN_FUNCTION",
+                "Handler requires an earlier function value",
+                span,
+            )
+        })?;
+        let signature = remaining(&closure);
+        if signature.parameters.len() != 1
+            || signature.parameters.values().next() != Some(&ParameterKind::Graph)
+            || signature.scalar_output.is_some()
+        {
+            return Err(error(
+                "E_HANDLER_SIGNATURE",
+                "Handler requires exactly one remaining graph input and a graph result",
+                span,
+            ));
+        }
+        if !signature.schemas.is_empty() {
+            return Err(error(
+                "E_HANDLER_SCHEMA",
+                "Handler event schema is not statically known; constrained inputs require an explicit future runtime contract",
+                span,
+            ));
+        }
+        handler_captures(
+            &closure,
+            span,
+            0,
+            &mut BTreeSet::new(),
+            &mut self.scalar_budget,
+        )?;
+        let parameter = signature
+            .parameters
+            .keys()
+            .next()
+            .expect("one parameter")
+            .clone();
+        let mut child = Expander {
+            scalar_values: BTreeMap::new(),
+            scalar_budget: std::mem::take(&mut self.scalar_budget),
+            functions: [("$handler".into(), closure)].into(),
+            rule_modules: self.rule_modules.clone(),
+            graphs: [("$event".into(), BTreeSet::new())].into(),
+            schemas: graph_types::State {
+                declarations: self.schemas.declarations.clone(),
+                graphs: BTreeMap::new(),
+            },
+            reserved: BTreeSet::new(),
+            output: Vec::new(),
+            counter: 0,
+            bytes: self.bytes,
+            emitted: self.emitted,
+            handlers: BTreeMap::new(),
+        };
+        let output = child.fresh("handler_output");
+        let result = child.process(
+            Statement::Apply {
+                name: output.clone(),
+                name_span: span,
+                function: "$handler".into(),
+                function_span: span,
+                arguments: vec![Argument {
+                    name: parameter,
+                    span,
+                    value_span: span,
+                    value: ArgumentValue::Graph("$event".into()),
+                }],
+            },
+            0,
+        );
+        self.scalar_budget = child.scalar_budget;
+        self.bytes = child.bytes;
+        self.emitted = child.emitted;
+        result?;
+        if !child.graphs.contains_key(&output) {
+            return Err(error(
+                "E_HANDLER_SIGNATURE",
+                "Handler must produce a graph value",
+                span,
+            ));
+        }
+        Ok(ExpandedHandler {
+            statements: child.output,
+            output,
+        })
+    }
     fn fresh(&mut self, hint: &str) -> String {
         loop {
             self.counter += 1;
@@ -447,7 +597,7 @@ impl Expander {
                 .expect("AST serializes")
                 .len(),
         );
-        if self.output.len() >= 10_000 || self.bytes > 4_194_304 {
+        if self.emitted >= 10_000 || self.bytes > 4_194_304 {
             return Err(error(
                 "E_EXPANSION_BUDGET",
                 "Function expansion exceeds the bounded compiler profile",
@@ -488,6 +638,7 @@ impl Expander {
                 | Statement::ContextSchema { .. }
                 | Statement::LiveHandle { .. }
                 | Statement::ViewTemplate { .. }
+                | Statement::HandlerTemplate { .. }
                 | Statement::Transaction { .. }
         ) {
             self.graphs.insert(name, pending);
@@ -501,6 +652,7 @@ impl Expander {
             self.rule_modules.insert(name.clone());
         }
         self.schemas.observe(&statement)?;
+        self.emitted += 1;
         self.output.push(statement);
         Ok(())
     }
@@ -514,6 +666,27 @@ impl Expander {
         }
         self.scalar_budget.step(declaration(&statement).1)?;
         match statement {
+            statement @ Statement::HandlerTemplate { .. } => {
+                let Statement::HandlerTemplate {
+                    ref name,
+                    ref function,
+                    function_span,
+                    ..
+                } = statement
+                else {
+                    unreachable!()
+                };
+                if self.handlers.len() >= 16 {
+                    return Err(error(
+                        "E_BUDGET",
+                        "Handler artifact limit exceeds 16",
+                        function_span,
+                    ));
+                }
+                let expanded = self.handler(function, function_span)?;
+                self.handlers.insert(name.clone(), expanded);
+                self.emit(statement)
+            }
             Statement::Value {
                 name,
                 name_span,
@@ -1426,9 +1599,7 @@ fn validate_definition(definition: &Definition, budget: &mut Budget) -> Result<(
     }
     Ok(())
 }
-pub(crate) fn expand(
-    program: Program,
-) -> Result<(Program, BTreeMap<String, ScalarValue>), Diagnostic> {
+pub(crate) fn expand(program: Program) -> Result<Expansion, Diagnostic> {
     let exported: BTreeSet<String> = program
         .statements
         .iter()
@@ -1463,6 +1634,8 @@ pub(crate) fn expand(
         output: Vec::new(),
         counter: 0,
         bytes: 0,
+        emitted: 0,
+        handlers: BTreeMap::new(),
     };
     for statement in program.statements {
         expander.process(statement, 0)?;
@@ -1472,12 +1645,13 @@ pub(crate) fn expand(
         .into_iter()
         .filter(|(n, _)| exported.contains(n))
         .collect();
-    Ok((
-        Program {
+    Ok(Expansion {
+        program: Program {
             statements: expander.output,
         },
         values,
-    ))
+        handlers: expander.handlers,
+    })
 }
 
 /// Remove source locations only at known AST metadata positions. User literals,

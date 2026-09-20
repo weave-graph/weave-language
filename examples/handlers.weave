@@ -1,0 +1,19 @@
+// An inert artifact. A trusted host installs its subscription and maps the output slot.
+rules QualityWarning revision "1" {
+  rule Warn {
+    when "bad_quality"(x, y);
+    yield "warning"(x, y);
+  }
+}
+function Diagnose revision "1" (graph input) {
+  metadata Quality from input on node "device" key "quality";
+  reason Diagnosed from Quality using QualityWarning;
+  lens Warnings from Diagnosed { match relation "warning"; }
+  return Warnings;
+}
+handler Warning revision "1" using Diagnose {
+  input event graph "Installation" branch "main" metadata depth 4;
+  on "graph.accepted", "graph.committed";
+  output slot "warnings";
+  replay pinned;
+}

@@ -2,9 +2,39 @@
 
 As of 2026-09-20, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
 
+## Compiled event handlers (protocol 0.18)
+
+The compiler vendors the exact 28-file canonical contract and versioned documentation
+from engine `9b444ffdaf183826008f07f55c5a0bc7a81de191`.
+The source compiler now emits sealed pure handler artifacts through `compile_artifacts`,
+`artifacts` and explicit `handler-plan --handler NAME`. Immutable scalar/callback
+specialization uses an internal `$event` seed and no hidden Query. Graph captures,
+unknown constrained event schemas, fabricated event names and store reads fail
+explicitly. All legacy output APIs reject artifacts they cannot return. Pinned
+module identities, exact rule identities and separate complete-artifact fingerprints
+remain bound to the template. See [the implemented boundary](HANDLER_ARTIFACTS.md).
+
+Local verification passed **151 all-target source tests**, strict all-target Clippy,
+rustfmt, exact 28-file vendor verification and the three original source artifacts.
+The fixed compiler fixture executed natively and in zero-import WebAssembly with
+**8,723 identical JSON bytes**, including the emitted handler and view artifacts.
+All 22 historical standalone examples retain exact commands, values and source
+identities apart from the declared protocol version and aggregate fingerprint.
+
+The actual compiler-to-host handler acceptance passed **25 compiler and 57 native
+processes**, including four controlled process deaths; it used 83 fixture files.
+The [structured report](measurements/2026-09-20-compiled-handlers.json) names twelve behaviors: pinned module identity, complete
+artifacts/legacy rejection, Metadata→Reason, both actual event types, immutable
+replay, private and detached-record visibility, original object provenance in owned
+identity output, empty/scalar snapshot influence, preparation/completion crash
+boundaries, renewed-lease exact bytes, stale-CAS atomic rollback and raw-completion
+rejection. This is a bounded local profile, not automatic external effects, source
+permission grants, sandboxing, arbitrary event subscriptions or full reactive conformance.
+Final source-archive and paired native/hosted release evidence are recorded separately.
+
 ## Exact snapshot and attachment influence (protocol 0.17)
 
-The compiler now vendors the exact 26-file contract and versioned documentation
+At the 0.17 checkpoint, the compiler vendored the exact 26-file contract and versioned documentation
 from engine `1eb33c089a9ae493df0c4e508232b2eb5426e64c`. Whole-value exact
 snapshot restrictions survive empty results; generated nodes, edges, claims and
 metadata attachments retain record-level snapshot restrictions. Movable attachments
@@ -24,8 +54,7 @@ typed contexts, geometry/explanation, scalar persistence, the original cyclic
 metadata/schema/join examples, and nested metadata selectors with path privacy.
 The canonical portable implementation separately passed 83 contract tests. These
 checks use existing caches and two low-priority Cargo jobs; hosted evidence follows
-publication. The reactor proposal now uses the approved snapshot carrier for empty
-inputs, but handler grammar, artifacts and native execution remain **design only**.
+publication. At that checkpoint the reactor proposal used the approved snapshot carrier, while handlers remained design only; the subsequent 0.18 implementation is described above.
 
 ## Source formatter checkpoint (source-only)
 
@@ -108,11 +137,11 @@ recorded in the final orchestrator handoff; publication remains orchestrator-own
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.17 exact snapshot/attachment influence and accepted/view artifacts plus schema/metadata/algebra/assertion/rule/context/geometry and graph-influence implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.18 sealed handlers plus exact snapshot/attachment influence and accepted/view artifacts plus schema/metadata/algebra/assertion/rule/context/geometry and graph-influence implementation addresses documented model gaps. Full semantic conformance remains open. |
 | L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; ordinary scalar specialization and complete host-artifact output now covered. A bounded token-preserving formatter now provides syntax-only stdout/check/write modes. Rich graph/vector/quantity types and effects remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. Typed total contextual assignments now preserve exact descriptor witnesses; general higher-order lenses/joins and explicit context compatibility remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity resolution now executes with explicit policy/mapping pins; general alignment, stratified absence and richer scenarios remain. |
-| L4 Reactive secure integration | in_progress, partial | Source emits sealed Query/Filter view templates and exact RequireCurrent reads; actual host registration, refresh, tick expiry, source-manifest retention and stale-read rollback are verified in the 0.16 fixture. Installation, scheduling and authority remain host-owned. General reactor syntax/execution and broader incremental operators remain; see the design-only [handler boundary](proposals/REACTOR_ARTIFACTS.md). |
+| L4 Reactive secure integration | in_progress, partial | Source emits sealed Query/Filter view templates and exact RequireCurrent reads; actual host registration, refresh, tick expiry, source-manifest retention and stale-read rollback are verified in the 0.16 fixture. Installation, scheduling and authority remain host-owned. Compiled pure event recipes now execute through explicit native preparation/completion with exact replay, CAS and snapshot restrictions. Broader event/effect syntax and incremental operators remain; see the [bounded handler profile](HANDLER_ARTIFACTS.md). |
 | L5 Spatial and multiscale language | in_progress, provisional | Assertion-backed distance, transforms and display projections now lower to engine services. Pinned bounded cluster navigation now executes; general vector types, learned mappings and overlapping clustering remain. |
 | L6 Distributed offline governance | in_progress, partial | Exact accepted occurrences now compile to native governed graph reads, including historical/empty results and retained proof carriers. The actual 0.16 fixture verifies current-policy denial and private repersistence; source cannot install policy, approve or accept proposals. Offline transport, branch reconciliation and host portability are engine-owned; a complete source offline/governance workflow remains open. |
 | L7 Tooling and release | in_progress, provisional | MIT license, independent crate, README and three-platform/WASM CI definition exist. The orchestrator verified public v0.4 CI on Ubuntu/macOS/Windows and the WASM target; later milestone publication remains tracked in PUBLICATION.md. LSP is optional proposed editor tooling, not a user-scope completion gate. |

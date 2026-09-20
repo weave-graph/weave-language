@@ -15,7 +15,10 @@ fn bytes() -> &'static [u8] {
         let artifact_source = "value Answer integer_add(20,22); live_handle Head graph \"Fleet\" branch \"main\"; view_template Active revision \"1\" from Head clock tick {match relation \"connected\"; at 0;}";
         let artifacts = weave_language::compile_artifacts(artifact_source).expect("fixed artifact fixture");
         let artifact_error = weave_language::compile(artifact_source).unwrap_err();
-        serde_json::to_vec(&serde_json::json!({"profile":"weave-source-scalar-artifact-parity-v2","cases":cases,"errors":errors,"artifacts":artifacts,"artifact_fingerprint":artifacts.fingerprint().unwrap(),"artifact_error":artifact_error})).unwrap()
+        let handler_source = include_str!("handlers.weave");
+        let handlers = weave_language::compile_artifacts(handler_source).expect("fixed handler fixture");
+        let handler_error = weave_language::compile(handler_source).unwrap_err();
+        serde_json::to_vec(&serde_json::json!({"profile":"weave-source-scalar-artifact-parity-v3","cases":cases,"errors":errors,"artifacts":artifacts,"artifact_fingerprint":artifacts.fingerprint().unwrap(),"artifact_error":artifact_error,"handlers":handlers,"handler_fingerprint":handlers.fingerprint().unwrap(),"handler_error":handler_error})).unwrap()
     })
 }
 #[unsafe(no_mangle)]

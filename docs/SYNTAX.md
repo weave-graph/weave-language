@@ -294,3 +294,7 @@ Explicit scalar returns, partial application, typed unary callbacks, immutable `
 ## Accepted graphs and explicit host view artifacts
 
 Protocol 0.16 adds `accepted Name view "view" decision "exact-occurrence";` and `view_current Name view "instance" definition "sha256:..." fixed;` (or `tick TIME;`). Both bind a native graph result once; pure functions consume the resulting value as an argument. `view_template Name revision "revision" from LiveHandle clock fixed { ... }` emits a separate host artifact, not a Program effect. See [full syntax/API and authority boundaries](VIEW_ARTIFACTS.md); ordinary plan/value/fingerprint compilation rejects unreturned templates.
+
+## Explicit compiled handlers
+
+Protocol 0.18 adds entry-level `handler Name revision "1" using Function { input event graph "G" branch "main" metadata depth 4; on "graph.accepted", "graph.committed"; output slot "result"; replay pinned; }`. The function must have one remaining unconstrained graph parameter, a graph result and no captured graph values. Compilation emits a separate sealed pure recipe seeded by the actual host event, never a synthetic Query or registration effect. `artifacts` returns complete output; `handler-plan --handler Name` explicitly selects one template. See [syntax, bounds, host mapping and replay semantics](HANDLER_ARTIFACTS.md).

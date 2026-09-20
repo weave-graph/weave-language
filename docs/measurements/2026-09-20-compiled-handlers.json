@@ -1,0 +1,31 @@
+{
+  "fixture_files": 83,
+  "processes": {
+    "compiler": 25,
+    "controlled_deaths": 4,
+    "native": 57
+  },
+  "profile": "compiled-handler-source-acceptance-v1",
+  "status": "passed",
+  "verified": [
+    "pinned_module_identity",
+    "complete_artifacts_and_legacy_rejection",
+    "metadata_reason_recipe",
+    "committed_and_accepted_events",
+    "immutable_replay",
+    "private_and_detached_record_visibility",
+    "identity_output_original_object_provenance",
+    "empty_and_scalar_snapshot_influence",
+    "prepare_and_complete_crash_boundaries",
+    "renewed_lease_exact_preparation",
+    "stale_cas_atomic_rollback",
+    "raw_completion_rejection"
+  ],
+  "engine_revision": "9b444ffdaf183826008f07f55c5a0bc7a81de191",
+  "engine_fixture_commit": "726bb65",
+  "contract_version": "0.18.0",
+  "source_tests_passed": 151,
+  "native_wasm_parity_bytes": 8723,
+  "wasm_host_imports": 0,
+  "historical_example_artifacts_unchanged": 22
+}

@@ -4,7 +4,7 @@ fn main() {
     let args: Vec<_> = env::args().skip(1).collect();
     let usage = || {
         eprintln!(
-            "Usage: weave <check|plan|ast|describe|fingerprint|values|artifacts|view-plan> FILE.weave [--modules MAP.json] [--template NAME]\nview-plan requires --template; compilation never registers a view.\nweave fmt FILE.weave [--check|--write] formats one source file."
+            "Usage: weave <check|plan|ast|describe|fingerprint|values|artifacts|view-plan|handler-plan> FILE.weave [--modules MAP.json] [--template NAME|--handler NAME]\nview-plan requires --template; handler-plan requires --handler; compilation never installs host artifacts.\nweave fmt FILE.weave [--check|--write] formats one source file."
         );
         process::exit(2);
     };
@@ -22,6 +22,7 @@ fn main() {
             "values",
             "artifacts",
             "view-plan",
+            "handler-plan",
         ]
         .contains(&args[0].as_str())
     {
@@ -38,10 +39,13 @@ fn main() {
             "--template" if template.is_none() && args[0] == "view-plan" => {
                 template = Some(&option[1])
             }
+            "--handler" if template.is_none() && args[0] == "handler-plan" => {
+                template = Some(&option[1])
+            }
             _ => usage(),
         }
     }
-    if (args[0] == "view-plan") != template.is_some() {
+    if (["view-plan", "handler-plan"].contains(&args[0].as_str())) != template.is_some() {
         usage();
     }
     let source = read_source(&args[1]).unwrap_or_else(|e| {
@@ -71,7 +75,7 @@ fn main() {
         let linked =
             weave_language::modules::link("entry", &source, &supplied).unwrap_or_else(module_fail);
         match args[0].as_str() {
-            "artifacts" | "view-plan" | "check" => {
+            "artifacts" | "view-plan" | "handler-plan" | "check" => {
                 let output = linked.compile_artifacts().unwrap_or_else(module_fail);
                 show_artifacts(&args[0], template.map(String::as_str), output);
             }
@@ -109,7 +113,7 @@ fn main() {
         }
         return;
     }
-    if ["check", "artifacts", "view-plan"].contains(&args[0].as_str()) {
+    if ["check", "artifacts", "view-plan", "handler-plan"].contains(&args[0].as_str()) {
         let output = weave_language::compile_artifacts(&source).unwrap_or_else(|e| fail(e));
         show_artifacts(&args[0], template.map(String::as_str), output);
     } else if args[0] == "values" {
@@ -168,9 +172,22 @@ fn show_artifacts(
             });
             println!("{}", serde_json::to_string_pretty(artifact).unwrap());
         }
+        "handler-plan" => {
+            let name = template.expect("argument checked");
+            let artifact = output.handler_templates.get(name).unwrap_or_else(|| {
+                fail(weave_language::Diagnostic {
+                    code: "E_HANDLER_TEMPLATE".into(),
+                    message: "Selected handler is not declared".into(),
+                    start: 0,
+                    end: 0,
+                    trace: vec![],
+                })
+            });
+            println!("{}", serde_json::to_string_pretty(artifact).unwrap());
+        }
         "check" => println!(
             "{}",
-            serde_json::json!({"status":"valid","version":output.program.version,"commands":output.program.commands.len(),"view_templates":output.view_templates.len(),"host_registration_required":!output.view_templates.is_empty()})
+            serde_json::json!({"status":"valid","version":output.program.version,"commands":output.program.commands.len(),"view_templates":output.view_templates.len(),"handler_templates":output.handler_templates.len(),"host_registration_required":!output.view_templates.is_empty() || !output.handler_templates.is_empty()})
         ),
         _ => println!(
             "{}",

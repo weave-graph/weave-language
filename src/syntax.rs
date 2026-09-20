@@ -34,6 +34,11 @@ pub struct Program {
 }
 pub type Span = (usize, usize);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HandlerEvent {
+    pub event_type: String,
+    pub span: Span,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Statement {
     Value {
@@ -69,6 +74,18 @@ pub enum Statement {
         clock: weave_contract::ViewClock,
         predicate: Option<StringExpr>,
         valid_at: Option<TimeExpr>,
+    },
+    HandlerTemplate {
+        name: String,
+        name_span: Span,
+        revision: String,
+        function: String,
+        function_span: Span,
+        input_graph: String,
+        input_branch: String,
+        metadata_depth: u32,
+        event_types: Vec<HandlerEvent>,
+        output_slot: String,
     },
     Pin {
         name: String,
@@ -1483,6 +1500,7 @@ impl Parser {
                     "accepted"
                         | "view_current"
                         | "view_template"
+                        | "handler"
                         | "resolve_identity"
                         | "cluster_navigation"
                         | "typed_context"
@@ -1578,6 +1596,92 @@ impl Parser {
                             definition_digest,
                             valid_at,
                         },
+                    });
+                }
+                "handler" => {
+                    self.word("revision")?;
+                    let revision = self.selector_string()?;
+                    self.word("using")?;
+                    let function_span = (self.peek().start, self.peek().end);
+                    let function = self.name()?;
+                    self.symbol('{')?;
+                    self.word("input")?;
+                    self.word("event")?;
+                    self.word("graph")?;
+                    let input_graph = self.selector_string()?;
+                    self.word("branch")?;
+                    let input_branch = self.selector_string()?;
+                    self.word("metadata")?;
+                    self.word("depth")?;
+                    let depth_span = (self.peek().start, self.peek().end);
+                    let depth = self.number()?;
+                    if !(0..=8).contains(&depth) {
+                        return Err(Diagnostic::new(
+                            "E_HANDLER_INPUT",
+                            "Handler metadata depth must be 0 through 8",
+                            depth_span.0,
+                            depth_span.1,
+                        ));
+                    }
+                    self.symbol(';')?;
+                    self.word("on")?;
+                    let mut event_types = Vec::new();
+                    loop {
+                        let span = (self.peek().start, self.peek().end);
+                        let event_type = self.selector_string()?;
+                        if !matches!(event_type.as_str(), "graph.committed" | "graph.accepted") {
+                            return Err(Diagnostic::new(
+                                "E_HANDLER_EVENT",
+                                "Handler requires genuine graph.committed and graph.accepted event types",
+                                span.0,
+                                span.1,
+                            ));
+                        }
+                        if event_types
+                            .iter()
+                            .any(|e: &HandlerEvent| e.event_type == event_type)
+                        {
+                            return Err(Diagnostic::new(
+                                "E_HANDLER_EVENT",
+                                "Duplicate handler event type",
+                                span.0,
+                                span.1,
+                            ));
+                        }
+                        event_types.push(HandlerEvent { event_type, span });
+                        if self.peek().kind != Kind::Symbol(',') {
+                            break;
+                        }
+                        self.symbol(',')?;
+                    }
+                    if event_types.len() != 2 {
+                        return Err(Diagnostic::new(
+                            "E_HANDLER_EVENT",
+                            "Handler requires both committed and accepted events",
+                            name_span.0,
+                            name_span.1,
+                        ));
+                    }
+                    self.symbol(';')?;
+                    self.word("output")?;
+                    self.word("slot")?;
+                    let output_slot = self.selector_string()?;
+                    self.symbol(';')?;
+                    self.word("replay")?;
+                    self.word("pinned")?;
+                    self.symbol(';')?;
+                    self.symbol('}')?;
+                    statements.push(Statement::HandlerTemplate {
+                        name,
+                        name_span,
+                        revision,
+                        function,
+                        function_span,
+                        input_graph,
+                        input_branch,
+                        metadata_depth: depth as u32,
+                        event_types,
+                        output_slot,
                     });
                 }
                 "view_template" => {
