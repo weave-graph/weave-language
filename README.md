@@ -38,3 +38,5 @@ The [source formatter](docs/FORMATTER.md) preserves tokens and comments: `weave 
 Exact source [Interval values](docs/INTERVALS.md) support checked half-open temporal predicates and pure function specialization without changing the runtime protocol.
 
 [Typed source vectors](docs/TYPED_VECTORS.md) retain full physical/embedding descriptors through pure functions and lower to existing native geometry payloads.
+
+The [byte-oriented compiler SDK](docs/COMPILER_SDK.md) accepts arbitrary bounded source and exact module units on native and zero-import WASM. It returns complete artifacts and diagnostics without host effects or JavaScript numeric round-trips.

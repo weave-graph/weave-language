@@ -8,6 +8,7 @@ mod graph_types;
 pub mod interval;
 pub mod modules;
 pub mod scalars;
+pub mod sdk;
 pub mod syntax;
 mod vector_types;
 pub mod vectors;

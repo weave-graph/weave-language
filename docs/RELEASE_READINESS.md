@@ -24,7 +24,7 @@ The source archive includes every canonical contract source/test file, Cargo met
 
 ## CI configuration
 
-Native jobs check contract integrity, formatting, strict Clippy, all-target tests and installation on Linux/macOS/Windows. A separate job checks the library's WASM target and executes the fixed source specialization/artifact parity fixture. Workflow permissions are limited to reading contents. These are configured jobs, not proof they have run. Rust and GitHub Action references currently follow their selected stable/major channels; action/toolchain pinning and dependency vulnerability review remain release-hardening work, not claims of bit-for-bit reproducibility.
+Native jobs check contract integrity, formatting, strict Clippy, all-target tests and installation on Linux/macOS/Windows. A separate job checks the library's WASM target and executes both the fixed source specialization/artifact fixture and arbitrary-source SDK native/WASM parity. Native jobs also build and exercise the byte-oriented cdylib SDK. Workflow permissions are limited to reading contents. These are configured jobs, not proof they have run. Rust and GitHub Action references currently follow their selected stable/major channels; action/toolchain pinning and dependency vulnerability review remain release-hardening work, not claims of bit-for-bit reproducibility.
 
 ## Orchestrator verification before public release
 

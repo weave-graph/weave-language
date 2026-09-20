@@ -2,6 +2,41 @@
 
 As of 2026-09-20, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
 
+## Arbitrary-source native and WASM compiler SDK (source-only, protocol 0.18)
+
+The byte API and pointer-free ABI compile bounded caller-supplied source/module units
+into complete Programs, values, view templates and handler templates. Strict request
+shape, exact content pins, original source diagnostics and complete-artifact identities
+reuse the existing compiler. The C header and dependency-free JavaScript adapter ship
+with the source archive; the adapter preserves JSON bytes instead of parsing i64
+values through JavaScript Number. No runtime execution, store, module fetching or
+host authority is exposed. See [API, ownership and limits](COMPILER_SDK.md).
+
+Local checks cover **174 tests**: the 173-test full workspace/all-target run plus
+all five SDK integration tests after a final diagnostic-classification regression.
+Strict workspace/all-target Clippy, rustfmt and exact 28-file contract, five-file
+spaces and three-paper verification passed. Actual safe Rust/native cdylib/zero-import
+Node WASM execution agreed on **546,308 response bytes across 19 arbitrary requests**,
+including pinned diamond modules, missing/changed/cyclic imports, exact integers and
+quantities, Unicode, real view/handler fixtures, ordinary errors and large responses.
+ABI tests cover range/ownership/quota/reservation and native unwind cleanup; adapter
+checks verify early UTF-8 source budgets and release after failures.
+
+All **25 existing standalone artifact outputs** retain exact commands, values,
+manifests and fingerprints against the preserved vector compiler. The existing fixed
+native/WASM fixture remains **20,050 identical bytes**. Independent review executed
+16 native requests against the preserved compiler and three arbitrary Node/WASM
+scalar/view/handler fixtures. Archive and hosted results are separate evidence.
+
+The [local measurement](measurements/2026-09-20-compiler-sdk.json) includes a
+4,194,520-byte request: approximately 1.11 seconds native Python ABI transfer plus
+13 ms compilation, and 325 ms total through Node/WASM, in debug builds. The input
+contains one 1 MiB entry and three unused 1 MiB supplied units; this measures bounded
+transport/decoding, not a four-module application workload. The two-byte transfer
+profile has visible overhead and makes no throughput guarantee. Hard deadlines
+require host worker termination; cooperative cancellation, runtime persistence,
+real device/offline integration and full L16/L29 remain open.
+
 ## Typed source vector values (source-only, protocol 0.18)
 
 Physical position/direction and embedding vector values now retain complete canonical

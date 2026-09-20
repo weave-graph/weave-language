@@ -1,0 +1,13 @@
+[package]
+name = "weave-compiler-sdk"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Bounded byte-oriented native and WebAssembly Weave compiler ABI"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+weave-language = { path = "../.." }
