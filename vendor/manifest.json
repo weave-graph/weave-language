@@ -1,9 +1,9 @@
 {
   "source_repository": "https://github.com/weave-graph/weave-engine",
   "source_path": "crates/weave-contract",
-  "contract_version": "0.15.0",
+  "contract_version": "0.16.0",
   "files": {
-    "Cargo.toml": "9d93c8d1dcf6cb81aab55d9abf27ff0cce5979c8c9f54fa2be7a0b5faf145b70",
+    "Cargo.toml": "23aa755d0eea5265f8d46acdd76469dcef4a456e1de53868ed9791bc23162875",
     "LICENSE": "9e24b3303156fce3c77e21da9d3e3b4cc864291987721d55286415a22ea5cfb7",
     "src/algebra.rs": "2f104fae397e6368482c1ab32b32008143f2b84985bd91b77357cd19909663e4",
     "src/algebra_types.rs": "afef6569624c0bda88fe1688889137f41e95932edf0fe29af12bda1420e7051d",
@@ -16,22 +16,24 @@
     "src/decimal.rs": "854e6374fea139c4ec9223196ff76cd59eb99ca81898c0487b6ea89cf00ed0c2",
     "src/geometry_types.rs": "bef5a89f80d21aa2bb4b8aec74d3da5ae96a5495200fe63e0f675c05a73bba00",
     "src/host_types.rs": "f8151861155e53511594a66691f4fac5eb62b3cd59c4df518d527aaedb61db48",
-    "src/identity.rs": "a09a8f831b3de41aac2f16e5b75a58c43300ca63df0171c4a992ccb16637bc82",
+    "src/identity.rs": "f243ae0e27eb255f4ca33329c6075bf9dc5370c68dd03564b0f5f10537dd22e1",
     "src/influence.rs": "dcd9b44896a407633962276a1c5d6fd42d2aba58efc1e9c947138ca6735968f4",
-    "src/lib.rs": "2e5c2c0bebb00773c1e59a8eba0bbcc3c59b68825e8765cf7764ddea338db21c",
+    "src/lib.rs": "791f978f5430fe876a4c4670b64e34341160ca7fb369e2cb9e7e40c9800e674d",
     "src/quantity.rs": "cb8aeea828450edb4b6dd6317c761df385b497b5cf5b38a9a9ae2ffedd60791c",
     "src/rules.rs": "ffe04f6db0c2df633c7049477aa1864f2d0a3a6dc5a933e5c003424bc7279576",
     "src/rules_types.rs": "0ebc0be4e190de8e4bf37198307ba6bcfc6873aa08db9d0630146d7b76952b26",
     "src/schema.rs": "e909e8c22575168397d1a0c040764c7fdb475713fb62131369828bb809a27c0f",
+    "src/view_registration.rs": "2e1de43e985d0df6b6e90b3ed7d924a1f8a1a94891a9be0f53ed825cff2e7b51",
     "tests/context_axes.rs": "7fbaf4f64b5b6521c2424204ba18c4ff2de454dca749ca44130926cbc92ca8ba",
     "tests/context_typing.rs": "23c1a7da367a7b9328933e1b5985ebfd51049416a77081128bbc1ba0b7dc752f",
     "tests/influence.rs": "c32c9dcaa3b2b14e15b08886819c445809e1d27f51a11e65027be1be9a37a403",
-    "tests/numeric.rs": "6695eb2dfb2b24122d531cb26b8708b09206ddec9baed95c5fad446bdd1fd050"
+    "tests/numeric.rs": "6695eb2dfb2b24122d531cb26b8708b09206ddec9baed95c5fad446bdd1fd050",
+    "tests/view_registration.rs": "eb13b515db85022f7a29d1e67e6689864591e98ba5ce13e1ae5b08c23829f7ca"
   },
-  "source_revision": "506729278cf3ee42a30eb9ac71336480e386fe89",
+  "source_revision": "8d359df4bc9b7b276411609b18cc7ef10de8bfa7",
   "license_source_path": "LICENSE",
   "documentation": {
-    "path": "docs/contract/v0.15/README.md",
-    "sha256": "55a19bf101c56745f0e83f376910fc112dcbfd034b7a831c2f42a593c5a5f0e5"
+    "path": "docs/contract/v0.16/README.md",
+    "sha256": "11d28b9be1d4165f6aaa76bd187142fc5cf9489dac48f5baeecd7ebce5f0403e"
   }
 }

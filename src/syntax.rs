@@ -60,6 +60,16 @@ pub enum Statement {
         graph: String,
         branch: String,
     },
+    ViewTemplate {
+        name: String,
+        name_span: Span,
+        revision: String,
+        source: String,
+        source_span: Span,
+        clock: weave_contract::ViewClock,
+        predicate: Option<StringExpr>,
+        valid_at: Option<TimeExpr>,
+    },
     Pin {
         name: String,
         name_span: Span,
@@ -207,6 +217,14 @@ pub struct ContextAxisBinding {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "service", rename_all = "snake_case")]
 pub enum NativeService {
+    Accepted {
+        selection: weave_contract::AcceptedGraphSelection,
+    },
+    Current {
+        view_id: String,
+        definition_digest: String,
+        valid_at: Option<TimeExpr>,
+    },
     Identity {
         selection: weave_contract::IdentityResolve,
     },
@@ -1462,7 +1480,10 @@ impl Parser {
             if context == 2
                 && matches!(
                     kind.as_str(),
-                    "resolve_identity"
+                    "accepted"
+                        | "view_current"
+                        | "view_template"
+                        | "resolve_identity"
                         | "cluster_navigation"
                         | "typed_context"
                         | "context_schema"
@@ -1505,6 +1526,111 @@ impl Parser {
                         revision,
                         digest,
                         digest_span,
+                    });
+                }
+                "accepted" => {
+                    self.word("view")?;
+                    let view_id = self.selector_string()?;
+                    self.word("decision")?;
+                    let decision_id = self.selector_string()?;
+                    self.symbol(';')?;
+                    statements.push(Statement::NativeService {
+                        name,
+                        name_span,
+                        service: NativeService::Accepted {
+                            selection: weave_contract::AcceptedGraphSelection {
+                                view_id,
+                                decision_id,
+                            },
+                        },
+                    });
+                }
+                "view_current" => {
+                    self.word("view")?;
+                    let view_id = self.selector_string()?;
+                    self.word("definition")?;
+                    let digest_span = (self.peek().start, self.peek().end);
+                    let definition_digest = self.string()?;
+                    if !weave_contract::view_registration::is_definition_digest(&definition_digest)
+                    {
+                        return Err(Diagnostic::new(
+                            "E_VIEW_TEMPLATE",
+                            "Canonical definition digest required",
+                            digest_span.0,
+                            digest_span.1,
+                        ));
+                    }
+                    let valid_at = match self.name()?.as_str() {
+                        "fixed" => None,
+                        "tick" => Some(if self.peek().kind == Kind::Word("value".into()) {
+                            TimeExpr::Value(self.scalar_expr(0)?)
+                        } else {
+                            TimeExpr::Literal(self.number()?)
+                        }),
+                        _ => return Err(self.error("View read requires fixed or tick")),
+                    };
+                    self.symbol(';')?;
+                    statements.push(Statement::NativeService {
+                        name,
+                        name_span,
+                        service: NativeService::Current {
+                            view_id,
+                            definition_digest,
+                            valid_at,
+                        },
+                    });
+                }
+                "view_template" => {
+                    self.word("revision")?;
+                    let revision = self.selector_string()?;
+                    self.word("from")?;
+                    let source_span = (self.peek().start, self.peek().end);
+                    let source = self.name()?;
+                    self.word("clock")?;
+                    let clock = match self.name()?.as_str() {
+                        "fixed" => weave_contract::ViewClock::Fixed,
+                        "tick" => weave_contract::ViewClock::Tick,
+                        _ => return Err(self.error("Template clock requires fixed or tick")),
+                    };
+                    self.symbol('{')?;
+                    let mut predicate = None;
+                    let mut valid_at = None;
+                    while self.peek().kind != Kind::Symbol('}') {
+                        match self.name()?.as_str() {
+                            "match" if predicate.is_none() => {
+                                self.word("relation")?;
+                                predicate =
+                                    Some(if self.peek().kind == Kind::Word("value".into()) {
+                                        StringExpr::Value(self.scalar_expr(0)?)
+                                    } else {
+                                        StringExpr::Literal(self.string()?)
+                                    });
+                            }
+                            "at" if valid_at.is_none() => {
+                                valid_at =
+                                    Some(if self.peek().kind == Kind::Word("value".into()) {
+                                        TimeExpr::Value(self.scalar_expr(0)?)
+                                    } else {
+                                        TimeExpr::Literal(self.number()?)
+                                    });
+                            }
+                            _ => {
+                                return Err(self
+                                    .error("Template permits one relation and time filter only"));
+                            }
+                        }
+                        self.symbol(';')?;
+                    }
+                    self.symbol('}')?;
+                    statements.push(Statement::ViewTemplate {
+                        name,
+                        name_span,
+                        revision,
+                        source,
+                        source_span,
+                        clock,
+                        predicate,
+                        valid_at,
                     });
                 }
                 "live_handle" => {
@@ -2631,6 +2757,11 @@ pub(crate) fn scalar_expressions(statement: &mut Statement, f: &mut impl FnMut(&
             predicate,
             valid_at,
             ..
+        }
+        | Statement::ViewTemplate {
+            predicate,
+            valid_at,
+            ..
         } => {
             if let Some(StringExpr::Value(v)) = predicate {
                 f(v)
@@ -2639,6 +2770,14 @@ pub(crate) fn scalar_expressions(statement: &mut Statement, f: &mut impl FnMut(&
                 f(v)
             }
         }
+        Statement::NativeService {
+            service:
+                NativeService::Current {
+                    valid_at: Some(TimeExpr::Value(v)),
+                    ..
+                },
+            ..
+        } => f(v),
         Statement::Graph { items, .. } => {
             for i in items {
                 match i {

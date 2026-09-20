@@ -146,6 +146,9 @@ pub(crate) fn declaration(statement: &Statement) -> (&str, Span) {
         | Statement::Import {
             name, name_span, ..
         }
+        | Statement::ViewTemplate {
+            name, name_span, ..
+        }
         | Statement::LiveHandle {
             name, name_span, ..
         }
@@ -280,6 +283,11 @@ impl Expander {
                 predicate,
                 valid_at,
                 ..
+            }
+            | Statement::ViewTemplate {
+                predicate,
+                valid_at,
+                ..
             } => {
                 if let Some(StringExpr::Value(e)) = predicate {
                     let v = e.evaluate(
@@ -306,6 +314,29 @@ impl Expander {
                         ));
                     };
                     *valid_at = Some(TimeExpr::Literal(v));
+                }
+            }
+            Statement::NativeService {
+                service:
+                    crate::syntax::NativeService::Current {
+                        valid_at: Some(v), ..
+                    },
+                ..
+            } => {
+                if let TimeExpr::Value(e) = v {
+                    let value = e.evaluate(
+                        &BTreeMap::new(),
+                        &self.scalar_values,
+                        &mut self.scalar_budget,
+                    )?;
+                    let ScalarValue::Time(time) = value else {
+                        return Err(error(
+                            "E_PARAMETER_TYPE",
+                            "Time selector needs Time",
+                            e.span,
+                        ));
+                    };
+                    *v = TimeExpr::Literal(time);
                 }
             }
             Statement::Transaction { body, .. } => {
@@ -456,6 +487,7 @@ impl Expander {
                 | Statement::Schema { .. }
                 | Statement::ContextSchema { .. }
                 | Statement::LiveHandle { .. }
+                | Statement::ViewTemplate { .. }
                 | Statement::Transaction { .. }
         ) {
             self.graphs.insert(name, pending);

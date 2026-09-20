@@ -2,6 +2,37 @@
 
 As of 2026-09-20, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
 
+## Accepted graphs and compiled view artifacts (protocol 0.16)
+
+[Source service reads and explicit host artifacts](VIEW_ARTIFACTS.md) now cover
+exact accepted occurrences, definition-matched RequireCurrent reads, and compiled
+Query/Filter view templates. Complete compiler output retains Program, typed values
+and templates; legacy execution outputs reject unreturned artifacts. Source-aware
+host registration and every recomputation preserve exact module/template manifests.
+Host acceptance, registration, enrollment, refresh and scheduling remain explicit.
+L15/L17/L24/L26 remain partial; this is not a general reactor or view language.
+
+Local validation: **134 language tests passed**, including nine artifact cases and
+two independent module-effect/literal-selector cases. Strict all-target Clippy,
+formatting, library WASM compilation, exact 26-file contract verification and the
+three original source artifacts passed. The vendored contract is pinned to coherent
+engine `8d359df` (protocol 0.16), including its final native registration documentation.
+
+Actual compiler-to-native acceptance passed through the trusted
+`source_view_fixture` helper: genuine accepted/empty proof carriers, exact module
+artifact identity and alias stability, separate registration, current/stale reads,
+explicit refresh and tick expiry, retained source manifests after incremental
+refresh, historical acceptance after replacement, persisted proof denial after
+policy expiry, and fresh-process atomic rollback of a commit before a stale read.
+The helper's fixed clock/keys belong to test host setup, never source authority.
+
+Executed native/Node WASM compiler parity also passed: **6,091 identical JSON bytes**,
+four scalar cases, three scalar errors, one complete view artifact and its legacy
+rejection diagnostic, with zero WASM host imports. This fixed portable compiler
+fixture does not claim browser storage or runtime host installation. Cargo used two
+low-priority jobs and existing caches; final source-archive evidence is recorded in
+the orchestrator handoff. Public publication remains the orchestrator's responsibility.
+
 ## Ordinary scalar checkpoint (source-only)
 
 [Scalar functions](SCALAR_FUNCTIONS.md) now support exact typed scalar parameters,
@@ -28,7 +59,7 @@ recorded in the final orchestrator handoff; publication remains orchestrator-own
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.15 schema/metadata/algebra/assertion/rule/context/geometry and graph-influence implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.16 accepted/view artifacts plus schema/metadata/algebra/assertion/rule/context/geometry and graph-influence implementation addresses documented model gaps. Full semantic conformance remains open. |
 | L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; ordinary scalar specialization and 123 test cases now covered. Rich graph/vector/quantity types, effects and formatter remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. Typed total contextual assignments now preserve exact descriptor witnesses; general higher-order lenses/joins and explicit context compatibility remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity resolution now executes with explicit policy/mapping pins; general alignment, stratified absence and richer scenarios remain. |

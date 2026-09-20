@@ -1,0 +1,8 @@
+// Compile with: weave view-plan template.weave --template Active
+// The output requires an explicit trusted-host registration call.
+value Relation "connected";
+live_handle FleetHead graph "Fleet" branch "main";
+view_template Active revision "1" from FleetHead clock tick {
+  match relation value Relation;
+  at 0;
+}

@@ -27,7 +27,12 @@
         "SOURCE_RECONCILIATION.md",
         "source/provenance.json",
         "PROTOCOL_015.md",
-        "contract/v0.15/README.md"
+        "contract/v0.15/README.md",
+        "VIEW_ARTIFACTS.md",
+        "../tests/view_artifacts.rs",
+        "../tests/root_view_artifacts.rs",
+        "../scripts/check_view_services.py",
+        "contract/v0.16/README.md"
       ],
       "source_reconciliation": "verified"
     },
@@ -82,7 +87,11 @@
         "SCALAR_FUNCTIONS.md",
         "../tests/scalars.rs",
         "../tests/root_scalars.rs",
-        "../scripts/check_scalar_parity.py"
+        "../scripts/check_scalar_parity.py",
+        "VIEW_ARTIFACTS.md",
+        "../tests/view_artifacts.rs",
+        "../tests/root_view_artifacts.rs",
+        "../scripts/check_view_services.py"
       ],
       "provisional": true
     },
@@ -189,7 +198,11 @@
         "../scripts/check_typed_contexts.py",
         "LIVE_REFERENCES.md",
         "../examples/live_handles.weave",
-        "../scripts/check_live_handles.py"
+        "../scripts/check_live_handles.py",
+        "VIEW_ARTIFACTS.md",
+        "../tests/view_artifacts.rs",
+        "../tests/root_view_artifacts.rs",
+        "../scripts/check_view_services.py"
       ],
       "provisional": true
     },
@@ -213,7 +226,11 @@
       "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
       "evidence": [
         "PROTOCOL_015.md",
-        "contract/v0.15/README.md"
+        "contract/v0.15/README.md",
+        "VIEW_ARTIFACTS.md",
+        "../tests/view_artifacts.rs",
+        "../tests/root_view_artifacts.rs",
+        "../scripts/check_view_services.py"
       ]
     },
     {
@@ -262,7 +279,12 @@
         "L16"
       ],
       "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
-      "evidence": []
+      "evidence": [
+        "VIEW_ARTIFACTS.md",
+        "../tests/view_artifacts.rs",
+        "../tests/root_view_artifacts.rs",
+        "../scripts/check_view_services.py"
+      ]
     },
     {
       "id": "L7",

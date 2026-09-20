@@ -246,7 +246,12 @@ impl<'a> Resolver<'a> {
                 Self::local_graph(left, *left_span)?;
                 Self::local_graph(right, *right_span)?;
             }
-            Statement::Lens {
+            Statement::ViewTemplate {
+                source,
+                source_span,
+                ..
+            }
+            | Statement::Lens {
                 source,
                 source_span,
                 ..

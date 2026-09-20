@@ -353,6 +353,61 @@ impl LinkedProgram {
         }
         Ok(output)
     }
+    /// Complete execution artifacts; source templates are never silently discarded.
+    pub fn compile_artifacts(&self) -> Result<crate::CompiledArtifacts, ModuleDiagnostic> {
+        let mut output =
+            crate::compile_artifacts_parsed(self.ast.clone()).map_err(|e| self.locate(e))?;
+        self.canonical_sources(&mut output.program.source_revisions)?;
+        let mut charge = 0usize;
+        for template in output.view_templates.values_mut() {
+            let added = self
+                .manifests
+                .iter()
+                .map(|r| {
+                    256usize.saturating_add(6 * (r.name.len() + r.revision.len() + r.digest.len()))
+                })
+                .sum::<usize>();
+            let existing = serde_json::to_vec(template)
+                .expect("template serializes")
+                .len();
+            charge = charge.saturating_add(existing).saturating_add(added);
+            if existing.saturating_add(added) > 1024 * 1024 || charge > 4 * 1024 * 1024 {
+                return Err(self.locate(issue(
+                    "E_BUDGET",
+                    "Linked template manifest budget exceeded",
+                    (0, 0),
+                )));
+            }
+            self.canonical_sources(&mut template.source_revisions)?;
+            // Name/recipe identity stays unchanged; only canonical linked source identities change.
+            template.definition_digest =
+                weave_contract::view_registration::definition_digest(template)
+                    .map_err(|e| self.locate(issue(&e.code, e.message, (0, 0))))?;
+            template.source_revisions =
+                weave_contract::algebra::merge_source_revisions(&template.source_revisions, &[])
+                    .map_err(|e| self.locate(issue(&e.code, e.message, (0, 0))))?;
+            weave_contract::view_registration::validate_template(template)
+                .map_err(|e| self.locate(issue(&e.code, e.message, (0, 0))))?;
+        }
+        Ok(output)
+    }
+    fn canonical_sources(
+        &self,
+        sources: &mut Vec<weave_contract::SourceRevision>,
+    ) -> Result<(), ModuleDiagnostic> {
+        for revision in sources.iter_mut() {
+            if let Some(name) = self.identities.get(&revision.name) {
+                revision.name = name.clone();
+            }
+        }
+        sources.extend(self.manifests.clone());
+        weave_contract::algebra::merge_source_revisions(sources, &[])
+            .map_err(|e| self.locate(issue(&e.code, e.message, (0, 0))))?;
+        Ok(())
+    }
+    pub fn require_no_artifacts(&self) -> Result<(), ModuleDiagnostic> {
+        crate::reject_artifacts(&self.ast).map_err(|e| self.locate(e))
+    }
     pub fn fingerprint(&self) -> Result<String, ModuleDiagnostic> {
         weave_contract::identity::program_fingerprint(&self.compile()?, &self.schemas())
             .map_err(|e| self.locate(issue(&e.code, e.message, (0, 0))))

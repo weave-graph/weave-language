@@ -137,6 +137,47 @@ pub(crate) fn compile_parsed(parsed: syntax::Program) -> Result<Program, Diagnos
     Ok(specialize_parsed(parsed)?.program)
 }
 pub(crate) fn specialize_parsed(parsed: syntax::Program) -> Result<SpecializedProgram, Diagnostic> {
+    reject_artifacts(&parsed)?;
+    let artifacts = compile_artifacts_parsed(parsed)?;
+    Ok(SpecializedProgram {
+        program: artifacts.program,
+        values: artifacts.values,
+    })
+}
+pub(crate) fn reject_artifacts(parsed: &syntax::Program) -> Result<(), Diagnostic> {
+    if let Some(Statement::ViewTemplate { name_span, .. }) = parsed
+        .statements
+        .iter()
+        .find(|s| matches!(s, Statement::ViewTemplate { .. }))
+    {
+        return Err(diagnostic(
+            "E_HOST_ARTIFACT_REQUIRED",
+            "View templates require the complete artifact API or view-plan",
+            *name_span,
+        ));
+    }
+    Ok(())
+}
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct CompiledArtifacts {
+    pub program: Program,
+    pub values: BTreeMap<String, scalars::ScalarValue>,
+    pub view_templates: BTreeMap<String, weave_contract::CompiledViewTemplate>,
+}
+impl CompiledArtifacts {
+    pub fn fingerprint(&self) -> Result<String, Diagnostic> {
+        weave_contract::identity::source_fingerprint(
+            &serde_json::json!({"profile":"weave-compiled-artifacts-v1","artifacts":self}),
+        )
+        .map_err(|e| diagnostic(&e.code, e.message, (0, 0)))
+    }
+}
+pub fn compile_artifacts(source: &str) -> Result<CompiledArtifacts, Diagnostic> {
+    compile_artifacts_parsed(parse(source)?)
+}
+pub(crate) fn compile_artifacts_parsed(
+    parsed: syntax::Program,
+) -> Result<CompiledArtifacts, Diagnostic> {
     for statement in &parsed.statements {
         if let Statement::Import { name_span, .. } | Statement::ModuleHeader { name_span, .. } =
             statement
@@ -152,6 +193,8 @@ pub(crate) fn specialize_parsed(parsed: syntax::Program) -> Result<SpecializedPr
     let (ast, scalar_values) = functions::expand(parsed)?;
     let mut names: BTreeMap<String, Lens> = BTreeMap::new();
     let mut commands = Vec::new();
+    let mut view_templates = BTreeMap::new();
+    let mut artifact_charge = 0usize;
     let mut declared = BTreeSet::new();
     let mut schemas: BTreeMap<String, GraphSchema> = BTreeMap::new();
     let mut rule_sets = BTreeMap::new();
@@ -240,7 +283,10 @@ pub(crate) fn specialize_parsed(parsed: syntax::Program) -> Result<SpecializedPr
             continue;
         }
         let (name, name_span) = match &statement {
-            Statement::LiveHandle {
+            Statement::ViewTemplate {
+                name, name_span, ..
+            }
+            | Statement::LiveHandle {
                 name, name_span, ..
             }
             | Statement::Pin {
@@ -306,6 +352,89 @@ pub(crate) fn specialize_parsed(parsed: syntax::Program) -> Result<SpecializedPr
                 let mut query = base_query(graph, None);
                 query.branch_id = branch;
                 handles.insert(name, query);
+            }
+            Statement::ViewTemplate {
+                name,
+                name_span,
+                revision,
+                source,
+                source_span,
+                clock,
+                predicate,
+                valid_at,
+            } => {
+                let mut query = handles.get(&source).cloned().ok_or_else(|| {
+                    diagnostic(
+                        "E_VIEW_TEMPLATE",
+                        "Template requires a declared live handle, not a captured graph value",
+                        source_span,
+                    )
+                })?;
+                query.predicate = match predicate {
+                    None => None,
+                    Some(StringExpr::Literal(v)) => Some(v),
+                    _ => {
+                        return Err(diagnostic(
+                            "E_VIEW_TEMPLATE",
+                            "Template relation must be concrete",
+                            name_span,
+                        ));
+                    }
+                };
+                query.valid_at = match valid_at {
+                    None => None,
+                    Some(TimeExpr::Literal(v)) => Some(v),
+                    _ => {
+                        return Err(diagnostic(
+                            "E_VIEW_TEMPLATE",
+                            "Template time must be concrete",
+                            name_span,
+                        ));
+                    }
+                };
+                let charge = 8192usize
+                    .saturating_add(
+                        6 * (name.len()
+                            + revision.len()
+                            + query.graph_id.len()
+                            + query.branch_id.len()
+                            + query.predicate.as_ref().map_or(0, String::len)),
+                    )
+                    .saturating_add(
+                        source_revisions
+                            .iter()
+                            .map(|r| {
+                                256usize.saturating_add(
+                                    6 * (r.name.len() + r.revision.len() + r.digest.len()),
+                                )
+                            })
+                            .sum::<usize>(),
+                    );
+                artifact_charge = artifact_charge.saturating_add(charge);
+                if view_templates.len() >= 16
+                    || charge > 1024 * 1024
+                    || artifact_charge > 4 * 1024 * 1024
+                {
+                    return Err(diagnostic(
+                        "E_BUDGET",
+                        "Compiled view artifact budget exceeded",
+                        name_span,
+                    ));
+                }
+                let template = weave_contract::view_registration::seal_template(
+                    weave_contract::CompiledViewTemplate {
+                        format: weave_contract::view_registration::VIEW_TEMPLATE_FORMAT.into(),
+                        protocol: VERSION.into(),
+                        name: name.clone(),
+                        revision,
+                        expression: GraphExpression::Query { query },
+                        clock,
+                        source_revisions: source_revisions.clone(),
+                        definition_digest: String::new(),
+                    },
+                )
+                .map_err(|e| diagnostic(&e.code, e.message, name_span))?;
+                view_templates.insert(name, template);
             }
             Statement::Pin {
                 name,
@@ -749,16 +878,48 @@ pub(crate) fn specialize_parsed(parsed: syntax::Program) -> Result<SpecializedPr
             }
             Statement::NativeService { name, service, .. } => {
                 let (expression, typed) = match service {
+                    syntax::NativeService::Accepted { selection } => {
+                        (GraphExpression::AcceptedGraph { selection }, None)
+                    }
+                    syntax::NativeService::Current {
+                        view_id,
+                        definition_digest,
+                        valid_at,
+                    } => {
+                        let time = match valid_at {
+                            None => weave_contract::ViewReadTime::Fixed,
+                            Some(TimeExpr::Literal(valid_at)) => {
+                                weave_contract::ViewReadTime::Tick { valid_at }
+                            }
+                            _ => {
+                                return Err(diagnostic(
+                                    "E_PARAMETER_TYPE",
+                                    "View time must be concrete",
+                                    (0, 0),
+                                ));
+                            }
+                        };
+                        (
+                            GraphExpression::CurrentView {
+                                selection: weave_contract::CurrentViewSelection {
+                                    view_id,
+                                    definition_digest,
+                                    time,
+                                },
+                            },
+                            None,
+                        )
+                    }
                     syntax::NativeService::Identity { selection } => {
-                        (GraphExpression::ResolveIdentity { selection }, true)
+                        (GraphExpression::ResolveIdentity { selection }, Some(true))
                     }
                     syntax::NativeService::Cluster { selection } => {
-                        (GraphExpression::Cluster { selection }, false)
+                        (GraphExpression::Cluster { selection }, Some(false))
                     }
                 };
                 let mut lens = Lens::concrete(base_query(String::new(), None));
                 lens.input = Some(expression);
-                lens.typed = Some(typed);
+                lens.typed = typed;
                 lens.emit(&name, &mut commands);
                 names.insert(name, lens);
             }
@@ -1176,7 +1337,8 @@ pub(crate) fn specialize_parsed(parsed: syntax::Program) -> Result<SpecializedPr
             }
         }
     }
-    Ok(SpecializedProgram {
+    Ok(CompiledArtifacts {
+        view_templates,
         values: scalar_values,
         program: Program {
             source_revisions,

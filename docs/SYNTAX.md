@@ -290,3 +290,7 @@ The compiler emits 0.15 plans. Metadata navigation now returns path-qualified no
 ## Ordinary scalar functions (source-only, protocol 0.15 unchanged)
 
 Explicit scalar returns, partial application, typed unary callbacks, immutable `value` bindings, exact arithmetic and compile-time literal substitution are described in [scalar functions](SCALAR_FUNCTIONS.md). `weave values` exposes typed results and a separate specialization identity. Scalar-returning functions cannot accept graph inputs or emit graph operations.
+
+## Accepted graphs and explicit host view artifacts
+
+Protocol 0.16 adds `accepted Name view "view" decision "exact-occurrence";` and `view_current Name view "instance" definition "sha256:..." fixed;` (or `tick TIME;`). Both bind a native graph result once; pure functions consume the resulting value as an argument. `view_template Name revision "revision" from LiveHandle clock fixed { ... }` emits a separate host artifact, not a Program effect. See [full syntax/API and authority boundaries](VIEW_ARTIFACTS.md); ordinary plan/value/fingerprint compilation rejects unreturned templates.

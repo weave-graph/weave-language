@@ -1,6 +1,6 @@
 # Accepted graphs and living views: source boundary proposal
 
-**Design only.** No syntax, DTO, host API or test described here is implemented by this proposal. The language baseline is `8a914c7` (protocol 0.15); the inspected native service baseline is engine `9b7f192`. Engine owns protocol versions, native execution, migrations and authorization. A future protocol version, provisionally 0.16, must be coordinated before implementation. This document does not reserve that version.
+**Historical approved design.** The bounded source implementation and current limitations are documented in [VIEW_ARTIFACTS.md](../../VIEW_ARTIFACTS.md). This proposal records the reviewed design and planned acceptance; consult STATUS.md for actual validation evidence. The language baseline is `8a914c7` (protocol 0.15); the inspected native service baseline is engine `9b7f192`. Engine owns protocol versions, native execution, migrations and authorization. A future protocol version, provisionally 0.16, must be coordinated before implementation. This document does not reserve that version.
 
 Language paper §§4.1–4.2 require pure computation, declared effects and semantic closure; §§9–10 separate governance from authority and require explicit reactive installation. Engine live materialization already exists, but language L15/L17/L24/L26 remain partial or open. The smallest useful next slice is an exact accepted-decision read, a current cached-view read, and a source-generated registration artifact. Policy installation, acceptance and subscriptions stay separate host operations. This does not complete the paper's reactor language.
 
@@ -16,7 +16,7 @@ Native `ViewDefinition` currently has no source manifest. Source-aware registrat
 
 ## Proposed source grammar
 
-These snippets are acceptance fixtures to implement later, not runnable examples today.
+These illustrative snippets include placeholder selectors/digests; the actual compiler/native fixture constructs exact runtime references.
 
 ```weave
 accepted Approved view "fleet-review" decision "decision-17";
