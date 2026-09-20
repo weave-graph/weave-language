@@ -8,6 +8,12 @@ It also distinguishes valid time, replica-local recorded time, revision ancestry
 and acceptance time. This proposal implements valid-time computation over pinned
 graph values; it does not manufacture the other clocks.
 
+Follow-up review: the match-attachment representation below is superseded by
+[Temporal attachment proof handoff](TEMPORAL_ATTACHMENT_PROOFS.md). Generated match
+details belong in occurrence derivation parameters. Real metadata navigation and
+empty-target protection require the coherent alternative-carrier design there;
+the experimental pure module is not an approved release of the earlier shape.
+
 ## Existing implementation and the missing seam
 
 `QueryPlan.revision` selects an exact stored graph revision; `valid_at` selects a
