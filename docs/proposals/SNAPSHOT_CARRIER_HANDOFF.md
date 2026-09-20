@@ -1,6 +1,6 @@
 # Snapshot carrier: coordinated implementation handoff
 
-Proposed 2026-09-20 after signed-export engine freeze `4b06f72`. This is the exact delta and ownership request for [snapshot influence](SNAPSHOT_INFLUENCE.md). No version, store marker or shared source is changed by this document. The parent owns the build slot until explicitly released.
+Approved for implementation on 2026-09-20 after signed-export engine freeze `4b06f72`, with protocol 0.17, store marker 15 and capsule 0.3 reserved by the parent. This is the coordinated delta and ownership handoff for [snapshot influence](SNAPSHOT_INFLUENCE.md). This document itself changes no shared source. Portable and native implementation remains under review; source vendoring waits for a coherent runtime freeze. Build ownership is explicitly coordinated.
 
 ## Exact fields and meaning
 
@@ -8,11 +8,12 @@ Proposed 2026-09-20 after signed-export engine freeze `4b06f72`. This is the exa
 |---|---|
 | Language owner: `crates/weave-contract/src/influence.rs` | `GraphInfluence.snapshots: Vec<GraphRef>` |
 | Engine owner: `crates/weave-contract/src/lib.rs` | `Node.derived_snapshots`, `Edge.derived_snapshots`, `MetadataAttachment.derived_snapshots`: each `Vec<GraphRef>` |
+| Engine owner: `crates/weave-contract/src/lib.rs` | `MetadataAttachment.derived_from: Vec<AssertionRef>` and `derived_nodes: Vec<NodeRef>` |
 | Engine owner: `crates/weave-contract/src/assertions.rs` | `Assertion.derived_snapshots: Vec<GraphRef>` |
 
-Each field is `default`, `skip_serializing_if = "Vec::is_empty"`, strict bounded decode and restriction-only. It is a conjunction of current whole-snapshot access gates, independent of record readers and outside derivation OR groups. Empty vectors preserve old canonical bytes. Exact graph/revision identity is mandatory; no branch head or caller authority object appears in these fields.
+All carriers are restriction-only global AND; the snapshot fields impose current whole-revision authorization, while attachment assertion/node fields use their existing exact record-proof semantics. Each field is `default`, `skip_serializing_if = "Vec::is_empty"`, strict bounded decode and restriction-only. They remain independent of record readers and outside derivation OR groups. Empty vectors preserve old canonical bytes. Exact graph/revision identity is mandatory; no branch head or caller authority object appears in these fields.
 
-The attachment field is required now. A graph-host literal attachment can be moved independently of any node/edge host, so a graph-level envelope or host-node gate alone does not protect it after repersistence. The native attachment visibility and attachment-as-AssertionRef proof path both enforce derived_snapshots, whether its host is graph, entity, node, edge or assertion. Metadata traversal/copying preserves the field. Generated protected attachments receive these gates just like generated nodes/edges. This closes the unsupported movable graph-host case in the prior proposal; no fake origin assertion is necessary.
+All three attachment fields are required now. Native metadata navigation can attach assertion/node path influence to a target that legitimately contains graph-host attachments; rejecting those attachments would regress existing navigation. A provisional fail-closed restriction was therefore replaced by these complete carriers before release. A graph-host literal attachment can be moved independently of any node/edge host, so a graph-level envelope or host-node gate alone does not protect it after repersistence. The native attachment visibility and attachment-as-AssertionRef proof path both enforce all three declared gate kinds, whether its host is graph, entity, node, edge or assertion. Metadata traversal/copying preserves the field. Generated protected attachments receive these gates just like generated nodes/edges. This closes the unsupported movable graph-host case in the prior proposal; no fake origin assertion is necessary.
 
 There is no StructuralEdge addition or Derivation snapshot alternative field in this profile. Whole snapshot influence remains conservative AND; alternative proof groups are neither flattened nor rewritten.
 
@@ -22,8 +23,8 @@ Language owner implements these in canonical `influence.rs`, with engine review 
 
 - Extend `validate`, `canonicalize`, `merge`, `validate_graph` and existing `snapshots(data)` for whole/record/attachment gates.
 - Add `validate_record_refs(assertions, nodes, snapshots)`; keep existing `validate_refs(assertions, nodes)` as a compatible wrapper for groups with no snapshot field. Combined raw references per gate ≤1,000; IDs use current limits.
-- Add `input_influence(data: &GraphData) -> Result<Option<GraphInfluence>, Diagnostic>`. Merge the existing whole-value carrier with declared snapshot gates from its nodes, edges, explicit assertions and attachments, deduplicating before bounded clones. Do not promote descriptive `QueryResult.input_snapshots` or unrelated record assertion/node proofs into new whole-snapshot gates.
-- Extend `protect_generated_result` to copy whole snapshot gates into generated nodes, edges and attachments, with precharged output and per-record limits. Preserve edge group boundaries; snapshots are global AND. Synchronize descriptive input snapshot indexes without fabricating AssertionRefs.
+- Add `input_influence(data: &GraphData) -> Result<Option<GraphInfluence>, Diagnostic>`. Merge the existing whole-value carrier with declared snapshot gates from its nodes, edges, explicit assertions and attachments, plus explicit attachment assertion/node gates, deduplicating before bounded clones. Do not promote descriptive `QueryResult.input_snapshots`, ordinary Node/Edge proof fields or attachment origins into new global gates. Attachment assertion/node gates keep their record-level meaning; they are never converted into whole-snapshot checks.
+- Extend `protect_generated_result` to copy whole snapshot gates into generated nodes and edges, and all three influence kinds into generated attachments, with precharged output and per-record limits. Preserve edge group boundaries; snapshots are global AND. Synchronize descriptive input snapshot indexes without fabricating AssertionRefs. Typed-context generated attachment protection also retains exact definition and anchor gates; unchanged input attachments remain unchanged.
 
 All consuming pure operators merge `input_influence` from each operand before losing filtered records, including context/filter/project and empty output. Retained source records remain byte-unchanged under their origin envelopes. Generated record identity keys and origin-conflict comparisons bind derived_snapshots. Explicit Assertion→Edge materialization copies the field.
 
