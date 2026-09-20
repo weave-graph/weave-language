@@ -1,6 +1,6 @@
 # Exact snapshot influence before compiled handlers
 
-Design/review only, 2026-09-20. Inspected the protocol-0.16 portable influence, algebra, context, identity and rules code, and current native influence/authorization/dispatch/capsule/admission paths. No canonical fields, version, store marker or implementation are changed here. This replaces the temporary empty-input restriction in [the handler interface](REACTOR_INTERFACE.md) once implemented and verified.
+Design/review only, 2026-09-20. The subsequent [coordinated handoff](SNAPSHOT_CARRIER_HANDOFF.md) adds an attachment-level field to close the movable graph-host metadata case described below. Inspected the protocol-0.16 portable influence, algebra, context, identity and rules code, and current native influence/authorization/dispatch/capsule/admission paths. No canonical fields, version, store marker or implementation are changed here. This replaces the temporary empty-input restriction in [the handler interface](REACTOR_INTERFACE.md) once implemented and verified.
 
 ## Why an exact snapshot gate is needed
 
