@@ -22,6 +22,8 @@ jobs:
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked --all-targets
       - run: cargo install --locked --path . --root install-check
+      - name: Check installed compiler against independent interval oracle
+        run: python3 scripts/check_interval_oracle.py --compiler install-check/bin/weave
   wasm:
     runs-on: ubuntu-latest
     steps:

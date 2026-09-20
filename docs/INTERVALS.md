@@ -73,3 +73,5 @@ schemas, recorded-time corrections/history and full bitemporal semantics remain 
 weave values examples/intervals.weave
 python3 scripts/check_intervals.py --compiler target/debug/weave --engine /path/to/weave-engine
 ```
+
+Verification at source implementation `09778d0`:157 tests, strict lint/format,11,876-byte executed native/WASM parity and23 prior standalone artifacts unchanged. An exact-commit archive built locked/offline. The orchestrator independently passed368 finite-set/boundary oracle cases and4 expected failures, reviewed strict decoding, and ran actual persistence/restart against the preserved native protocol0.18/store16 binary. `scripts/check_interval_oracle.py` runs against the installed compiler in Linux/macOS/Windows CI. Hosted results are checked separately; full temporal gates remain open.
