@@ -37,7 +37,7 @@ recorded in the final orchestrator handoff; publication remains orchestrator-own
 | L6 Distributed offline governance | proposed | Portable source structure only; no mobile, networking or governance conformance claim. |
 | L7 Tooling and release | in_progress, provisional | MIT license, independent crate, README and three-platform/WASM CI definition exist. The orchestrator verified public v0.4 CI on Ubuntu/macOS/Windows and the WASM target; later milestone publication remains tracked in PUBLICATION.md. LSP is optional proposed editor tooling, not a user-scope completion gate. |
 
-## Local verification
+## Earlier local foundation verification (historical)
 
 - `cargo test --locked`: 102 behavior/conformance tests passed, including half-open interval laws, negative scope/type cases, revision pins, data/code isolation and 5,000 deterministic malformed input cases.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
@@ -127,7 +127,7 @@ This profile selects positive directed bridge claims whose endpoints already dec
 
 The public `decimal` module implements a bounded exact decimal profile without shared-protocol changes. Five tests pass, including a 6,561-pair rational arithmetic oracle, canonical string serialization beyond binary64 integer precision, exact cancellation and explicit error boundaries. Strict Clippy and the WASM library check pass. See [profile and limits](DECIMAL.md).
 
-This library work addresses part of the paper's required scalar family. Source literal/type syntax, runtime schema integration, typed quantities and units remain unimplemented for Decimal; existing Float semantics are unchanged.
+This standalone-library checkpoint initially left source literal/type syntax and runtime schema integration open. The later numeric and ordinary scalar checkpoints below and above implement the bounded Decimal/nominal Quantity profile; full unit algebra remains open. Existing Float semantics are unchanged.
 
 ## Pinned node influence v0.11 verification
 
