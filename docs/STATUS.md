@@ -33,6 +33,8 @@ fixture does not claim browser storage or runtime host installation. Cargo used 
 low-priority jobs and existing caches; final source-archive evidence is recorded in
 the orchestrator handoff. Public publication remains the orchestrator's responsibility.
 
+Independent root verification passed both source boundary tests, all seven native compiled-view/binding tests, actual compiler-to-host acceptance, schema13-to14 process-death migration and old-binary refusal, and executed 6,091-byte compiler WASM parity. All 26 vendored files match canonical engine8d359df exactly (license from repository root). All 21 historical top-level examples retain identical plans/source identities apart from the declared protocol version. The exact25b1da8 source archive built locked/offline using cached dependencies. Paired hosted CI is tracked in the public project evidence; full gates remain open.
+
 ## Ordinary scalar checkpoint (source-only)
 
 [Scalar functions](SCALAR_FUNCTIONS.md) now support exact typed scalar parameters,
