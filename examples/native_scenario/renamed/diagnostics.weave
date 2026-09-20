@@ -1,0 +1,14 @@
+module "scenario.alt.diagnostics" revision "2";
+// Explicit negative evidence is distinct from an absent positive fact.
+rules AssessmentRules revision "2" {
+  rule Warn {
+    when negative "quality_ok"(x, y);
+    yield "needs_review"(x, y);
+  }
+}
+function Assess revision "2" (graph input) {
+  metadata Evidence from input on edge "operational-link" key "measurements";
+  reason Diagnosed from Evidence using AssessmentRules;
+  lens Selected from Diagnosed {match relation "needs_review"; at 7;}
+  return Selected;
+}

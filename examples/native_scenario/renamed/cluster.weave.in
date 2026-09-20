@@ -1,0 +1,3 @@
+// The trusted controller quotes the delivered warning event's exact revision.
+cluster_navigation Proposal source graph "Alerts" revision {{WARNING_REVISION_JSON}}
+  relation "needs_review" at 7 levels 2 context default;

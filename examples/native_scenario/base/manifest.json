@@ -1,0 +1,63 @@
+{
+  "format": "weave-native-scenario-fixture/1",
+  "variant": "base",
+  "files": {
+    "seed": "seed.weave",
+    "diagnostics": "diagnostics.weave",
+    "handler": "handler.weave",
+    "offline": "offline.weave.in",
+    "cluster": "cluster.weave.in",
+    "modules": "module-map.json"
+  },
+  "graphs": {
+    "evidence": "Evidence",
+    "installation": "Installation",
+    "warnings": "Warnings",
+    "clusters": "ClustersPhone",
+    "annotations": "ReviewerNotes"
+  },
+  "selection": {
+    "function": "Diagnose",
+    "rules": "QualityDiagnostics",
+    "rule_revision": "1",
+    "connection_id": "connection",
+    "attachment_id": "evidence-binding",
+    "metadata_key": "evidence",
+    "cluster_binding": "Proposal",
+    "valid_at": 7
+  },
+  "substitutions": {
+    "offline": [
+      "EVIDENCE_REVISION_JSON",
+      "INSTALLATION_REVISION_JSON"
+    ],
+    "cluster": [
+      "WARNING_REVISION_JSON"
+    ]
+  },
+  "principal": "collector",
+  "reviewer": "reviewer",
+  "handlers": {
+    "selected": "Diagnostic",
+    "unused": "UnusedDiagnostic"
+  },
+  "adapters": {
+    "diagnostic": "diagnose",
+    "cluster": "cluster-warnings"
+  },
+  "warning_predicate": "warning",
+  "output_slot": "warnings",
+  "modules": [
+    {
+      "id": "scenario.diagnostics",
+      "revision": "1",
+      "sha256": "0ebc70e217a0d66a828bfa16c38d53caa5dfc7fe6359bd3ed14a887d4d20e750",
+      "file": "diagnostics.weave"
+    }
+  ],
+  "tokens": {
+    "EVIDENCE_REVISION_JSON": "{{EVIDENCE_REVISION_JSON}}",
+    "INSTALLATION_REVISION_JSON": "{{INSTALLATION_REVISION_JSON}}",
+    "WARNING_REVISION_JSON": "{{WARNING_REVISION_JSON}}"
+  }
+}

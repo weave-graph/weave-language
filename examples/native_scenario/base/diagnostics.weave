@@ -1,0 +1,14 @@
+module "scenario.diagnostics" revision "1";
+// Explicit negative evidence is distinct from an absent positive fact.
+rules QualityDiagnostics revision "1" {
+  rule Warn {
+    when negative "quality_ok"(x, y);
+    yield "warning"(x, y);
+  }
+}
+function Diagnose revision "1" (graph input) {
+  metadata Evidence from input on edge "connection" key "evidence";
+  reason Diagnosed from Evidence using QualityDiagnostics;
+  lens Selected from Diagnosed {match relation "warning"; at 7;}
+  return Selected;
+}
