@@ -29,3 +29,5 @@ The emitted JSON executes through the engine's trusted host interface. Graph dec
 The contract is vendored to keep clean checkouts independently buildable; [its manifest](vendor/manifest.json) records exact file hashes. Public source-paper recovery and conformance are separate gates from this executable foundation.
 
 Build or install from a Git checkout/source archive with `cargo install --locked --path .`. Registry publication is disabled until an optional coordinated crate release; this does not block publishing the open-source repositories. See [release readiness](docs/RELEASE_READINESS.md).
+
+The [source formatter](docs/FORMATTER.md) preserves tokens and comments: `weave fmt FILE.weave` prints formatted source, `--check` checks it and explicit `--write` updates one regular file. Formatting a content-pinned module changes its byte digest and requires explicit relinking.

@@ -4,10 +4,14 @@ fn main() {
     let args: Vec<_> = env::args().skip(1).collect();
     let usage = || {
         eprintln!(
-            "Usage: weave <check|plan|ast|describe|fingerprint|values|artifacts|view-plan> FILE.weave [--modules MAP.json] [--template NAME]\nview-plan requires --template; compilation never registers a view."
+            "Usage: weave <check|plan|ast|describe|fingerprint|values|artifacts|view-plan> FILE.weave [--modules MAP.json] [--template NAME]\nview-plan requires --template; compilation never registers a view.\nweave fmt FILE.weave [--check|--write] formats one source file."
         );
         process::exit(2);
     };
+    if args.first().is_some_and(|arg| arg == "fmt") {
+        format_command(&args);
+        return;
+    }
     if args.len() < 2
         || ![
             "check",
@@ -189,4 +193,101 @@ fn read_source(path: &str) -> std::io::Result<String> {
         .take(1_048_577)
         .read_to_string(&mut source)?;
     Ok(source)
+}
+
+fn format_command(args: &[String]) {
+    if !(args.len() == 2 || (args.len() == 3 && matches!(args[2].as_str(), "--check" | "--write")))
+    {
+        eprintln!("Usage: weave fmt FILE.weave [--check|--write]");
+        process::exit(2);
+    }
+    let io_fail = |error: std::io::Error| -> ! {
+        eprintln!(
+            "{}",
+            serde_json::json!({"code":"E_IO","message":error.to_string()})
+        );
+        process::exit(1)
+    };
+    let source = read_source(&args[1]).unwrap_or_else(|e| io_fail(e));
+    let formatted = weave_language::format_source(&source).unwrap_or_else(|e| fail(e));
+    match args.get(2).map(String::as_str) {
+        Some("--check") if formatted != source => {
+            eprintln!(
+                "{}",
+                serde_json::json!({"code":"E_FORMAT","message":"Source needs formatting"})
+            );
+            process::exit(1);
+        }
+        Some("--write") => {
+            write_formatted(std::path::Path::new(&args[1]), &source, &formatted)
+                .unwrap_or_else(|e| io_fail(e));
+        }
+        Some("--check") => {}
+        _ => print!("{formatted}"),
+    }
+}
+
+/// Same-directory atomic replacement; final-component symlinks are rejected.
+/// Preserve the original permission bits. No imports or module pins are changed.
+fn write_formatted(path: &std::path::Path, original: &str, formatted: &str) -> std::io::Result<()> {
+    use std::io::{Error, ErrorKind, Write};
+    let metadata = fs::symlink_metadata(path)?;
+    if !metadata.file_type().is_file() {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "--write requires a regular file; symlinks are rejected",
+        ));
+    }
+    if original == formatted {
+        return Ok(());
+    }
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(std::path::Path::new("."));
+    let mut temporary = None;
+    for attempt in 0..100 {
+        let candidate = parent.join(format!(".weave-format-{}-{attempt}.tmp", process::id()));
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(file) => {
+                temporary = Some((candidate, file));
+                break;
+            }
+            Err(e) if e.kind() == ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    let (temporary, mut file) = temporary.ok_or_else(|| {
+        Error::new(
+            ErrorKind::AlreadyExists,
+            "Cannot allocate formatter temporary file",
+        )
+    })?;
+    let result = (|| {
+        file.set_permissions(metadata.permissions())?;
+        file.write_all(formatted.as_bytes())?;
+        file.sync_all()?;
+        // Refuse a detected intervening edit or replacement with a symlink.
+        if !fs::symlink_metadata(path)?.file_type().is_file()
+            || read_source(
+                path.to_str()
+                    .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "Invalid source path"))?,
+            )? != original
+        {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Source changed while formatting",
+            ));
+        }
+        drop(file);
+        fs::rename(&temporary, path)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
 }

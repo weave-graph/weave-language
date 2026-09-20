@@ -2,11 +2,13 @@
 //! No source program can invoke host effects: compilation only emits a plan.
 pub mod context_axes;
 pub mod decimal;
+mod format;
 mod functions;
 mod graph_types;
 pub mod modules;
 pub mod scalars;
 pub mod syntax;
+pub use format::format_source;
 use std::collections::{BTreeMap, BTreeSet};
 use syntax::{AlgebraOperation, BindingValue, Item, Metadata, Statement, StringExpr, TimeExpr};
 pub use syntax::{Diagnostic, parse};

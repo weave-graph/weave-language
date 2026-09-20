@@ -2706,6 +2706,16 @@ pub fn parse(source: &str) -> Result<Program, Diagnostic> {
     .program(0)
 }
 
+/// Exact lexical ranges, excluding EOF and whitespace/comments. The formatter
+/// recovers comments from the gaps rather than interpreting decoded literals.
+pub(crate) fn token_spans(source: &str) -> Result<Vec<Span>, Diagnostic> {
+    Ok(lex(source)?
+        .into_iter()
+        .filter(|token| !matches!(token.kind, Kind::End))
+        .map(|token| (token.start, token.end))
+        .collect())
+}
+
 /// Visit only typed source expressions; never interpret user JSON object keys.
 pub(crate) fn scalar_expressions(statement: &mut Statement, f: &mut impl FnMut(&mut ScalarExpr)) {
     fn literal(v: &mut LiteralExpr, f: &mut impl FnMut(&mut ScalarExpr)) {

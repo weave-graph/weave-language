@@ -301,8 +301,10 @@
       ],
       "acceptance_reference": "IMPLEMENTATION_PLAN.md#staged-gates-and-completion-criteria",
       "evidence": [
-        "STATUS.md#local-verification",
-        "../tests/conformance.rs"
+        "STATUS.md",
+        "../tests/conformance.rs",
+        "FORMATTER.md",
+        "../tests/formatter.rs"
       ],
       "provisional": true
     }

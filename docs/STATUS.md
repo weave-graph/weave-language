@@ -2,6 +2,27 @@
 
 As of 2026-09-20, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
 
+## Source formatter checkpoint (source-only)
+
+The [token-preserving formatter](FORMATTER.md) now provides library `format_source`
+and `weave fmt FILE.weave` with read-only stdout/check and explicit atomic write
+modes. Comment/string/numeric spellings survive; malformed source diagnostics keep
+original spans. Writes preserve file permissions and reject final-component
+symlinks. Module byte pins deliberately invalidate when module bytes change;
+relinking remains explicit. Protocol and vendored contract remain 0.16 unchanged.
+
+Local verification passed **142 all-target tests**, including eight formatter tests
+and round trips over all 29 example/scalar source fixtures, linked module artifact
+identity, explicit pin invalidation/relinking, output/comment budgets and CLI
+failure preservation. Strict all-target Clippy, rustfmt, library WASM compilation,
+26-file exact contract verification and all three original paper artifact checks
+passed. The independent formatter CLI script also passed Unicode/CRLF comments,
+escaped strings, scalar fingerprint equivalence, permissions, symlink rejection
+and unchanged files on syntax/resource errors. Cargo used two low-priority jobs
+and the existing cache. This is compilation evidence for the formatter on WASM,
+not a new executed formatter-WASM parity claim. L29's discovery/repair workflow and
+full project gates remain open.
+
 ## Accepted graphs and compiled view artifacts (protocol 0.16)
 
 [Source service reads and explicit host artifacts](VIEW_ARTIFACTS.md) now cover
@@ -62,7 +83,7 @@ recorded in the final orchestrator handoff; publication remains orchestrator-own
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
 | L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.16 accepted/view artifacts plus schema/metadata/algebra/assertion/rule/context/geometry and graph-influence implementation addresses documented model gaps. Full semantic conformance remains open. |
-| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; ordinary scalar specialization and 123 test cases now covered. Rich graph/vector/quantity types, effects and formatter remain. |
+| L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; ordinary scalar specialization and complete host-artifact output now covered. A bounded token-preserving formatter now provides syntax-only stdout/check/write modes. Rich graph/vector/quantity types and effects remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. Typed total contextual assignments now preserve exact descriptor witnesses; general higher-order lenses/joins and explicit context compatibility remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity resolution now executes with explicit policy/mapping pins; general alignment, stratified absence and richer scenarios remain. |
 | L4 Reactive secure integration | in_progress, partial | Source emits sealed Query/Filter view templates and exact RequireCurrent reads; actual host registration, refresh, tick expiry, source-manifest retention and stale-read rollback are verified in the 0.16 fixture. Installation, scheduling and authority remain host-owned. General reactor syntax/execution and broader incremental operators remain; see the design-only [handler boundary](proposals/REACTOR_ARTIFACTS.md). |
