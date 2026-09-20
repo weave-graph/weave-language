@@ -705,6 +705,7 @@ pub(crate) fn compile_artifacts_parsed(
                                 metadata: refs(&metadata),
                                 readers: vec![],
                                 derived_from: vec![],
+                                derived_snapshots: Vec::new(),
                                 derived_nodes: vec![],
                                 derivations: vec![],
                             });
@@ -733,6 +734,9 @@ pub(crate) fn compile_artifacts_parsed(
                                 ));
                             }
                             data.attachments.push(MetadataAttachment {
+                                derived_snapshots: Vec::new(),
+                                derived_from: Vec::new(),
+                                derived_nodes: Vec::new(),
                                 context,
                                 id,
                                 host,
@@ -754,6 +758,7 @@ pub(crate) fn compile_artifacts_parsed(
                             metadata,
                             properties,
                         } => data.nodes.push(Node {
+                            derived_snapshots: Vec::new(),
                             derived_nodes: Vec::new(),
                             derived_from: Vec::new(),
                             context_scope: None,
@@ -831,6 +836,7 @@ pub(crate) fn compile_artifacts_parsed(
                                 metadata: refs(&metadata),
                                 readers: Vec::new(),
                                 derived_from: Vec::new(),
+                                derived_snapshots: Vec::new(),
                                 derived_nodes: Vec::new(),
                                 derivations: Vec::new(),
                             });

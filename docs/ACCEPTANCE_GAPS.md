@@ -1,6 +1,6 @@
 # Acceptance gaps and source-reconciliation checklist
 
-This living audit covers the implemented slices through protocol v0.16 and the source-only formatter. **None of the full-design gates is complete.** Existing executable slices are evidence toward gates, not a substitute for the original scope. This file introduces no additional product requirements.
+This living audit covers the implemented slices through protocol v0.17 exact snapshot/attachment influence and the source-only formatter. **None of the full-design gates is complete.** Existing executable slices are evidence toward gates, not a substitute for the original scope. This file introduces no additional product requirements.
 
 The original paired papers are now recovered and reviewed. See [source reconciliation](SOURCE_RECONCILIATION.md) and the byte-preserved [language paper](source/Weave_Language_White_Paper_v0.1.md). The table retains implementation gaps, but its source-retrieval requests are superseded by the exact section references below. References L/E identify language/engine sections. Illustrative syntax remains a proposal.
 

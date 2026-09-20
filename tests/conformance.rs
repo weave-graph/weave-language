@@ -1256,7 +1256,7 @@ fn service_bindings_do_not_smuggle_policy_authority_or_schema_compatibility() {
 fn typed_context_source_declarations_lower_canonical_descriptor_and_exact_read() {
     let source = include_str!("../examples/typed_contexts.weave");
     let program = weave_language::compile(source).unwrap();
-    assert_eq!(program.version, "0.16.0");
+    assert_eq!(program.version, "0.17.0");
     let json = serde_json::to_value(program).unwrap();
     assert_eq!(json["commands"][0]["op"], "commit_batch");
     let descriptor = &json["commands"][0]["commits"][0]["data"];
@@ -1368,7 +1368,7 @@ fn live_handles_are_deferred_and_pin_emits_an_immutable_reference() {
     .unwrap();
     assert_eq!(plan.commands.len(), 2);
     let json = serde_json::to_value(plan).unwrap();
-    assert_eq!(json["version"], "0.16.0");
+    assert_eq!(json["version"], "0.17.0");
     let query = &json["commands"][0]["value"]["query"];
     assert_eq!(query["graph_id"], "Evidence");
     assert_eq!(query["branch_id"], "local");
@@ -1447,7 +1447,7 @@ fn explicit_snapshot_replacement_preserves_branch_cas_and_metadata_binding_kind(
 #[test]
 fn schema_constrained_functions_support_partial_higher_order_and_captured_calls() {
     let plan = compile(include_str!("../examples/schema_functions.weave")).unwrap();
-    assert_eq!(plan.version, "0.16.0");
+    assert_eq!(plan.version, "0.17.0");
     assert_eq!(
         plan.commands
             .iter()

@@ -6,8 +6,8 @@ This checklist concerns distribution of the current experimental source, not ful
 
 - Repository includes MIT license, contribution and security guidance, source, tests, examples, lockfile and a standalone vendored contract.
 - Contract verifier checks the exact vendored file set, license, Cargo version, protocol constant and current documentation hash.
-- Source grammar and public API are documented as provisional; current protocol is v0.15.0. Historical contract notes are labeled historical.
-- `check`, `ast`, `plan`, `fingerprint` and source-schema `describe` are the implemented CLI subcommands. No formatter, language runner, remote privileged discovery, LSP or mobile SDK is advertised as implemented.
+- Source grammar and public API are documented as provisional; current protocol is v0.17.0. Historical contract notes are labeled historical.
+- `check`, `ast`, `plan`, `fingerprint`, `values`, `artifacts`, `view-plan`, source-schema `describe` and token-preserving `fmt` are implemented CLI subcommands. Host registration/execution remains explicit and separate. No language runner, remote privileged discovery or LSP is advertised as implemented.
 - `publish = false` prevents accidental registry publication before the separate contract package has an approved distribution path. Git source distribution remains available.
 
 ## Distribution procedure
@@ -24,7 +24,7 @@ The source archive includes every canonical contract source/test file, Cargo met
 
 ## CI configuration
 
-Native jobs check contract integrity, formatting, strict Clippy, all-target tests and installation on Linux/macOS/Windows. A separate job checks the library's WASM target. Workflow permissions are limited to reading contents. These are configured jobs, not proof they have run. Rust and GitHub Action references currently follow their selected stable/major channels; action/toolchain pinning and dependency vulnerability review remain release-hardening work, not claims of bit-for-bit reproducibility.
+Native jobs check contract integrity, formatting, strict Clippy, all-target tests and installation on Linux/macOS/Windows. A separate job checks the library's WASM target and executes the fixed source specialization/artifact parity fixture. Workflow permissions are limited to reading contents. These are configured jobs, not proof they have run. Rust and GitHub Action references currently follow their selected stable/major channels; action/toolchain pinning and dependency vulnerability review remain release-hardening work, not claims of bit-for-bit reproducibility.
 
 ## Orchestrator verification before public release
 

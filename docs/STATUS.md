@@ -2,6 +2,31 @@
 
 As of 2026-09-20, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
 
+## Exact snapshot and attachment influence (protocol 0.17)
+
+The compiler now vendors the exact 26-file contract and versioned documentation
+from engine `1eb33c089a9ae493df0c4e508232b2eb5426e64c`. Whole-value exact
+snapshot restrictions survive empty results; generated nodes, edges, claims and
+metadata attachments retain record-level snapshot restrictions. Movable attachments
+also retain explicit assertion/node restrictions, including typed-context descriptor
+influence. These data references constrain runtime visibility; source compilation
+never installs authority or fabricates an input event.
+
+Local verification passed **142 all-target source tests**, strict Clippy, rustfmt,
+exact vendor/source checks and library WASM compilation. The actual compiler fixture
+executed natively and in zero-import WebAssembly with **6,091 identical JSON bytes**.
+All 22 standalone example artifacts retain exact commands, values and source
+identities apart from the declared protocol version and protocol-bound fingerprint.
+
+Actual compiler/runtime acceptance passed compiled host-view registration and current
+reads, pinned modules, schema-constrained functions, live handles/CAS rollback,
+typed contexts, geometry/explanation, scalar persistence, the original cyclic
+metadata/schema/join examples, and nested metadata selectors with path privacy.
+The canonical portable implementation separately passed 83 contract tests. These
+checks use existing caches and two low-priority Cargo jobs; hosted evidence follows
+publication. The reactor proposal now uses the approved snapshot carrier for empty
+inputs, but handler grammar, artifacts and native execution remain **design only**.
+
 ## Source formatter checkpoint (source-only)
 
 The [token-preserving formatter](FORMATTER.md) now provides library `format_source`
@@ -9,7 +34,8 @@ and `weave fmt FILE.weave` with read-only stdout/check and explicit atomic write
 modes. Comment/string/numeric spellings survive; malformed source diagnostics keep
 original spans. Writes preserve file permissions and reject final-component
 symlinks. Module byte pins deliberately invalidate when module bytes change;
-relinking remains explicit. Protocol and vendored contract remain 0.16 unchanged.
+relinking remains explicit. That source-only checkpoint left protocol 0.16 unchanged;
+the subsequent contract update is described above.
 
 Local verification passed **142 all-target tests**, including eight formatter tests
 and round trips over all 29 example/scalar source fixtures, linked module artifact
@@ -82,7 +108,7 @@ recorded in the final orchestrator handoff; publication remains orchestrator-own
 
 | Gate | Status | Evidence and remaining work |
 |---|---|---|
-| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.16 accepted/view artifacts plus schema/metadata/algebra/assertion/rule/context/geometry and graph-influence implementation addresses documented model gaps. Full semantic conformance remains open. |
+| L0 Source and contract | in_progress | Original papers recovered and reconciled; exact language source and hashes are included. Protocol v0.17 exact snapshot/attachment influence and accepted/view artifacts plus schema/metadata/algebra/assertion/rule/context/geometry and graph-influence implementation addresses documented model gaps. Full semantic conformance remains open. |
 | L1 Front end | in_progress, provisional | Lexer/parser, versioned scalar schemas, typed endpoint/space validation, JSON diagnostics and check/ast/plan/describe CLI implemented; ordinary scalar specialization and complete host-artifact output now covered. A bounded token-preserving formatter now provides syntax-only stdout/check/write modes. Rich graph/vector/quantity types and effects remain. |
 | L2 Deterministic semantic kernel | in_progress, provisional | Typed relation/time parameters, partial application, temporal filtering and reusable cross-graph path-join values lower to engine IR. Named intermediate results feed later parameterized lenses and joins without commits. Union, diff, projection and temporal four-valued support now execute. Typed total contextual assignments now preserve exact descriptor witnesses; general higher-order lenses/joins and explicit context compatibility remain. |
 | L3 Full knowledge semantics | in_progress, provisional | Named attributable graph attachments, native metadata-value extraction and real cyclic local snapshots now execute through a logical manifest; typed schema meanings are retained through query/join results. Finite signed-evidence rule closure now executes. Declared counterpart bridges and source-level explanation execute; accepted identity resolution now executes with explicit policy/mapping pins; general alignment, stratified absence and richer scenarios remain. |
