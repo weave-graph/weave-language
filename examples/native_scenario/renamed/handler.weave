@@ -1,0 +1,16 @@
+import diagnostics module "scenario.alt.diagnostics" revision "2" sha256 "75346202e80be189751e7217039ddf17db30e5f3f535f78639c2726c89a47b81";
+// Complete artifacts retain these exact scalars and both inert templates.
+value ExactCounter 9007199254740993;
+value Label "λ scenario 🚀";
+handler Assessment revision "2" using diagnostics::Assess {
+  input event graph "SiteLayout" branch "main" metadata depth 4;
+  on "graph.accepted", "graph.committed";
+  output slot "alerts";
+  replay pinned;
+}
+handler UnusedAssessment revision "2" using diagnostics::Assess {
+  input event graph "SiteLayout" branch "main" metadata depth 4;
+  on "graph.accepted", "graph.committed";
+  output slot "alerts";
+  replay pinned;
+}

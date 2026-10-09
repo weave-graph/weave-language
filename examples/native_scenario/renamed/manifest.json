@@ -1,0 +1,63 @@
+{
+  "format": "weave-native-scenario-fixture/1",
+  "variant": "renamed",
+  "files": {
+    "seed": "seed.weave",
+    "diagnostics": "diagnostics.weave",
+    "handler": "handler.weave",
+    "offline": "offline.weave.in",
+    "cluster": "cluster.weave.in",
+    "modules": "module-map.json"
+  },
+  "graphs": {
+    "evidence": "Observations",
+    "installation": "SiteLayout",
+    "warnings": "Alerts",
+    "clusters": "ClusterReview",
+    "annotations": "PrivateAnnotations"
+  },
+  "selection": {
+    "function": "Assess",
+    "rules": "AssessmentRules",
+    "rule_revision": "2",
+    "connection_id": "operational-link",
+    "attachment_id": "sample-link",
+    "metadata_key": "measurements",
+    "cluster_binding": "Proposal",
+    "valid_at": 7
+  },
+  "substitutions": {
+    "offline": [
+      "EVIDENCE_REVISION_JSON",
+      "INSTALLATION_REVISION_JSON"
+    ],
+    "cluster": [
+      "WARNING_REVISION_JSON"
+    ]
+  },
+  "principal": "collector",
+  "reviewer": "reviewer",
+  "handlers": {
+    "selected": "Assessment",
+    "unused": "UnusedAssessment"
+  },
+  "adapters": {
+    "diagnostic": "assess",
+    "cluster": "group-alerts"
+  },
+  "warning_predicate": "needs_review",
+  "output_slot": "alerts",
+  "modules": [
+    {
+      "id": "scenario.alt.diagnostics",
+      "revision": "2",
+      "sha256": "75346202e80be189751e7217039ddf17db30e5f3f535f78639c2726c89a47b81",
+      "file": "diagnostics.weave"
+    }
+  ],
+  "tokens": {
+    "EVIDENCE_REVISION_JSON": "{{EVIDENCE_REVISION_JSON}}",
+    "INSTALLATION_REVISION_JSON": "{{INSTALLATION_REVISION_JSON}}",
+    "WARNING_REVISION_JSON": "{{WARNING_REVISION_JSON}}"
+  }
+}
