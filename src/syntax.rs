@@ -88,6 +88,13 @@ pub enum Statement {
         digest: String,
         digest_span: Span,
     },
+    RecordedHandle {
+        name: String,
+        name_span: Span,
+        graph: String,
+        branch: String,
+        selection: weave_contract::RecordedSelection,
+    },
     LiveHandle {
         name: String,
         name_span: Span,
@@ -1635,6 +1642,7 @@ impl Parser {
                         | "typed_context"
                         | "context_schema"
                         | "context_value"
+                        | "recorded_handle"
                         | "live_handle"
                         | "pin"
                         | "import"
@@ -1864,6 +1872,41 @@ impl Parser {
                         clock,
                         predicate,
                         valid_at,
+                    });
+                }
+                "recorded_handle" => {
+                    self.word("graph")?;
+                    let graph = self.selector_string()?;
+                    self.word("branch")?;
+                    let branch = self.selector_string()?;
+                    let selection = match self.name()?.as_str() {
+                        "known_at" => weave_contract::RecordedSelection::LocalTime {
+                            unix_millis: self.number()?,
+                        },
+                        "checkpoint" => {
+                            let checkpoint = self.selector_string()?;
+                            self.word("observer")?;
+                            weave_contract::RecordedSelection::Checkpoint {
+                                observer: self.selector_string()?,
+                                checkpoint,
+                            }
+                        }
+                        _ => {
+                            return Err(self.error(
+                                "Recorded handle requires known_at or checkpoint with observer",
+                            ));
+                        }
+                    };
+                    weave_contract::recorded_history::validate_selection(&selection).map_err(
+                        |d| Diagnostic::new(&d.code, d.message, name_span.0, name_span.1),
+                    )?;
+                    self.symbol(';')?;
+                    statements.push(Statement::RecordedHandle {
+                        name,
+                        name_span,
+                        graph,
+                        branch,
+                        selection,
                     });
                 }
                 "live_handle" => {

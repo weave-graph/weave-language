@@ -160,6 +160,9 @@ pub(crate) fn declaration(statement: &Statement) -> (&str, Span) {
         | Statement::HandlerTemplate {
             name, name_span, ..
         }
+        | Statement::RecordedHandle {
+            name, name_span, ..
+        }
         | Statement::LiveHandle {
             name, name_span, ..
         }
@@ -665,6 +668,7 @@ impl Expander {
             Statement::Rules { .. }
                 | Statement::Schema { .. }
                 | Statement::ContextSchema { .. }
+                | Statement::RecordedHandle { .. }
                 | Statement::LiveHandle { .. }
                 | Statement::ViewTemplate { .. }
                 | Statement::HandlerTemplate { .. }
