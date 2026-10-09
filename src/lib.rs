@@ -366,6 +366,9 @@ fn lower_artifacts(
             | Statement::TypedContext {
                 name, name_span, ..
             }
+            | Statement::HistoryRange {
+                name, name_span, ..
+            }
             | Statement::NativeService {
                 name, name_span, ..
             }
@@ -1180,8 +1183,30 @@ fn lower_artifacts(
                     &mut active_batch,
                 );
             }
+            Statement::HistoryRange { command, .. } => {
+                commands.push(command);
+            }
             Statement::NativeService { name, service, .. } => {
                 let (expression, typed) = match service {
+                    syntax::NativeService::AcceptedHistory {
+                        view_id,
+                        selection,
+                        valid_at,
+                    } => {
+                        let input = GraphExpression::AcceptedHistory { view_id, selection };
+                        (
+                            if let Some(time) = valid_at {
+                                GraphExpression::Filter {
+                                    input: Box::new(input),
+                                    predicate: None,
+                                    valid_at: Some(time),
+                                }
+                            } else {
+                                input
+                            },
+                            None,
+                        )
+                    }
                     syntax::NativeService::Accepted { selection } => {
                         (GraphExpression::AcceptedGraph { selection }, None)
                     }

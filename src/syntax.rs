@@ -153,6 +153,11 @@ pub enum Statement {
         schema: String,
         schema_span: Span,
     },
+    HistoryRange {
+        name: String,
+        name_span: Span,
+        command: weave_contract::Command,
+    },
     NativeService {
         name: String,
         name_span: Span,
@@ -270,6 +275,11 @@ pub struct ContextAxisBinding {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "service", rename_all = "snake_case")]
 pub enum NativeService {
+    AcceptedHistory {
+        view_id: String,
+        selection: weave_contract::AcceptedSelection,
+        valid_at: Option<i64>,
+    },
     Accepted {
         selection: weave_contract::AcceptedGraphSelection,
     },
@@ -708,7 +718,7 @@ impl Parser {
     fn selector_string(&mut self) -> Result<String, Diagnostic> {
         let token = self.peek().clone();
         let value = self.string()?;
-        if value.len() > 512 || value.chars().any(char::is_control) {
+        if value.is_empty() || value.len() > 512 || value.chars().any(char::is_control) {
             return Err(Diagnostic::new(
                 "E_ID",
                 "Selector requires 1 to 512 bytes without controls",
@@ -1634,6 +1644,9 @@ impl Parser {
                 && matches!(
                     kind.as_str(),
                     "accepted"
+                        | "accepted_history"
+                        | "recorded_range"
+                        | "accepted_range"
                         | "view_current"
                         | "view_template"
                         | "handler"
@@ -1681,6 +1694,117 @@ impl Parser {
                         revision,
                         digest,
                         digest_span,
+                    });
+                }
+                "recorded_range" | "accepted_range" => {
+                    self.word(if kind == "recorded_range" {
+                        "graph"
+                    } else {
+                        "view"
+                    })?;
+                    let selected = self.selector_string()?;
+                    let branch = if kind == "recorded_range" {
+                        self.word("branch")?;
+                        self.selector_string()?
+                    } else {
+                        String::new()
+                    };
+                    self.word("observer")?;
+                    let observer = self.selector_string()?;
+                    self.word("between")?;
+                    let start = self.number()?;
+                    self.word("and")?;
+                    let end = self.number()?;
+                    self.word("limit")?;
+                    let number = self.number()?;
+                    let limit = usize::try_from(number)
+                        .map_err(|_| self.error("History limit must be positive and bounded"))?;
+                    let interval = weave_contract::Interval {
+                        start,
+                        end: Some(end),
+                    };
+                    weave_contract::accepted_history::validate_range(&interval, limit).map_err(
+                        |d| Diagnostic::new(&d.code, d.message, name_span.0, name_span.1),
+                    )?;
+                    let valid_at = if self.peek().kind == Kind::Word("at".into()) {
+                        self.word("at")?;
+                        Some(self.number()?)
+                    } else {
+                        None
+                    };
+                    self.symbol(';')?;
+                    let command = if kind == "recorded_range" {
+                        weave_contract::Command::RecordedRange {
+                            name: name.clone(),
+                            query: weave_contract::QueryPlan {
+                                graph_id: selected,
+                                branch_id: branch,
+                                revision: None,
+                                predicate: None,
+                                from: None,
+                                to: None,
+                                valid_at,
+                                include_metadata: false,
+                                max_depth: 8,
+                            },
+                            observer,
+                            interval,
+                            limit,
+                        }
+                    } else {
+                        weave_contract::Command::AcceptedRange {
+                            name: name.clone(),
+                            view_id: selected,
+                            observer,
+                            interval,
+                            limit,
+                            valid_at,
+                        }
+                    };
+                    statements.push(Statement::HistoryRange {
+                        name,
+                        name_span,
+                        command,
+                    });
+                }
+                "accepted_history" => {
+                    self.word("view")?;
+                    let view_id = self.selector_string()?;
+                    let selection =
+                        match self.name()?.as_str() {
+                            "accepted_at" => weave_contract::AcceptedSelection::LocalTime {
+                                unix_millis: self.number()?,
+                            },
+                            "decision" => {
+                                let decision_id = self.selector_string()?;
+                                self.word("observer")?;
+                                weave_contract::AcceptedSelection::Decision {
+                                    decision_id,
+                                    observer: self.selector_string()?,
+                                }
+                            }
+                            _ => return Err(self.error(
+                                "Accepted history requires accepted_at or decision with observer",
+                            )),
+                        };
+                    weave_contract::accepted_history::validate_selection(&selection).map_err(
+                        |d| Diagnostic::new(&d.code, d.message, name_span.0, name_span.1),
+                    )?;
+                    let valid_at = if self.peek().kind == Kind::Word("at".into()) {
+                        self.word("at")?;
+                        Some(self.number()?)
+                    } else {
+                        None
+                    };
+                    self.symbol(';')?;
+                    statements.push(Statement::NativeService {
+                        name,
+                        name_span,
+                        service: NativeService::AcceptedHistory {
+                            view_id,
+                            selection,
+                            valid_at,
+                        },
                     });
                 }
                 "accepted" => {
