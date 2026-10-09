@@ -53,8 +53,27 @@ fn base_query(graph_id: String, revision: Option<String>) -> QueryPlan {
     }
 }
 #[derive(Clone)]
+struct Handle {
+    query: QueryPlan,
+    recorded: Option<weave_contract::RecordedSelection>,
+}
+impl Handle {
+    fn expression(&self) -> GraphExpression {
+        match &self.recorded {
+            Some(selection) => GraphExpression::RecordedQuery {
+                query: self.query.clone(),
+                selection: selection.clone(),
+            },
+            None => GraphExpression::Query {
+                query: self.query.clone(),
+            },
+        }
+    }
+}
+#[derive(Clone)]
 struct Lens {
     query: QueryPlan,
+    recorded: Option<weave_contract::RecordedSelection>,
     input: Option<GraphExpression>,
     typed: Option<bool>,
     relation: Option<String>,
@@ -64,6 +83,7 @@ impl Lens {
     fn concrete(query: QueryPlan) -> Self {
         Self {
             query,
+            recorded: None,
             input: None,
             typed: None,
             relation: None,
@@ -80,8 +100,14 @@ impl Lens {
                 }
             }
             Some(input) => input.clone(),
-            None => GraphExpression::Query {
-                query: self.query.clone(),
+            None => match &self.recorded {
+                Some(selection) => GraphExpression::RecordedQuery {
+                    query: self.query.clone(),
+                    selection: selection.clone(),
+                },
+                None => GraphExpression::Query {
+                    query: self.query.clone(),
+                },
             },
         }
     }
@@ -325,6 +351,9 @@ fn lower_artifacts(
             | Statement::HandlerTemplate {
                 name, name_span, ..
             }
+            | Statement::RecordedHandle {
+                name, name_span, ..
+            }
             | Statement::LiveHandle {
                 name, name_span, ..
             }
@@ -477,6 +506,23 @@ fn lower_artifacts(
                 lens.emit(&name, &mut commands);
                 names.insert(name, lens);
             }
+            Statement::RecordedHandle {
+                name,
+                graph,
+                branch,
+                selection,
+                ..
+            } => {
+                let mut query = base_query(graph, None);
+                query.branch_id = branch;
+                handles.insert(
+                    name,
+                    Handle {
+                        query,
+                        recorded: Some(selection),
+                    },
+                );
+            }
             Statement::LiveHandle {
                 name,
                 graph,
@@ -485,7 +531,13 @@ fn lower_artifacts(
             } => {
                 let mut query = base_query(graph, None);
                 query.branch_id = branch;
-                handles.insert(name, query);
+                handles.insert(
+                    name,
+                    Handle {
+                        query,
+                        recorded: None,
+                    },
+                );
             }
             Statement::HandlerTemplate {
                 name,
@@ -603,13 +655,14 @@ fn lower_artifacts(
                 predicate,
                 valid_at,
             } => {
-                let mut query = handles.get(&source).cloned().ok_or_else(|| {
+                let mut handle = handles.get(&source).cloned().ok_or_else(|| {
                     diagnostic(
                         "E_VIEW_TEMPLATE",
-                        "Template requires a declared live handle, not a captured graph value",
+                        "Template requires a declared live or recorded handle",
                         source_span,
                     )
                 })?;
+                let query = &mut handle.query;
                 query.predicate = match predicate {
                     None => None,
                     Some(StringExpr::Literal(v)) => Some(v),
@@ -667,7 +720,7 @@ fn lower_artifacts(
                         protocol: VERSION.into(),
                         name: name.clone(),
                         revision,
-                        expression: GraphExpression::Query { query },
+                        expression: handle.expression(),
                         clock,
                         source_revisions: source_revisions.clone(),
                         definition_digest: String::new(),
@@ -687,15 +740,17 @@ fn lower_artifacts(
                 let query = handles.get(&source).ok_or_else(|| {
                     diagnostic(
                         "E_HANDLE_TYPE",
-                        "Pin requires a declared live graph handle",
+                        "Pin requires a declared live or recorded graph handle",
                         source_span,
                     )
                 })?;
-                let mut query = query.clone();
+                let handle = query;
+                let mut query = handle.query.clone();
                 query.valid_at = valid_at;
                 query.include_metadata = metadata_depth.is_some();
                 query.max_depth = metadata_depth.unwrap_or(8);
                 let mut value = Lens::concrete(query);
+                value.recorded = handle.recorded.clone();
                 value.emit(&name, &mut commands);
                 names.insert(name, value);
             }

@@ -80,7 +80,7 @@ fn unused_body_types_and_closed_interval_errors_are_checked() {
 fn instantiated_operators_emit_typed_plans_and_complete_sdk_artifacts() {
     let source = "function F revision \"1\" (graph input,interval span){window W from input during param span;return W;} apply Partial from F{interval span interval(time 0,time 10);} graph G{} apply Result from Partial{graph input G;}";
     let artifact = compile_artifacts(source).unwrap();
-    assert_eq!(artifact.program.version, "0.19.0");
+    assert_eq!(artifact.program.version, weave_contract::VERSION);
     assert!(
         serde_json::to_string(&artifact.program)
             .unwrap()
@@ -198,7 +198,7 @@ fn temporal_handler_recipe_is_inert_and_artifact_complete() {
     let artifacts = compile_artifacts(source).unwrap();
     assert!(artifacts.program.commands.is_empty());
     let handler = &artifacts.handler_templates["ClipEvent"];
-    assert_eq!(handler.protocol, "0.19.0");
+    assert_eq!(handler.protocol, weave_contract::VERSION);
     assert!(
         handler
             .recipe

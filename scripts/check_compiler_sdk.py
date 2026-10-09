@@ -51,6 +51,10 @@ cases=[('exact-integers',request('value Min -9223372036854775808; value Max 9223
 temporal_module='module "temporal" revision "1"; function During revision "1" (graph input, interval span){window W from input during param span;return W;}'
 temporal_entry=imp('t','temporal',temporal_module)+'use G graph "observed" revision "exact-r"; apply W from t::During {graph input G;interval span interval_open(time -9223372036854775808);}'
 cases.append(('temporal-pinned-module',request(temporal_entry,[unit('temporal',temporal_module)])))
+cases.append(('recorded-handle-pin',request('recorded_handle H graph "Facts" branch "main" known_at 9007199254740993; pin Historical from H at 7;')))
+cases.append(('recorded-checkpoint-view',request('recorded_handle H graph "Facts" branch "main" checkpoint "observation:exact" observer "urn:weave:replica:local"; view_template Historical revision "1" from H clock tick { at 7; }')))
+cases.append(('recorded-hidden-read-denial',request('function Hidden revision "1" (graph input) { recorded_handle H graph "Facts" branch "main" known_at 10; return input; }')))
+
 fixtures={name:root/'examples'/f'{name}.weave' for name in ['scalars','quantities','intervals','vectors','handlers','bytes_references','temporal']}
 fixtures['view-template']=root/'examples/view_services/template.weave'
 b='module "b" revision "1"; import a module "a" revision "1" sha256 "'+('0'*64)+'";'
@@ -109,8 +113,8 @@ with tempfile.TemporaryDirectory(prefix='weave-sdk-') as tmp:
   if name in fixtures:
    expected=json.loads(subprocess.check_output([str(a.compiler.resolve()),'artifacts',str(fixtures[name])]))
    result=json.loads(actual);assert result['ok'] and result['artifacts']==expected['artifacts'] and result['artifact_fingerprint']==expected['artifact_fingerprint'],name
-  if name in ['exact-integers','diamond-modules','near-4MiB-decoded-budget','large-output','all-octets']:assert json.loads(actual)['ok'],actual
-  expected_errors={'bad-reference':'E_REFERENCE_VALUE','bad-bytes':'E_BYTES_LITERAL','missing-module':'E_MODULE_MISSING','wrong-pin':'E_MODULE_DIGEST','cycle':'E_MODULE_CYCLE','invalid-utf8':'E_SDK_UTF8','invalid-json':'E_SDK_REQUEST','duplicate-fields':'E_SDK_REQUEST','decoded-bound':'E_SDK_BUDGET'}
+  if name in ['exact-integers','diamond-modules','near-4MiB-decoded-budget','large-output','all-octets','recorded-handle-pin','recorded-checkpoint-view']:assert json.loads(actual)['ok'],actual
+  expected_errors={'bad-reference':'E_REFERENCE_VALUE','bad-bytes':'E_BYTES_LITERAL','missing-module':'E_MODULE_MISSING','recorded-hidden-read-denial':'E_FUNCTION_EFFECT','wrong-pin':'E_MODULE_DIGEST','cycle':'E_MODULE_CYCLE','invalid-utf8':'E_SDK_UTF8','invalid-json':'E_SDK_REQUEST','duplicate-fields':'E_SDK_REQUEST','decoded-bound':'E_SDK_BUDGET'}
   if name in expected_errors:assert json.loads(actual)['error']['code']==expected_errors[name],actual
   if name in ['source-error','original-module-diagnostic']:assert json.loads(actual)['ok'] is False,actual
   reports.append({'name':name,'request_bytes':len(raw),'response_bytes':len(actual),'native_abi':timing})

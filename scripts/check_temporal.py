@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix='weave-temporal-') as directory:
   if ok:assert out.returncode==0,out.stderr.decode('utf-8');return json.loads(out.stdout)
   assert out.returncode!=0;return out.stderr.decode('utf-8')
  def bound(plan,outputs):return {c['name']:r['result'] for c,r in zip(plan['commands'],outputs) if c['op']=='bind'}
- plan=compile_source((root/'examples/temporal.weave').read_bytes().decode('utf-8'));assert plan['version']=='0.19.0'
+ plan=compile_source((root/'examples/temporal.weave').read_bytes().decode('utf-8'));assert plan['version']=='0.20.0'
  outputs=execute(plan);values=bound(plan,outputs)
  revisions={c['graph_id']:r['revision'] for c,r in zip(plan['commands'],outputs) if c['op']=='commit'}
  for result in outputs:

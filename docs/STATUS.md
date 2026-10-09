@@ -2,6 +2,31 @@
 
 As of 2026-09-20, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.
 
+## Replica-local recorded handles (protocol 0.20)
+
+`recorded_handle H graph "Facts" branch "main" known_at 20;` declares a lazy
+handle. `pin Old from H at 7;` reads once at that statement, with valid time7
+separate from local recorded time20. Exact replay uses `checkpoint "..." observer
+"..."`. Selectors are bounded read criteria; compiler source never installs an
+authoritative clock or observation. Compiled view templates retain selectors and
+their explicit fixed/tick valid-time policy. Pure functions and handler recipes
+cannot declare or perform hidden recorded reads.
+
+The canonical0.20 result manifest preserves selected observations through pure
+operators and empty results. The native owner validates actual registry identity,
+whole current authority, cache reuse and store19→20 preservation. Native source
+ranges, accepted-view cuts, retention and the broader full requirement gates remain
+mandatory follow-up. The existing0.19 valid-time and artifact behavior remains
+supported. The canonical 35-file contract is vendored exactly from engine
+`54890abad609a6e8b5e853e01cc99c78f55c1740`.
+The source workspace passes 195 tests, formatting and strict all-target lint.
+Twenty-eight arbitrary source SDK requests produce 560,498 identical bytes across
+safe Rust, native C ABI and zero-import WebAssembly, including recorded pins,
+recorded view templates and hidden-read denial. The native owner additionally
+executes twelve durable source processes, populated store19→20 migration and the
+complete retained scenario. These are scoped profiles, not full gate completion.
+See [contract 0.20](contract/v0.20/README.md).
+
 ## Bounded graph temporal values (protocol 0.19)
 
 Window and Sequence now lower from ordinary source/functions/pinned modules into
