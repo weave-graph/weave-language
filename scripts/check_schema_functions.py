@@ -9,6 +9,7 @@ import tempfile
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--engine", type=Path, required=True)
+parser.add_argument("--compiler", type=Path)
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 source = (root / "examples/schema_functions.weave").read_text()
@@ -17,7 +18,8 @@ with tempfile.TemporaryDirectory(prefix="weave-schema-functions-") as directory:
     def compile_source(text, name):
         path = work / f"{name}.weave"
         path.write_text(text)
-        return json.loads(subprocess.check_output(["cargo", "run", "--locked", "--quiet", "--", "plan", str(path)], cwd=root))
+        command = [str(args.compiler.resolve()), "plan", str(path)] if args.compiler else ["cargo", "run", "--locked", "--quiet", "--", "plan", str(path)]
+        return json.loads(subprocess.check_output(command, cwd=root))
     def run(plan, name, database=None):
         path = work / f"{name}.json"
         path.write_text(json.dumps(plan))
@@ -27,7 +29,7 @@ with tempfile.TemporaryDirectory(prefix="weave-schema-functions-") as directory:
         return json.loads(result.stdout)
     annotated = compile_source(source, "annotated")
     plain = compile_source(source.replace("graph input schema Infrastructure", "graph input").replace("returns graph schema Infrastructure", ""), "plain")
-    assert annotated["version"] == plain["version"] == "0.20.0"
+    assert annotated["version"] == plain["version"] == json.loads((Path(__file__).resolve().parents[1] / "vendor/manifest.json").read_text())["contract_version"]
     assert annotated["commands"] == plain["commands"], "Static annotations must not introduce reads or effects"
     actual = run(annotated, "annotated")
     oracle = run(plain, "plain")
