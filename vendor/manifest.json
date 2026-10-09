@@ -4,6 +4,7 @@
   "contract_version": "0.21.0",
   "files": {
     "Cargo.toml": "69bdf792ad34f0295db13e95d66e93fa43ccd7ec7ee9c9c84a4ae5f256a560ec",
+    "LICENSE": "9e24b3303156fce3c77e21da9d3e3b4cc864291987721d55286415a22ea5cfb7",
     "src/accepted_history.rs": "4944d31544a513d5ddb4dcb44d2c793cbc6d2beea3e2b01b990138d593f6e00f",
     "src/algebra.rs": "eccdd47e63640d72e80264c84e57d00963164c18f703eeb0369e35a6064a3fe4",
     "src/algebra_types.rs": "8800a434c46f65b6cf3cdc6273fe56fb2e0e9a712707402c1f711c50effbf849",
