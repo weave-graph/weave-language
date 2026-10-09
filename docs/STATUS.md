@@ -1,3 +1,20 @@
+## Accepted history and recorded/accepted ranges (protocol0.21)
+
+Source `accepted_history` binds one genuine local accepted-time or exact-decision
+read. Named `recorded_range` and `accepted_range` return authorized start states
+and every half-open history occurrence, with an independent optional fact-time
+filter. Exact observer and protected/source pins are preserved in ordinary graph
+results, even when empty. Pure functions and unused modules cannot hide these
+reads; range collections cannot be used as graph arguments.
+
+The development workspace passes198 tests. Actual SDK/SystemClock source history
+passes8 compiler and15 runtime processes; the complete offline/diagnostic/cluster/
+signed-peer/acceptance/effect trace passes214/12 with22 controlled deaths. Exact
+vendoring, source archives, portable parity and hosted results are verified against
+publication revisions separately. The complete36-file contract is vendored
+from engine `405973f6c8895bc2f8cf0a58e3ebe5a41418e668`. Full original requirements remain mandatory.
+See [history selection](HISTORY_SELECTION.md).
+
 # Verified status
 
 As of 2026-09-20, this is an experimental compiler foundation, not full Weave implementation and not full conformance to the recovered architecture white papers.

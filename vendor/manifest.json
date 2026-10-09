@@ -1,11 +1,11 @@
 {
   "source_repository": "https://github.com/weave-graph/weave-engine",
   "source_path": "crates/weave-contract",
-  "contract_version": "0.20.0",
+  "contract_version": "0.21.0",
   "files": {
-    "Cargo.toml": "75802803f08d2cac9808ff0df5da5be4d8c9f73e2108a36a9c29fdde1068d366",
-    "LICENSE": "9e24b3303156fce3c77e21da9d3e3b4cc864291987721d55286415a22ea5cfb7",
-    "src/algebra.rs": "f8fe3cb41041a5dc94d579f7ef22a51280a46b79b0675e5b6940b463dc3446d9",
+    "Cargo.toml": "69bdf792ad34f0295db13e95d66e93fa43ccd7ec7ee9c9c84a4ae5f256a560ec",
+    "src/accepted_history.rs": "4944d31544a513d5ddb4dcb44d2c793cbc6d2beea3e2b01b990138d593f6e00f",
+    "src/algebra.rs": "eccdd47e63640d72e80264c84e57d00963164c18f703eeb0369e35a6064a3fe4",
     "src/algebra_types.rs": "8800a434c46f65b6cf3cdc6273fe56fb2e0e9a712707402c1f711c50effbf849",
     "src/assertions.rs": "4217fb83951f48c88c58a7b41ce5a6123d2f73aef341f0b7f2c8ea1ff5d8c328",
     "src/carrier_algebra.rs": "4b6af2b3155b9dc48876854538882f4afd01533af2bd16d1ecd4ed61f40b5402",
@@ -17,18 +17,19 @@
     "src/counterpart.rs": "0b02c4d5e7a28828bc06b48a0fd6e36e2451f8002e408ebfe3a9efe6a1c2f674",
     "src/decimal.rs": "854e6374fea139c4ec9223196ff76cd59eb99ca81898c0487b6ea89cf00ed0c2",
     "src/geometry_types.rs": "bef5a89f80d21aa2bb4b8aec74d3da5ae96a5495200fe63e0f675c05a73bba00",
-    "src/handler_registration.rs": "8a099889f5be701fb53fc689603b96102753329fac6a764734cc8511e54c28b0",
+    "src/handler_registration.rs": "67e97177b4c55616766695f79b166a89efb7473dd745ae48c327402f98e1fccf",
     "src/host_types.rs": "f8151861155e53511594a66691f4fac5eb62b3cd59c4df518d527aaedb61db48",
-    "src/identity.rs": "438e06ac5ceaa93d77f7ae322c90544bafc69c945507cb6d4bbf927145f078b3",
+    "src/identity.rs": "04ecadaca1dc5c055cc7820ffffd92f047e3e0e20062139b7e6c11fc486eedca",
     "src/influence.rs": "cbc7e327e33a8b521e0683d0bfaa74978437ff4d7d017022e38619e6f5ec9368",
-    "src/lib.rs": "f1217834b2c2444c7f090ebc5fc86b90a31e16180e80bd66a8b6a00336e1f932",
+    "src/lib.rs": "090750d5e7f78c39b410ac2181f2d8f9752831bc819944f2243da84dda4602eb",
     "src/quantity.rs": "cb8aeea828450edb4b6dd6317c761df385b497b5cf5b38a9a9ae2ffedd60791c",
-    "src/recorded_history.rs": "4c9c6875eb6ddc22f2ee7f287c3e12b5d949179e9f0527013f07aafeeeafa894",
+    "src/recorded_history.rs": "21c19ddcb7ac8dc559487d86229d1fe994134ecb691021dacb04cc8a8e41d44e",
     "src/rules.rs": "6f7ce8f2129240823bfc35aee02c240725bbdee19945dc7bce1a5bf41570f817",
     "src/rules_types.rs": "0ebc0be4e190de8e4bf37198307ba6bcfc6873aa08db9d0630146d7b76952b26",
     "src/schema.rs": "9c225e1973921b9e05b2da5b50c6a94d2882ba1f6c1e282473a8b1b44b6cdab0",
-    "src/temporal.rs": "ddcf73c950bb23d2607cbc5c46ff959569ffb7b7107c184da470f836eec81eba",
-    "src/view_registration.rs": "1de3ddd6ecc4f1966d438b20d78ca52a0ce924866214b275bae35c5759ec6319",
+    "src/temporal.rs": "9a04f8f6e5d72cf92ea6a138f80311a5753a7395336bd65fe23ec78a58781de9",
+    "src/view_registration.rs": "46cde43096b050e1525558e8c084b724c0cd956e3df7aae1e8777ef9057df1fd",
+    "tests/accepted_history.rs": "d358b6e975353d9486cc36d177d485cb81f9aa7e8c9f98aa36b83db1c0892990",
     "tests/carrier_composition.rs": "b9105c94cb03d9e2a2e1ce23cb5d3d46e983c444271c8c8e2a7c1936dfad9ffe",
     "tests/carrier_profile.rs": "61abfa0c9b14920d3bdecf2cac997584d9c16bc7923ad0efe68864117779f9ee",
     "tests/context_axes.rs": "7fbaf4f64b5b6521c2424204ba18c4ff2de454dca749ca44130926cbc92ca8ba",
@@ -39,10 +40,10 @@
     "tests/recorded_history.rs": "c3562961a50b04735a5f65f656c921a6a9cc5b3060c1b23b40645fb3b0e46482",
     "tests/view_registration.rs": "eb13b515db85022f7a29d1e67e6689864591e98ba5ce13e1ae5b08c23829f7ca"
   },
-  "source_revision": "54890abad609a6e8b5e853e01cc99c78f55c1740",
+  "source_revision": "405973f6c8895bc2f8cf0a58e3ebe5a41418e668",
   "license_source_path": "LICENSE",
   "documentation": {
-    "path": "docs/contract/v0.20/README.md",
-    "sha256": "73071a396e1804bb7d17d53824614b07752fc28009334ad603524d75345e2b20"
+    "path": "docs/contract/v0.21/README.md",
+    "sha256": "dac5c400a16ad048d60869a812cc2c5c609ed9982b81f79f8d958f57f71c9e4e"
   }
 }

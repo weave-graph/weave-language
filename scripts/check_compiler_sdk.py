@@ -51,6 +51,10 @@ cases=[('exact-integers',request('value Min -9223372036854775808; value Max 9223
 temporal_module='module "temporal" revision "1"; function During revision "1" (graph input, interval span){window W from input during param span;return W;}'
 temporal_entry=imp('t','temporal',temporal_module)+'use G graph "observed" revision "exact-r"; apply W from t::During {graph input G;interval span interval_open(time -9223372036854775808);}'
 cases.append(('temporal-pinned-module',request(temporal_entry,[unit('temporal',temporal_module)])))
+cases.append(('accepted-local-history',request('accepted_history H view "team" accepted_at 9007199254740993 at 7;')))
+cases.append(('accepted-exact-decision',request('accepted_history H view "team" decision "decision:exact" observer "local";')))
+cases.append(('recorded-and-accepted-ranges',request('recorded_range R graph "Facts" branch "offline" observer "local" between 10 and 20 limit 100 at 7; accepted_range A view "team" observer "local" between 10 and 20 limit 100 at 8;')))
+cases.append(('accepted-hidden-read-denial',request('function Hidden revision "1" (graph input) { accepted_history H view "team" accepted_at 10; return input; }')))
 cases.append(('recorded-handle-pin',request('recorded_handle H graph "Facts" branch "main" known_at 9007199254740993; pin Historical from H at 7;')))
 cases.append(('recorded-checkpoint-view',request('recorded_handle H graph "Facts" branch "main" checkpoint "observation:exact" observer "urn:weave:replica:local"; view_template Historical revision "1" from H clock tick { at 7; }')))
 cases.append(('recorded-hidden-read-denial',request('function Hidden revision "1" (graph input) { recorded_handle H graph "Facts" branch "main" known_at 10; return input; }')))

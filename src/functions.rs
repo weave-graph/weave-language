@@ -181,6 +181,9 @@ pub(crate) fn declaration(statement: &Statement) -> (&str, Span) {
         | Statement::TypedContext {
             name, name_span, ..
         }
+        | Statement::HistoryRange {
+            name, name_span, ..
+        }
         | Statement::NativeService {
             name, name_span, ..
         }
@@ -668,6 +671,7 @@ impl Expander {
             Statement::Rules { .. }
                 | Statement::Schema { .. }
                 | Statement::ContextSchema { .. }
+                | Statement::HistoryRange { .. }
                 | Statement::RecordedHandle { .. }
                 | Statement::LiveHandle { .. }
                 | Statement::ViewTemplate { .. }
