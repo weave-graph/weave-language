@@ -1,5 +1,10 @@
 # Implementation workflow
 
+> **Historical plan: superseded for scheduling.** This is the original
+> white-paper gate gate graph (L0–L7). Scheduling now follows the engine's
+> proposed [phased roadmap](https://github.com/weave-graph/weave-engine/blob/main/docs/ROADMAP.md)
+> and this repository's [roadmap proposal](ROADMAP_PROPOSAL.md).
+
 This workflow covers the full [implementation plan](IMPLEMENTATION_PLAN.md). Its executable data representation is [workflow.json](workflow.json). A completed early gate never implies full product completion.
 
 ```mermaid

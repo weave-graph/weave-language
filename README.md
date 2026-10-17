@@ -1,10 +1,48 @@
 # Weave Language
 
-An experimental graph-native language for composing and explaining multidimensional temporal knowledge graphs, built with [Weave Engine](https://github.com/weave-graph/weave-engine).
+**An optional, AI-friendly language for writing queries and graph computations
+against [Weave Engine](https://github.com/weave-graph/weave-engine).**
 
-**Implemented foundation:** a bounded lexer/parser, basic graph validation, structured diagnostics, pinned graph references and graph-valued metadata, typed relation/time parameters and partial application, plus filter composition and reusable temporal path-join graph values compiled to engine protocol v0.21.0. Versioned scalar schemas, typed endpoints/spaces, source schema discovery, named metadata graph extraction and atomic cyclic local snapshots are also supported. Pure graph functions support graph/scalar/function parameters, immutable partial application and statically proven exact schema constraints on graph parameters and returns. Pure union, membership diff, projection and four-valued support at an explicit instant preserve pinned origins and alternative derivations. Explicit graph profiles separate structural relations from source claims; source-aware fingerprints and portable explanation helpers preserve attribution. Finite range-restricted rule modules provide bounded graph-valued recursive closure with temporal and alternative provenance. Exact default/pinned contexts scope claims, metadata paths and derived values without implicit broadcasts. Typed total context assignments now retain descriptor witnesses and restrictions through empty, derived and saved graph values. Graph-valued distance, explicit frame transforms, embedding distance, display projections and source-level explanations use authorized assertion operands. Declared directed counterpart bridges remain graph-valued evidence with exact source identity and distinct manifestation state. Pinned node influences preserve restrictions on isolated-node copies and derived scalar values. Exact Decimal and nominal Quantity schemas, canonical literals and pure literal arithmetic preserve precision without Float conversion. Ordinary scalar functions additionally specialize Boolean/Integer/String/Time/Decimal/Quantity parameters and results, with typed unary callbacks, bounded work and no runtime scalar effects. Explicit pinned accepted-identity resolution and bounded cluster navigation now return reusable graph values through native host services. Explicit live handles can be pinned into immutable per-execution values; live metadata and full-snapshot CAS replacement preserve fixed historical bindings. Explicit content-pinned pure source modules retain canonical namespaces, source manifests and per-file diagnostics without hidden reads. Exact accepted-decision reads and definition-matched current-view reads preserve native proof restrictions. Source templates produce separate, explicit host registration artifacts with source identities. Rust library and CLI; MIT licensed.
+Weave is an open-source temporal knowledge graph for hardware-heavy industries
+and the AI agents that work in them. It relates telemetry, hardware metadata and
+user metadata, tracks when every fact was true and when it was recorded, shares
+knowledge across people, teams and agents with permissions, and links embeddings
+to the graph for time-aware hybrid retrieval. The engine's [vision](https://github.com/weave-graph/weave-engine/blob/main/VISION.md)
+and [phased roadmap](https://github.com/weave-graph/weave-engine/blob/main/docs/ROADMAP.md)
+describe the goals.
 
-**Not yet complete:** general higher-order graph functions and joins, stratified absence and aggregation, general reactive/live-view syntax, permission syntax, general vector/quantity types and learned mappings, general overlapping clustering, distributed governance and mobile integration. The full roadmap is retained. Original white papers are recovered and [reconciled](docs/SOURCE_RECONCILIATION.md); the implementation remains a partial profile and the syntax is provisional.
+This repository holds a compiler. It turns `.weave` source into the engine's
+versioned JSON contract (Programs, view artifacts and handler artifacts). It never
+executes anything or grants authority. The engine validates and authorizes
+everything. **You do not need this language to use Weave.** The engine's
+JSON, Python and Rust interfaces work without it. The language is for people and
+agents who want a compact, checkable way to express temporal joins, time travel,
+graph functions, rules and explanations.
+
+## Who it is for
+
+- Engineers who want to describe relationships across hardware, telemetry
+  references and organizational data concisely, with compile-time checks.
+- AI agents that generate queries. The compiler returns machine-readable
+  diagnostics, schema discovery (`describe`) and a bounded native/WASM SDK.
+
+## Status
+
+The compiler is experimental, with 198 tests passing, and it targets engine
+contract **0.21.0**. The syntax is provisional.
+
+| Works today | Not yet |
+|---|---|
+| Graphs, nodes, first-class edges, graph-valued metadata, pinned and live references | Permission syntax (sharing is engine-side) |
+| Valid-time filters, `Window`/`Sequence`, `diff`, recorded and accepted history ("as known at") | k-hop traversal and change-set queries (waiting on engine Phase A) |
+| Pure graph functions, joins, union, projection, four-valued support, bounded rules, `explain` | Vector search and hybrid retrieval operators (waiting on engine Phase A) |
+| Typed contexts, exact Decimal/Quantity, typed vectors, intervals, bytes, typed refs | Agent identity and agent-facing workflows (engine Phase B) |
+| `check`, `plan`, `ast`, `describe`, `fmt`, view and handler artifacts, native/C/WASM compiler SDK | Distributed and offline governance (deferred) |
+
+See [docs/STATUS.md](docs/STATUS.md) for details and
+[docs/ROADMAP_PROPOSAL.md](docs/ROADMAP_PROPOSAL.md) for the proposed plan.
+
+## Quickstart
 
 ```sh
 cargo test --locked
@@ -12,37 +50,43 @@ cargo run -- check examples/fleet.weave
 cargo run -- plan examples/fleet.weave > fleet.plan.json
 ```
 
-The emitted JSON executes through the engine's trusted host interface. Graph declarations create new graph snapshots, so use a fresh database for the example. Input source cannot grant runtime authority. See [syntax and execution](docs/SYNTAX.md).
+A small example (from [examples/join.weave](examples/join.weave)) derives which
+devices were exposed to an advisory, and when:
 
-- [Implementation plan and requirement matrix](docs/IMPLEMENTATION_PLAN.md)
-- [Workflow and dependency graph](docs/WORKFLOW.md)
-- [Machine-readable workflow](docs/workflow.json)
-- [Verified status and remaining gates](docs/STATUS.md)
-- [Acceptance gaps](docs/ACCEPTANCE_GAPS.md)
-- [Contributing](CONTRIBUTING.md) and [security policy](SECURITY.md)
-- [Protocol 0.15 pairing and selectors](docs/PROTOCOL_015.md)
-- [Pinned source modules](docs/MODULES.md)
-- [Ordinary scalar functions and `weave values`](docs/SCALAR_FUNCTIONS.md)
-- [Accepted graphs and explicit view artifacts](docs/VIEW_ARTIFACTS.md)
-- [Compiled event-handler artifacts](docs/HANDLER_ARTIFACTS.md)
-- [Shared protocol](docs/contract/v0.21/README.md)
+```weave
+graph Operations {
+  node "device" entity "device-17" space "operational";
+  node "model-local" entity "model-4" space "catalog";
+  edge "uses-model" from "device" to "model-local" relation "model_of" valid 100 until 200;
+}
+graph Advisories {
+  node "model-vendor" entity "model-4" space "catalog";
+  node "issue" entity "issue-31" space "advisory";
+  edge "affected-model" from "model-vendor" to "issue" relation "affected_by" valid 150 until 250;
+}
+lens ModelOf from Operations {match relation "model_of";}
+lens AffectedBy from Advisories {match relation "affected_by";}
+// Joins on stable entity+space identity; the result is valid for [150,200).
+join Exposure from ModelOf to AffectedBy relation "exposed_to";
+```
 
-[History selection](docs/HISTORY_SELECTION.md) includes lazy recorded handles, genuine accepted-time/decision reads and named recorded/accepted range collections, with separate valid time and retained exact witnesses.
+The emitted JSON runs through the engine's trusted host, for example
+`weave-engine run --db fleet.sqlite --actor demo --write Fleet fleet.plan.json`.
+Graph declarations create new snapshots, so use a fresh database. Source code
+cannot grant runtime authority. See [syntax and execution](docs/SYNTAX.md).
 
-The contract is vendored to keep clean checkouts independently buildable; [its manifest](vendor/manifest.json) records exact file hashes. Public source-paper recovery and conformance are separate gates from this executable foundation.
+To install from a checkout, run `cargo install --locked --path .`. Registry
+publication is disabled; see [release readiness](docs/RELEASE_READINESS.md).
 
-Build or install from a Git checkout/source archive with `cargo install --locked --path .`. Registry publication is disabled until an optional coordinated crate release; this does not block publishing the open-source repositories. See [release readiness](docs/RELEASE_READINESS.md).
+## Documentation and development
 
-The [source formatter](docs/FORMATTER.md) preserves tokens and comments: `weave fmt FILE.weave` prints formatted source, `--check` checks it and explicit `--write` updates one regular file. Formatting a content-pinned module changes its byte digest and requires explicit relinking.
+- [Documentation index](docs/README.md): guides by feature, references and
+  history.
+- [AGENTS.md](AGENTS.md): architecture, commands, conventions and the
+  definition of done, for AI agents and contributors.
+- [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
-[Compiled handlers](docs/HANDLER_ARTIFACTS.md) seal pure event recipes separately from Programs. `weave handler-plan examples/handlers.weave --handler Warning` emits an inert artifact; the trusted host explicitly installs its subscription/output mapping and prepares/completes pinned event occurrences.
+The engine's `weave-contract` crate is vendored in `vendor/` with a hash
+[manifest](vendor/manifest.json), so clean checkouts build on their own.
 
-Bounded graph [Window and Sequence](docs/TEMPORAL_QUERIES.md) operators now preserve separate occurrence intervals, direct metadata, exact pins and conditional proofs.
-
-Exact source [Interval values](docs/INTERVALS.md) support checked half-open temporal predicates and pure function specialization without changing the runtime protocol.
-
-[Typed source vectors](docs/TYPED_VECTORS.md) retain full physical/embedding descriptors through pure functions and lower to existing native geometry payloads.
-
-The [byte-oriented compiler SDK](docs/COMPILER_SDK.md) accepts arbitrary bounded source and exact module units on native and zero-import WASM. It returns complete artifacts and diagnostics without host effects or JavaScript numeric round-trips.
-
-[Bytes and exact typed references](docs/BYTES_AND_REFERENCES.md) pass through pure scalar functions and literal metadata while preserving kind/revision and granting no runtime access.
+MIT licensed.

@@ -1,5 +1,7 @@
 # Native and WebAssembly compiler SDK
 
+> Written for protocol 0.18. Version statements below describe that release; the compiler now targets 0.21.0 ([status](STATUS.md)).
+
 The SDK compiles arbitrary bounded source into complete artifacts without I/O.
 It uses the same language compiler, exact module linker and protocol 0.18 as the
 CLI. It never executes a Program, installs a view/handler, accesses a store, fetches

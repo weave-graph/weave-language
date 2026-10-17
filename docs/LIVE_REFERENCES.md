@@ -1,5 +1,7 @@
 # Live references and explicit snapshot replacement (protocol 0.14)
 
+> Written for protocol 0.14. Version statements below describe that release; the compiler now targets 0.21.0 ([status](STATUS.md)).
+
 A live handle selects a branch head when evaluated. A pinned graph value records the exact snapshots used for one evaluation. This source slice uses the existing 0.14 Query, Bind, LiveGraph metadata and compare-and-swap Commit operations; it adds no runtime authority or protocol variant.
 
 ```weave

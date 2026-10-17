@@ -1,5 +1,10 @@
 # Weave language implementation plan
 
+> **Historical plan: superseded for scheduling.** This is the original
+> white-paper gate plan (L0–L7, L01–L30). Scheduling now follows the engine's
+> proposed [phased roadmap](https://github.com/weave-graph/weave-engine/blob/main/docs/ROADMAP.md)
+> and this repository's [roadmap proposal](ROADMAP_PROPOSAL.md). The requirement IDs remain valid references.
+
 Status: proposed execution plan, 2026-09-19. No implementation is claimed by this document.
 
 ## Evidence and scope
@@ -15,6 +20,8 @@ The user's later clarification governs the design: a dimension is a space in whi
 The language project owns grammar, typed AST, diagnostics, schema and module checking, pure graph-producing computation, rule semantics, plan lowering, tooling, and the executable language conformance suite. The engine owns persistence, commit recording time, atomic effects and events, capabilities, subscriptions, adapters, distribution, materialization, clustering execution, and device lifecycle. Optional LSP/editor enhancements are proposed conveniences and do not block completion of the user-required language/runtime semantics. Both projects own the versioned protocol and cross-project conformance fixtures; neither may weaken the other's semantics through a private shortcut.
 
 Use a Rust workspace because the semantic core can compile to native CLI and WebAssembly while avoiding an unrelated mobile implementation. Proposed crates:
+
+> The crates below were the proposed split. As of 2026-10 the compiler is one package (`src/`) plus `crates/weave-compiler-sdk`; there is no LSP. See [AGENTS.md](../AGENTS.md) for the actual layout.
 
 - `weave-syntax`: tokens, spans, parser, lossless syntax where useful, and formatter.
 - `weave-types`: schema/type/context/effect checking and stable diagnostic codes.
@@ -67,7 +74,7 @@ Class **U** means an explicit recovered user requirement; **P** means a proposed
 
 ## Shared engine contract proposal
 
-The authority should be `weave-engine/docs/contract/v0.1` with a version/hash-pinned vendored copy in this repository, plus bidirectional fixture tests. A runtime-independent shared crate may later be published only when both repositories can independently build from its tagged source. During bootstrap, a JSON schema plus normative semantics avoids a circular dependency.
+(Adopted: the engine owns `crates/weave-contract`; the current version is 0.21.0, vendored in `vendor/`.) The authority should be `weave-engine/docs/contract/v0.1` with a version/hash-pinned vendored copy in this repository, plus bidirectional fixture tests. A runtime-independent shared crate may later be published only when both repositories can independently build from its tagged source. During bootstrap, a JSON schema plus normative semantics avoids a circular dependency.
 
 The protocol must define:
 

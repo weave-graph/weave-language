@@ -1,5 +1,7 @@
 # Protocol 0.15 pairing and metadata selectors
 
+> Written for protocol 0.15. Version statements below describe that release; the compiler now targets 0.21.0 ([status](STATUS.md)).
+
 The compiler now emits protocol `0.15.0`, using the exact 24-file contract distribution from engine commit `506729278cf3ee42a30eb9ac71336480e386fe89` (including its MIT license). The manifest records every byte hash and the versioned contract documentation. Pure modules, exact schema constraints, live handles and all existing source operators remain available.
 
 The runtime retains whole-graph assertion/node influences, including when a result is empty. Per-derivation node premises preserve alternative proofs; global node influences remain additional conjunctions. Generated records retain their constraints when copied or saved. References constrain visibility; they do not grant authority. Source bootstrap declarations emit no influence/proof-authority fields, and ordinary properties named `influence`, `derived_nodes` or `node_premises` remain data. The source language does not add governance acceptance, release or permission-installation syntax in this pairing.
