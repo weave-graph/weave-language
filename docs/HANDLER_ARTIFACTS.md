@@ -1,5 +1,7 @@
 # Compiled event handlers
 
+> Written for protocol 0.18. Version statements below describe that release; the compiler now targets 0.21.0 ([status](STATUS.md)).
+
 The compiler implements inert protocol 0.18 handler artifacts. Actual compiler-to-native install/prepare/complete acceptance has passed locally; paired public CI and final release evidence are tracked in [status](STATUS.md).
 
 A handler names a pure graph function and an explicit event subscription. Compilation produces a sealed recipe and does not subscribe, read a store, install an adapter, grant permissions, or run an external effect.

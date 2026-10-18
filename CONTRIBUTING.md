@@ -1,6 +1,6 @@
 # Contributing
 
-Weave Language is an experimental implementation of a broader proposed design. Start with [verified status](docs/STATUS.md), [acceptance gaps](docs/ACCEPTANCE_GAPS.md), [syntax](docs/SYNTAX.md), and the [implementation workflow](docs/WORKFLOW.md). Original white-paper reconciliation is recorded in docs/SOURCE_RECONCILIATION.md; illustrative grammar and exploratory implementation choices are not ratified specifications.
+Weave Language is an optional, experimental front end for Weave Engine. Start with [AGENTS.md](AGENTS.md) (architecture, commands, conventions, definition of done), [current status](docs/STATUS.md), the [roadmap proposal](docs/ROADMAP_PROPOSAL.md) and [syntax](docs/SYNTAX.md). Original white-paper reconciliation is recorded in docs/SOURCE_RECONCILIATION.md; illustrative grammar and exploratory implementation choices are not ratified specifications.
 
 Before a change, identify the requirement IDs, observable acceptance behavior and affected protocol version. Keep semantic changes separate from maintenance. Compiler changes that affect the runtime contract need coordinated engine review and fixtures in both projects. Do not hand-edit vendored protocol code: import the complete authoritative engine crate, preserve its MIT license, update `vendor/manifest.json`, and run its verifier.
 
@@ -23,6 +23,8 @@ The separately built engine can run the cross-project fixture:
 ```sh
 python3 scripts/check_composed.py --engine /path/to/weave-engine
 ```
+
+**Docs ship with code.** A PR that changes behavior updates the affected docs and `docs/STATUS.md` in the same PR. A PR without doc changes must state `[no-docs]` and a reason; CI enforces this.
 
 Add tests for changed observable behavior, including relevant failure cases. Document commands actually run and their outcomes. Preserve explicit coverage, authority, uncertainty, provenance and valid/system-time distinctions. A compiling stub or skipped unsupported case does not close a requirement.
 

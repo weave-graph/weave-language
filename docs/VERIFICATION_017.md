@@ -1,5 +1,7 @@
 # Protocol0.17 compiler pairing
 
+> Written for protocol 0.17. Version statements below describe that release; the compiler now targets 0.21.0 ([status](STATUS.md)).
+
 Compiler implementation812d4a1 vendors the exact26-file canonical contract at engine1eb33c089a9ae493df0c4e508232b2eb5426e64c. New optional record fields are empty on authored source records; the portable operators retain restrictions on computed graph values. No new handler syntax or executable reactor is included.
 
 The source owner passed142 tests, strict lint/formatting, executed native/WebAssembly output parity (6,091 bytes),22 historical standalone artifact comparisons excluding declared protocol/fingerprint changes, and actual native view/module/schema/live/typed-context/geometry/scalar/cyclic metadata workflows. An exact source archive verified contract/paper hashes and built with locked offline dependencies in the existing cache; its temporary files were removed.

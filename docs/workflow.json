@@ -308,5 +308,7 @@
       ],
       "provisional": true
     }
-  ]
+  ],
+  "status": "superseded_for_scheduling",
+  "superseded_by": "docs/ROADMAP_PROPOSAL.md (follows weave-engine docs/ROADMAP.md)"
 }
