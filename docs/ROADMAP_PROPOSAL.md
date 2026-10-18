@@ -1,6 +1,6 @@
 # Proposed GitHub issue changes (language)
 
-Status: **draft for owner approval. Nothing below has been applied on GitHub.**
+Status: **approved by the owner on 2026-10-18.**
 It follows the engine's proposed
 [phased roadmap](https://github.com/weave-graph/weave-engine/blob/main/docs/ROADMAP.md)
 and [vision](https://github.com/weave-graph/weave-engine/blob/main/VISION.md). The
@@ -17,9 +17,10 @@ every goal without it. It earns its place in two ways:
 - as an agent-friendly query surface, through structured diagnostics,
   `describe` and a bounded SDK.
 
-**Recommendation:** until engine epic A1 (core contract v1) lands, limit
-language work to contract synchronization and maintenance. Then build LA1
-against the stabilized Phase A operators. The engine's JSON and Python
+**Sequencing (approved):** until engine epic A1 (core contract v1) lands,
+language work is limited to contract synchronization and maintenance. **LA1
+starts only after engine A1 lands**, and builds against the Phase A operators
+as they stabilize. The engine's JSON and Python
 interfaces remain the Phase A critical path.
 
 ## How to apply, once approved
@@ -125,7 +126,8 @@ change sets, hybrid retrieval and explanation.
 - [ ] Native/WASM parity covers the new constructs.
 - [ ] SYNTAX.md and examples cover each construct.
 
-**Depends on:** engine A2–A4 contracts and LA0.
+**Starts after:** engine A1 has landed. **Depends on:** engine A2–A4 contracts
+and LA0.
 
 ---
 
@@ -140,8 +142,9 @@ can express sharing intent that the engine enforces.
 - Syntax for declaring readers or groups on asserted facts. It lowers to the B1
   principal model and never grants authority, because the engine checks
   everything.
-- A compile tool exposed through the engine's MCP server (B4): source in, plan
-  and diagnostics out, with no host effects.
+- A compile tool exposed through the engine's MCP server (B4, which extends the
+  A7 read-only preview): source in, plan and diagnostics out, with no host
+  effects.
 - Data/code boundary: compiling untrusted text cannot produce effects beyond
   the declared plan.
 

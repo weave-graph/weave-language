@@ -40,7 +40,7 @@ contract **0.21.0**. The syntax is provisional.
 | `check`, `plan`, `ast`, `describe`, `fmt`, view and handler artifacts, native/C/WASM compiler SDK | Distributed and offline governance (deferred) |
 
 See [docs/STATUS.md](docs/STATUS.md) for details and
-[docs/ROADMAP_PROPOSAL.md](docs/ROADMAP_PROPOSAL.md) for the proposed plan.
+[docs/ROADMAP_PROPOSAL.md](docs/ROADMAP_PROPOSAL.md) for the approved plan.
 
 ## Quickstart
 

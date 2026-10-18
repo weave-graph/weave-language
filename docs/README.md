@@ -12,7 +12,7 @@ behavior are in [STATUS.md](STATUS.md).
 |---|---|
 | [Weave vision](https://github.com/weave-graph/weave-engine/blob/main/VISION.md) | The three goals of Weave and the role of this language |
 | [Engine roadmap](https://github.com/weave-graph/weave-engine/blob/main/docs/ROADMAP.md) | Phases A, B and C. The language roadmap follows it |
-| [Language roadmap proposal](ROADMAP_PROPOSAL.md) | Proposed changes to the L0–L7 epics (not yet applied) |
+| [Language roadmap proposal](ROADMAP_PROPOSAL.md) | Approved changes to the L0–L7 epics |
 | [Status](STATUS.md) | What works today, and its limits |
 | [AGENTS.md](../AGENTS.md) | Architecture, commands, conventions, definition of done |
 

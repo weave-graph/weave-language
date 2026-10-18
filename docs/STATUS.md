@@ -38,8 +38,8 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
 
 - k-hop traversal, change-set ("what changed between K1 and K2") queries and
   vector search or hybrid retrieval. These wait for the engine Phase A operators
-  (A3, A4) and are proposed as LA1.
-- Permission syntax and agent-facing workflows (Phase B, proposed LB1). All
+  (A3, A4) and are planned as LA1, which starts after engine A1.
+- Permission syntax and agent-facing workflows (Phase B, planned as LB1). All
   source-created records are public; restricted fixtures are built through the
   protocol directly.
 - Mixed graph-to-scalar functions, general named joins with explicit
