@@ -13,6 +13,15 @@ p.add_argument('--compiler', type=Path, required=True)
 p.add_argument('--host', type=Path, required=True)
 a = p.parse_args()
 compiler, host_binary = str(a.compiler.resolve()), str(a.host.resolve())
+# The native host's read API returns no `fact_provenance`; a compiled 0.22.0+
+# plan's result also cites engine-recorded provenance for each source fact.
+def same_as_host(plan_result, host_result, cites_facts=False):
+    plan_result = dict(plan_result)
+    if 'fact_provenance' not in host_result and tuple(map(int, plan_result['version'].split('.'))) >= (0, 22, 0):
+        facts = plan_result.pop('fact_provenance', [])
+        assert facts or not cites_facts, plan_result
+        assert all(e['provenance'].get('writer') and isinstance(e['provenance'].get('recorded_at_ms'), int) for e in facts), facts
+    return plan_result == host_result
 with tempfile.TemporaryDirectory(prefix='weave-view-services-') as d:
     work = Path(d)
     db = work / 'store.db'
@@ -42,7 +51,7 @@ with tempfile.TemporaryDirectory(prefix='weave-view-services-') as d:
     accepted_source = f'accepted Approved view "team" decision "{decision}";'
     accepted_plan = compile_source(accepted_source)
     accepted = run(accepted_plan)[0]['result']
-    assert accepted == host('accepted', 'team', decision)
+    assert same_as_host(accepted, host('accepted', 'team', decision), cites_facts=True)
     assert len(accepted['graph']['edges']) == 2
     assert accepted['graph']['influence']['assertions'], 'acceptance influence required'
     empty_source = f'accepted EmptyResult view "empty" decision "{seed["empty"]["decision_id"]}";'
@@ -74,8 +83,8 @@ with tempfile.TemporaryDirectory(prefix='weave-view-services-') as d:
     current_source = f'view_current Cached view "fleet-active" definition "{digest}" tick 5;'
     current_plan = compile_source(current_source)
     before_events = host('events')
-    assert run(current_plan)[0]['result'] == snapshot['result']
-    assert run(current_plan)[0]['result'] == host('current','fleet-active',digest,5)['result']
+    assert same_as_host(run(current_plan)[0]['result'], snapshot['result'])
+    assert same_as_host(run(current_plan)[0]['result'], host('current','fleet-active',digest,5)['result'])
     assert host('events') == before_events
     assert host('current','fleet-active',digest,5)['generation'] == snapshot['generation']
     assert snapshot['result']['source_revisions'] == template['source_revisions']
@@ -90,7 +99,7 @@ with tempfile.TemporaryDirectory(prefix='weave-view-services-') as d:
     run(atomic, error='E_FRESHNESS')
     assert host('head','Marker')['revision'] is None
     refreshed = host('refresh','fleet-active',5)
-    assert run(current_plan)[0]['result'] == refreshed['result']
+    assert same_as_host(run(current_plan)[0]['result'], refreshed['result'])
     assert refreshed['result']['source_revisions'] == template['source_revisions']
     assert refreshed['result']['graph']['nodes'][0]['properties']['turn'] == 1
     # Historical occurrence keeps the old source even after the host accepts a new one.
@@ -100,7 +109,7 @@ with tempfile.TemporaryDirectory(prefix='weave-view-services-') as d:
     run(expired_time, error='E_FRESHNESS')
     expired_result = host('refresh','fleet-active',10)
     assert expired_result['result']['graph']['edges'] == []
-    assert run(expired_time)[0]['result'] == expired_result['result']
+    assert same_as_host(run(expired_time)[0]['result'], expired_result['result'])
     assert expired_result['result']['source_revisions'] == template['source_revisions']
 
     # Pure composition and persisted copies keep actual acceptance proof obligations.

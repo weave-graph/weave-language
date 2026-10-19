@@ -13,6 +13,14 @@ parser.add_argument("--compiler", type=Path)
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 source = (root / "examples/schema_functions.weave").read_text()
+# Results of 0.22.0+ programs cite engine-recorded fact provenance. Two
+# independent stores record different times, so equivalence ignores only
+# `recorded_at_ms`, after checking that the engine recorded one.
+def without_recorded_time(output):
+    if isinstance(output.get("result"), dict):
+        for entry in output["result"].get("fact_provenance", []):
+            assert isinstance(entry["provenance"].pop("recorded_at_ms"), int), entry
+    return output
 with tempfile.TemporaryDirectory(prefix="weave-schema-functions-") as directory:
     work = Path(directory)
     def compile_source(text, name):
@@ -39,7 +47,7 @@ with tempfile.TemporaryDirectory(prefix="weave-schema-functions-") as directory:
         if a["kind"] == "queried":
             a["result"].pop("source_revisions", None)
             b["result"].pop("source_revisions", None)
-        assert a == b
+        assert without_recorded_time(a) == without_recorded_time(b)
     schema = annotated["commands"][0]["commits"][0]["data"]["schema"]
     reference = values["Reference"]
     for name in ["HigherOrder", "Direct", "ThroughCapture"]:

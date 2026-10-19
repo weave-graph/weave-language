@@ -12,6 +12,14 @@ args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 fixture = root / "examples/modules"
 engine = str(args.engine.resolve())
+# Results of 0.22.0+ programs cite engine-recorded fact provenance. Two
+# independent stores record different times, so equivalence ignores only
+# `recorded_at_ms`, after checking that the engine recorded one.
+def without_recorded_time(output):
+    if isinstance(output.get("result"), dict):
+        for entry in output["result"].get("fact_provenance", []):
+            assert isinstance(entry["provenance"].pop("recorded_at_ms"), int), entry
+    return output
 with tempfile.TemporaryDirectory(prefix="weave-modules-") as directory:
     work = Path(directory)
     def compile_file(path, mapped=False):
@@ -45,7 +53,7 @@ with tempfile.TemporaryDirectory(prefix="weave-modules-") as directory:
         if left["kind"] == "queried":
             left["result"].pop("source_revisions", None)
             right["result"].pop("source_revisions", None)
-        assert left == right
+        assert without_recorded_time(left) == without_recorded_time(right)
     empty = actual[-1]["result"]["graph"]
     assert empty["nodes"] == empty["edges"] == []
     assert empty["schema"]["id"] == "module:example.core:schema:Network"

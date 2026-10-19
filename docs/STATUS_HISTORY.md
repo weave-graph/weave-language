@@ -1,8 +1,24 @@
 # Status history (verified checkpoint ledger)
 
 > **Historical record.** Newest-first ledger of verified checkpoints through
-> protocol 0.21, moved from `STATUS.md` on 2026-10-17. Each entry is accurate for
+> protocol 0.22, moved from `STATUS.md` on 2026-10-17. Each entry is accurate for
 > its stated protocol version. Current status: [STATUS.md](STATUS.md).
+
+## Fact provenance, node valid time and fact writes (protocol 0.22.0), 2026-10-19
+
+Re-vendored the complete 82-file contract crate from engine
+`61eccfb90e5a9e1ac7fa04bccfb0d9c3754ff337` (A2 part 2,
+[weave-engine#3](https://github.com/weave-graph/weave-engine/issues/3)). The
+compiler now labels plans and artifacts 0.22.0 without emitting any 0.22-only
+field. `describe --contract` classifies the `write` command as core v1. Local
+results: `verify_contract.py` passes for the exact 82-file set; the vendored
+harness passes 8 tests over 20 positive and 19 negative fixtures;
+`cargo test --workspace --locked --all-targets` passes 203 tests. fmt, Clippy
+with `-D warnings`, the SDK and interval oracles, the wasm32 check and
+native/WASM scalar and SDK parity pass. Against engine `61eccfb`, every
+language script in the engine's `compiler-runtime` job passes, and so do the
+engine's root and compiler-host SDK scripts run with this compiler. See
+[CORE_V1.md](CORE_V1.md#protocol-0220-engine-a2).
 
 ## Core contract v1 (protocol 0.21.0, profile core-v1), 2026-10-19
 

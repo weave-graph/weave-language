@@ -1,6 +1,6 @@
 # Public project and acceptance tracking
 
-> Written for protocol 0.3. Version statements below describe that release; the compiler now targets 0.21.0 ([status](STATUS.md)).
+> Written for protocol 0.3. Version statements below describe that release; the compiler now targets 0.22.0 ([status](STATUS.md)).
 
 The experimental source repository is public under the MIT license: [weave-graph/weave-language](https://github.com/weave-graph/weave-language). It is not a claim of full white-paper conformance.
 

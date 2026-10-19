@@ -969,6 +969,7 @@ fn lower_artifacts(
                                 ));
                             }
                             data.structural_edges.push(StructuralEdge {
+                                provenance: None,
                                 id,
                                 type_id,
                                 from,
@@ -1020,6 +1021,7 @@ fn lower_artifacts(
                                 ));
                             }
                             data.assertions.push(Assertion {
+                                provenance: None,
                                 id,
                                 edge_id,
                                 source,
@@ -1066,6 +1068,7 @@ fn lower_artifacts(
                                 ));
                             }
                             data.attachments.push(MetadataAttachment {
+                                provenance: None,
                                 derivations: Vec::new(),
                                 derived_snapshots: Vec::new(),
                                 derived_from: Vec::new(),
@@ -1091,6 +1094,8 @@ fn lower_artifacts(
                             metadata,
                             properties,
                         } => data.nodes.push(Node {
+                            provenance: None,
+                            valid_time: None,
                             derivations: Vec::new(),
                             derived_snapshots: Vec::new(),
                             derived_nodes: Vec::new(),
@@ -1148,6 +1153,7 @@ fn lower_artifacts(
                                 ));
                             }
                             data.edges.push(Edge {
+                                provenance: None,
                                 structural_ref: None,
                                 assertion_properties: BTreeMap::new(),
                                 assertion_source: None,
