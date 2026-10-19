@@ -15,6 +15,17 @@ p.add_argument('--compiler', type=Path, required=True)
 p.add_argument('--host', type=Path, required=True)
 p.add_argument('--work-dir', type=Path, help='retain diagnostic files in a new empty directory')
 a = p.parse_args()
+# Version-gated graph-data carrier fields (engine `Engine::run` profile checks):
+# (protocol that introduced the field, record collection, field).
+CARRIER_FIELD_PROTOCOLS = [
+    ('0.17.0', 'nodes', 'derived_snapshots'),
+    ('0.17.0', 'edges', 'derived_snapshots'),
+    ('0.17.0', 'assertions', 'derived_snapshots'),
+    ('0.17.0', 'attachments', 'derived_snapshots'),
+    ('0.22.0', 'nodes', 'valid_time'),
+    *[('0.22.0', collection, 'provenance')
+      for collection in ['nodes', 'edges', 'structural_edges', 'assertions', 'attachments']],
+]
 if a.work_dir:
     a.work_dir.mkdir(exist_ok=False)
 compiler, host_binary = str(a.compiler.resolve()), str(a.host.resolve())
@@ -121,11 +132,34 @@ with (nullcontext(str(a.work_dir)) if a.work_dir else tempfile.TemporaryDirector
     copy_plan = compile_source('graph Marker {}')
     copy_plan['commands'][0]['data'] = detached
     # A historical compiler may install its unchanged artifact, but cannot label
-    # newly returned carrier fields as an old wire profile. The trusted copy uses
-    # the current result's declared protocol after verifying old-profile rejection.
-    if copy_plan['version'] != warning['version']:
+    # carrier fields newer than its protocol as an old wire profile. The engine
+    # gates by field, not by version mismatch: copied data is rejected with
+    # E_VERSION only when it carries a field newer than its declared protocol.
+    def protocol(version):
+        return tuple(int(part) for part in version.split('.'))
+    def required_protocol(data):
+        needed = (0, 0, 0)
+        for introduced, collection, field in CARRIER_FIELD_PROTOCOLS:
+            if any(record.get(field) for record in data.get(collection, [])):
+                needed = max(needed, protocol(introduced))
+        return needed
+    compiler_version, result_version = copy_plan['version'], warning['version']
+    assert protocol(result_version) >= protocol(compiler_version), (compiler_version, result_version)
+    if required_protocol(detached) > protocol(compiler_version):
         host('run', program=copy_plan, error='E_VERSION')
-    copy_plan['version'] = warning['version']
+        copy_plan['version'] = result_version
+    # Negative cases that hold whatever the engine/compiler protocol pair:
+    # a known-gated field under an older label, and an unsupported version.
+    assert required_protocol(detached) >= (0, 17, 0), 'copied data must carry derived_snapshots'
+    host('run', program={**copy_plan, 'version': '0.16.0'}, error='E_VERSION')
+    host('run', program={**copy_plan, 'version': '999.0.0'}, error='E_VERSION')
+    if protocol(result_version) >= (0, 22, 0) and protocol(compiler_version) < (0, 22, 0):
+        # A field newer than the compiler's protocol, under the compiler's label.
+        newer = copy.deepcopy(copy_plan)
+        newer['version'] = compiler_version
+        newer['commands'][0]['data']['nodes'][0]['valid_time'] = {'start': 0, 'end': 100}
+        assert required_protocol(newer['commands'][0]['data']) == (0, 22, 0)
+        host('run', program=newer, error='E_VERSION')
     host('run', program=copy_plan)
     detached_hidden = result('use W graph "Marker";', outsider=True)
     assert not detached_hidden['graph']['nodes'] and not detached_hidden['graph']['edges'] and not detached_hidden['graph'].get('attachments', [])
