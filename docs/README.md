@@ -1,6 +1,6 @@
 # Weave Language documentation
 
-The compiler targets engine contract **0.21.0** and its core v1 profile
+The compiler targets engine contract **0.22.0** and its core v1 profile
 ([CORE_V1.md](CORE_V1.md)). Many feature documents were
 written when the feature was introduced and name the protocol version of that
 release ("protocol 0.18", "0.15 candidate" and so on). Read those numbers as
@@ -38,8 +38,8 @@ behavior are in [STATUS.md](STATUS.md).
 | [History selection](HISTORY_SELECTION.md) | Recorded handles, accepted history, recorded/accepted ranges | 0.20–0.21 |
 | [Native services](NATIVE_SERVICES.md) | Cluster navigation and other native service bindings | 0.13 |
 | [Formatter](FORMATTER.md) | `weave fmt` | — |
-| [Core contract v1](CORE_V1.md) | 0.21 → v1 migration note, feature classes, `describe --contract` | 0.21 (core-v1) |
-| [Shared protocol](contract/v0.21/README.md) | The current contract notes. Earlier versions are in `contract/v0.*` | 0.21 |
+| [Core contract v1](CORE_V1.md) | 0.21 → v1 migration note, 0.22 fact provenance, feature classes, `describe --contract` | 0.21–0.22 (core-v1) |
+| [Shared protocol](contract/v0.22/README.md) | The current contract notes. Earlier versions are in `contract/v0.*` | 0.22 |
 
 ## Planning and release
 
@@ -57,7 +57,7 @@ These are accurate as dated records:
   [workflow.json](workflow.json): the original white-paper gate plan
   (superseded for scheduling).
 - [Status history](STATUS_HISTORY.md): the per-version ledger of verified
-  checkpoints through 0.21.
+  checkpoints through 0.22.
 - [Protocol 0.15 pairing](PROTOCOL_015.md), [verification 0.17](VERIFICATION_017.md)
   and [source reconciliation](SOURCE_RECONCILIATION.md).
 - `proposals/`: design proposals. Most are implemented; each says so in its

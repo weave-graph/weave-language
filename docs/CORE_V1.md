@@ -1,4 +1,4 @@
-# Core contract v1: migration note from 0.21
+# Core contract v1: migration note from 0.21, with protocol 0.22
 
 Introduced by LA0 ([#1](https://github.com/weave-graph/weave-language/issues/1)),
 which tracks engine epic A1. The normative specification is the engine's
@@ -7,16 +7,18 @@ This note covers what changes for weave-language users and tools.
 
 ## Summary
 
-- **No wire change.** Core v1 is a *profile* (`core-v1`) of protocol
-  **0.21.0**, not a new protocol version. The compiler emits the same bytes as
-  before. `Program.version` stays `0.21.0`, and so do the vendored crate version
-  and `weave_contract::VERSION`.
+- **No wire change for v1 itself.** Core v1 is a *profile* (`core-v1`)
+  introduced at protocol **0.21.0**, not a new protocol version. Engine A2
+  then activated per-fact provenance, node valid time and fact-level writes
+  as protocol **0.22.0** (see [Protocol 0.22.0](#protocol-0220-engine-a2)).
+  The compiler emits `weave_contract::VERSION`, now `0.22.0`, equal to the
+  vendored crate version.
 - **Every emitted plan is checked against v1.** A golden test compiles every
   entry source in `examples/` and decodes the plan and its templates with the
   contract's strict decoder (`tests/core_v1_contract.rs`).
 - **The engine's golden fixtures run in language CI.** The vendored crate now
-  ships `fixtures/core-v1/` (17 positive and 17 negative JSON fixtures plus a
-  hash manifest) and
+  ships `fixtures/core-v1/` (20 positive and 19 negative JSON fixtures plus a
+  hash manifest at 0.22.0) and
   `tests/core_v1_fixtures.rs`.
 - **`weave describe FILE --contract`** reports which core v1, extension and
   deferred features a source compiles to.
@@ -27,10 +29,10 @@ This note covers what changes for weave-language users and tools.
 |---|---|---|
 | Specification | 21 additive notes (`docs/contract/v0.1` to `v0.21`) | One consolidated document for everything classified core v1. The notes still govern extension and deferred features |
 | Decoding | serde decoding, one generic input error | `weave_contract::decode_program` checks size, strict JSON (no duplicate keys), then `version`, then structure, with stable codes `E_BUDGET`, `E_DECODE`, `E_VERSION`, `E_UNKNOWN_FIELD` and `E_UNKNOWN_VARIANT`. A program with an unknown version is never partially decoded. `weave-engine run` now reports these codes instead of `E_INPUT` |
-| Versions | Implicit | `SUPPORTED_VERSIONS` is the closed set 0.1.0 to 0.21.0. Each version keeps its published semantics, and a feature newer than the declared version fails with `E_VERSION` |
+| Versions | Implicit | `SUPPORTED_VERSIONS` is the closed set 0.1.0 to 0.22.0. Each version keeps its published semantics, and a feature newer than the declared version fails with `E_VERSION` |
 | Feature status | Every feature equal | Each feature is *core v1*, *extension* or *deferred* (table below). No semantics change because of the class |
-| Reserved names | None | Rejected by 0.21.0 and reserved for later epics: `provenance` on nodes, edges, structural edges, assertions and attachments; `Node.valid_time`; `GraphData.embedding_spaces` and `embeddings`; result fields `fact_provenance`, `candidates` and `exactness`; commands `assert`, `retract` and `correct`; expressions `expand`, `changes`, `nearest` and `similar_candidates`; the `weave:` predicate and ID namespace |
-| Provenance and embeddings | Not modelled | Records (`FactProvenance`, `ClaimedProvenance`, `EmbeddingSpace`, `EmbeddingFact`, `CandidateRelation`) are defined, but no program accepts them yet. Engine A2 and A4 activate them in later minor versions |
+| Reserved names | None | Rejected and reserved for later epics: `reader_groups` on fact records (B1); `GraphData.embedding_spaces` and `embeddings`; result fields `candidates` and `exactness`; expressions `expand`, `changes`, `nearest` and `similar_candidates`; the `weave:` predicate and ID namespace |
+| Provenance and embeddings | Not modelled | Records (`FactProvenance`, `ClaimedProvenance`, `EmbeddingSpace`, `EmbeddingFact`, `CandidateRelation`) are defined. Engine A2 activated provenance in 0.22.0. Embedding records are not accepted by any program until A4 |
 | Compatibility | Additive by convention | Written policy: before 1.0.0 every wire change is an additive minor bump; protocol 1.0.0 is cut at the engine Phase A release |
 
 ## Language constructs by class
@@ -40,7 +42,7 @@ is a guide and the command is authoritative.
 
 | Class | Constructs | Contract features |
 |---|---|---|
-| core v1 | `graph`, `transaction`, schemas with string, integer, float and boolean properties, claims and assertions (including a claim's `context graph`), attachments, `lens`, `pin`, live handles, `join`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, functions over graphs, `recorded_handle`, `recorded_range` | `commit`, `commit_batch`, `query`, `join`, `bind`, `evaluate`, expressions `query`, `reference`, `filter`, `join`, `metadata`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, `recorded_query`, command `recorded_range` |
+| core v1 | `graph`, `transaction`, schemas with string, integer, float and boolean properties, claims and assertions (including a claim's `context graph`), attachments, `lens`, `pin`, live handles, `join`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, functions over graphs, `recorded_handle`, `recorded_range` | `commit`, `commit_batch`, `query`, `join`, `bind`, `evaluate`, expressions `query`, `reference`, `filter`, `join`, `metadata`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, `recorded_query`, command `recorded_range`, command `write` (0.22, never emitted by this compiler) |
 | extension | `rules` and rule application, context selection and contextual attachments, typed contexts, `decimal` and `quantity` schema properties, geometry and typed-vector `distance` (including embedding-role vectors), `counterparts`, `resolve_identity`, `accepted_history`, `accepted_range`, `accepted`, `view_current`, view templates | `reason`, `context`, `attachment_context`, `context_scope`, `context_typing`, `typed_context`, `decimal`, `quantity`, `geometry`, `counterparts`, `resolve_identity`, `accepted_history`, `accepted_range`, `accepted_graph`, `current_view`, `compiled_view_template` |
 | deferred | `cluster_navigation`, handler templates | `cluster`, `compiled_handler_template` |
 
@@ -48,6 +50,29 @@ Typed embedding vectors (see [typed vectors](TYPED_VECTORS.md)) still lower to
 the 0.9 geometry extension and legacy binary64 vector properties. They are not
 core v1 `EmbeddingFact` records, and the engine never reinterprets them as such.
 Embedding retrieval in the language waits for engine A4 and language LA1.
+
+## Protocol 0.22.0 (engine A2)
+
+Engine A2 ([weave-engine#3](https://github.com/weave-graph/weave-engine/issues/3))
+activated the reserved provenance, node valid time and fact-write names as
+protocol 0.22.0 ([version note](contract/v0.22/README.md)). Engine
+core-v1.md section 12 classifies all of it as **core v1**: the `write`
+command (assert, correct, retract) and fact revisions, `Node.valid_time`,
+claimed `provenance` on nodes, edges, structural edges, assertions and
+attachments, and `QueryResult.fact_provenance`.
+
+For weave-language:
+
+- Plans, view templates and handler artifacts are labelled `0.22.0`. Their
+  commands and data are byte-for-byte what 0.21.0 emitted, and the engine
+  still accepts 0.21.0 programs and artifacts.
+- Results of compiled plans now include `fact_provenance`: the
+  engine-recorded writer and recorded time of each source fact the result
+  cites. The compiler never supplies either.
+- There is no source syntax yet for `write`, node valid time or claimed
+  provenance. `describe --contract` classifies them (`write` as a core v1
+  command; node `valid_time` and `provenance` as core v1 data, so they are not
+  listed), so plans built through the protocol directly classify correctly.
 
 ## `describe --contract`
 
@@ -85,7 +110,9 @@ keeps its output (a JSON array of schemas) and behaviour. The library API is
 - The classification of data fields checks the section 12 extension fields of
   `GraphData`: node `context_scope` (which this compiler does not currently
   emit), attachment `context`, `context_typing`, and decimal and quantity
-  schema types. Other data fields are core v1.
+  schema types. It checks the same node and attachment fields in the facts of
+  `write` changes. Other data fields, including 0.22 node `valid_time` and
+  `provenance`, are core v1.
 - The compiler SDK (C ABI and WASM) does not expose `--contract` yet.
 - The compiler does not reject author-written `weave:` predicates or IDs. The
   namespace is reserved for the engine.

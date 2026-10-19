@@ -1,7 +1,7 @@
 //! Core contract v1 classification of emitted plans and artifacts.
 //!
 //! The engine's `docs/contract/core-v1.md` section 12 classifies every contract
-//! feature from 0.1 to 0.21 as *core v1*, *extension* or *deferred*. This module
+//! feature from 0.1 to 0.22 as *core v1*, *extension* or *deferred*. This module
 //! walks what the compiler actually emitted (commands, graph expressions, the
 //! data-level extension fields and host templates) and reports each feature
 //! with that class and the exact JSON locations that use it.
@@ -11,7 +11,8 @@
 //! variant is classified. The classification never changes what is emitted.
 use std::collections::BTreeMap;
 use weave_contract::ScalarType;
-use weave_contract::{Command, GraphData, GraphExpression, Program};
+use weave_contract::facts::{Fact, FactChange};
+use weave_contract::{Command, GraphData, GraphExpression, MetadataAttachment, Node, Program};
 
 /// Profile name of the engine's consolidated core specification.
 pub const CORE_PROFILE: &str = weave_contract::wire::CORE_PROFILE;
@@ -100,6 +101,16 @@ impl Collector {
             }
             Command::RecordedRange { .. } => self.add("recorded_range", "0.21", CoreV1, at),
             Command::AcceptedRange { .. } => self.add("accepted_range", "0.21", Extension, at),
+            Command::Write { changes, .. } => {
+                self.add("write", "0.22", CoreV1, at);
+                for (index, change) in changes.iter().enumerate() {
+                    let fact = match change {
+                        FactChange::Assert { fact } | FactChange::Correct { fact, .. } => fact,
+                        FactChange::Retract { .. } => continue,
+                    };
+                    self.fact(fact, &format!("{at}/changes/{index}/fact"));
+                }
+            }
         }
     }
 
@@ -200,6 +211,39 @@ impl Collector {
         }
     }
 
+    /// Extension fields of one fact record carried by a `write` change. Node
+    /// `valid_time` and claimed `provenance` (0.22) are core v1.
+    fn fact(&mut self, fact: &Fact, at: &str) {
+        self.construct = "field";
+        match fact {
+            Fact::Node(node) => self.node(node, at),
+            Fact::Attachment(attachment) => self.attachment(attachment, at),
+            Fact::Edge(_) | Fact::StructuralEdge(_) | Fact::Assertion(_) => {}
+        }
+    }
+
+    fn node(&mut self, node: &Node, at: &str) {
+        if node.context_scope.is_some() {
+            self.add(
+                "context_scope",
+                "0.8",
+                FeatureClass::Extension,
+                &format!("{at}/context_scope"),
+            );
+        }
+    }
+
+    fn attachment(&mut self, attachment: &MetadataAttachment, at: &str) {
+        if attachment.context.is_some() {
+            self.add(
+                "attachment_context",
+                "0.8",
+                FeatureClass::Extension,
+                &format!("{at}/context"),
+            );
+        }
+    }
+
     /// Data-level fields that section 12 classifies as extensions. Every other
     /// `GraphData` field emitted by this compiler is core v1.
     fn data(&mut self, data: &GraphData, at: &str) {
@@ -214,24 +258,10 @@ impl Collector {
             );
         }
         for (index, node) in data.nodes.iter().enumerate() {
-            if node.context_scope.is_some() {
-                self.add(
-                    "context_scope",
-                    "0.8",
-                    Extension,
-                    &format!("{at}/nodes/{index}/context_scope"),
-                );
-            }
+            self.node(node, &format!("{at}/nodes/{index}"));
         }
         for (index, attachment) in data.attachments.iter().enumerate() {
-            if attachment.context.is_some() {
-                self.add(
-                    "attachment_context",
-                    "0.8",
-                    Extension,
-                    &format!("{at}/attachments/{index}/context"),
-                );
-            }
+            self.attachment(attachment, &format!("{at}/attachments/{index}"));
         }
         if let Some(schema) = &data.schema {
             let nodes = schema

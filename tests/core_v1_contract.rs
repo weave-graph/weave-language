@@ -129,7 +129,8 @@ fn emitted_plans_are_rejected_by_v1_when_they_drift() {
     )
     .unwrap();
     let mut extra = plan.clone();
-    extra["commands"][0]["data"]["nodes"][0]["provenance"] = serde_json::json!({});
+    // `provenance` is active from 0.22.0; `reader_groups` stays reserved (B1).
+    extra["commands"][0]["data"]["nodes"][0]["reader_groups"] = serde_json::json!([]);
     let mut newer = plan.clone();
     newer["version"] = "0.99.0".into();
     for (value, code) in [(extra, "E_UNKNOWN_FIELD"), (newer, "E_VERSION")] {
@@ -304,4 +305,66 @@ fn cli_describe_contract_is_explicit_and_legacy_describe_is_unchanged() {
     ] {
         assert_eq!(weave(args).status.code(), Some(2), "{args:?}");
     }
+}
+
+#[test]
+fn describe_contract_classifies_fact_writes_and_provenance_as_core_v1() {
+    // The compiler never emits `write`; classify the engine's golden program.
+    let fixture: Value = serde_json::from_slice(
+        &std::fs::read(root().join(
+            "vendor/weave-contract/fixtures/core-v1/positive/fact-write-assert-correct-retract.json",
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    let mut input = fixture["input"].clone();
+    // A node carrying 0.22 valid time and claimed provenance, plus an
+    // extension field, inside a write change.
+    let node = &mut input["commands"][0]["changes"][0]["fact"];
+    node["valid_time"] = serde_json::json!({"start": 0, "end": 10});
+    node["provenance"] = serde_json::json!({"source": "sensor", "method": {"kind": "human"}});
+    node["context_scope"] = serde_json::json!({"kind": "default"});
+    let program = match decode_program(&serde_json::to_vec(&input).unwrap()) {
+        Ok(program) => program,
+        Err(error) => panic!("{error}"),
+    };
+    let profile = weave_language::contract_profile::classify(
+        &program,
+        &Default::default(),
+        &Default::default(),
+    );
+    let write = profile
+        .features
+        .iter()
+        .find(|f| f.feature == "write")
+        .unwrap();
+    assert_eq!(
+        (write.since, write.construct, write.class),
+        ("0.22", "command", FeatureClass::CoreV1)
+    );
+    let writes = input["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["op"] == "write")
+        .count();
+    assert!(writes >= 2);
+    assert_eq!(write.locations.len(), writes);
+    let scope = profile
+        .features
+        .iter()
+        .find(|f| f.feature == "context_scope")
+        .unwrap();
+    assert_eq!(scope.class, FeatureClass::Extension);
+    assert_eq!(
+        scope.locations,
+        ["/program/commands/0/changes/0/fact/context_scope"]
+    );
+    assert!(!profile.core_only);
+    // Node valid time and claimed provenance are core v1 data, not extensions.
+    let features: BTreeSet<_> = profile.features.iter().map(|f| f.feature).collect();
+    assert_eq!(
+        features,
+        BTreeSet::from(["context_scope", "query", "write"])
+    );
 }

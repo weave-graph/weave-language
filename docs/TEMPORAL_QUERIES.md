@@ -1,6 +1,6 @@
 # Graph windows and bounded sequences
 
-> Written for protocol 0.19. Version statements below describe that release; the compiler now targets 0.21.0 ([status](STATUS.md)).
+> Written for protocol 0.19. Version statements below describe that release; the compiler now targets 0.22.0 ([status](STATUS.md)).
 
 Protocol 0.19 adds two pure graph operators over already selected graph values:
 

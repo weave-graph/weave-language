@@ -1,6 +1,6 @@
 # Protocol 0.15 pairing and metadata selectors
 
-> Written for protocol 0.15. Version statements below describe that release; the compiler now targets 0.21.0 ([status](STATUS.md)).
+> Written for protocol 0.15. Version statements below describe that release; the compiler now targets 0.22.0 ([status](STATUS.md)).
 
 The compiler now emits protocol `0.15.0`, using the exact 24-file contract distribution from engine commit `506729278cf3ee42a30eb9ac71336480e386fe89` (including its MIT license). The manifest records every byte hash and the versioned contract documentation. Pure modules, exact schema constraints, live handles and all existing source operators remain available.
 
