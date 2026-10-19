@@ -368,3 +368,56 @@ fn describe_contract_classifies_fact_writes_and_provenance_as_core_v1() {
         BTreeSet::from(["context_scope", "query", "write"])
     );
 }
+
+#[test]
+fn describe_contract_classifies_expand_as_of_and_changes_as_core_v1() {
+    // The compiler has no source syntax for the 0.23 operators (LA1); classify
+    // the engine's golden programs, built through the protocol directly.
+    let mut seen = BTreeSet::new();
+    for (name, expected) in [
+        ("expand-k-hop", &["evaluate", "expand", "write"][..]),
+        ("expand-valid-time-as-of", &["evaluate", "expand"][..]),
+        ("as-of-partially-visible", &["as_of", "evaluate"][..]),
+        ("changes-between-times", &["changes", "evaluate"][..]),
+    ] {
+        let fixture: Value = serde_json::from_slice(
+            &std::fs::read(root().join(format!(
+                "vendor/weave-contract/fixtures/core-v1/positive/{name}.json"
+            )))
+            .unwrap(),
+        )
+        .unwrap();
+        let input = &fixture["input"];
+        assert_eq!(input["version"], "0.23.0", "{name}");
+        let program = match decode_program(&serde_json::to_vec(input).unwrap()) {
+            Ok(program) => program,
+            Err(error) => panic!("{name}: {error}"),
+        };
+        let profile = weave_language::contract_profile::classify(
+            &program,
+            &Default::default(),
+            &Default::default(),
+        );
+        assert!(profile.core_only, "{name}: {:?}", profile.features);
+        let features: BTreeSet<_> = profile.features.iter().map(|f| f.feature).collect();
+        assert_eq!(features, expected.iter().copied().collect(), "{name}");
+        for feature in &profile.features {
+            assert_eq!(feature.class, FeatureClass::CoreV1, "{name}");
+            if ["expand", "as_of", "changes"].contains(&feature.feature) {
+                assert_eq!((feature.since, feature.construct), ("0.23", "expression"));
+                // Every evaluate command of these programs uses the operator.
+                let evaluates = input["commands"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, c)| c["value"]["kind"] == feature.feature)
+                    .map(|(index, _)| format!("/program/commands/{index}/value"))
+                    .collect::<Vec<_>>();
+                assert_eq!(feature.locations, evaluates, "{name}");
+                seen.insert(feature.feature);
+            }
+        }
+    }
+    assert_eq!(seen, BTreeSet::from(["as_of", "changes", "expand"]));
+}
