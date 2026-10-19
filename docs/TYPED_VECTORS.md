@@ -1,6 +1,6 @@
 # Typed physical and embedding source vectors
 
-> Written for protocol 0.18. Version statements below describe that release; the compiler now targets 0.22.0 ([status](STATUS.md)).
+> Written for protocol 0.18. Version statements below describe that release; the compiler now targets 0.23.0 ([status](STATUS.md)).
 
 Ordinary vector values retain their complete native Space descriptor and role through
 pure function parameters, results, partial application and unary callbacks. Values

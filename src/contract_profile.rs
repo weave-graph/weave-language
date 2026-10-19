@@ -1,7 +1,7 @@
 //! Core contract v1 classification of emitted plans and artifacts.
 //!
 //! The engine's `docs/contract/core-v1.md` section 12 classifies every contract
-//! feature from 0.1 to 0.22 as *core v1*, *extension* or *deferred*. This module
+//! feature from 0.1 to 0.23 as *core v1*, *extension* or *deferred*. This module
 //! walks what the compiler actually emitted (commands, graph expressions, the
 //! data-level extension fields and host templates) and reports each feature
 //! with that class and the exact JSON locations that use it.
@@ -203,6 +203,11 @@ impl Collector {
             }
             GraphExpression::RecordedQuery { .. } => ("recorded_query", "0.20", CoreV1),
             GraphExpression::AcceptedHistory { .. } => ("accepted_history", "0.21", Extension),
+            // 0.23 (A3) operators read one branch directly and take no
+            // expression input. The `as_of` field of `expand` is core v1 data.
+            GraphExpression::Expand(_) => ("expand", "0.23", CoreV1),
+            GraphExpression::AsOf { .. } => ("as_of", "0.23", CoreV1),
+            GraphExpression::Changes(_) => ("changes", "0.23", CoreV1),
         };
         self.construct = "expression";
         self.add(feature, since, class, at);

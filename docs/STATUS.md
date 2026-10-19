@@ -1,11 +1,11 @@
 # Current status
 
-As of **19 October 2026**: an experimental compiler at `main` targeting engine
-contract **0.22.0** and its **core v1** profile (LA0, see
-[CORE_V1.md](CORE_V1.md)). It vendors the complete 82-file contract crate from
-engine `61eccfb90e5a` (A2 part 2), including the core v1 golden fixtures, which
+As of **20 October 2026**: an experimental compiler at `main` targeting engine
+contract **0.23.0** and its **core v1** profile (LA0, see
+[CORE_V1.md](CORE_V1.md)). It vendors the complete 91-file contract crate from
+engine `5976d47d6ab8` (A3 part 1), including the core v1 golden fixtures, which
 `scripts/verify_contract.py` checks against `vendor/manifest.json`.
-`cargo test --workspace --locked` passes 203 tests locally. CI runs Linux, macOS
+`cargo test --workspace --locked` passes 204 tests locally. CI runs Linux, macOS
 and Windows plus WASM parity, and runs the engine's core v1 fixture harness on
 the vendored crate (`.github/workflows/ci.yml`).
 
@@ -28,6 +28,12 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
   source fact). The compiler emits no 0.22-only field: it has no syntax for
   the `write` command, node `valid_time` or claimed `provenance`, and it never
   supplies a writer or recorded time.
+- **Protocol 0.23.0 (engine A3):** plans, view templates and handler
+  artifacts are labelled 0.23.0, with the same commands and data as 0.22.0.
+  `describe --contract` classifies the new `expand`, `as_of` and `changes`
+  expressions as core v1 when a program built through the protocol uses them.
+  Compiled plans never yield `QueryResult.changes`, because the compiler emits
+  none of these operators.
 - **Graphs:** nodes with entity and space, first-class edges, claims and
   assertions, graph-valued metadata attachments, pinned and live references,
   and atomic transactions.
@@ -51,9 +57,12 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
 
 ## Not supported, mapped to the [engine roadmap](https://github.com/weave-graph/weave-engine/blob/main/docs/ROADMAP.md)
 
-- k-hop traversal, change-set ("what changed between K1 and K2") queries and
-  vector search or hybrid retrieval. These wait for the engine Phase A operators
-  (A3, A4) and are planned as LA1, which starts after engine A1.
+- Source syntax for k-hop traversal (`expand`), as-of reads (`as_of`) and
+  change sets (`changes`, "what changed between K1 and K2"). The engine
+  operators exist since protocol 0.23.0 (A3); the syntax is planned as LA1
+  ([#3](https://github.com/weave-graph/weave-language/issues/3)).
+- Vector search and hybrid retrieval. These wait for engine A4 and are also
+  planned as LA1.
 - Source syntax for fact-level writes (`write`: assert, correct, retract),
   node valid time and claimed per-fact provenance (engine A2, protocol 0.22).
   Source `graph` and `transaction` still lower to snapshot `commit` and

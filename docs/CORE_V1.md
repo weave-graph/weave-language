@@ -1,4 +1,4 @@
-# Core contract v1: migration note from 0.21, with protocol 0.22
+# Core contract v1: migration note from 0.21, with protocols 0.22 and 0.23
 
 Introduced by LA0 ([#1](https://github.com/weave-graph/weave-language/issues/1)),
 which tracks engine epic A1. The normative specification is the engine's
@@ -10,15 +10,17 @@ This note covers what changes for weave-language users and tools.
 - **No wire change for v1 itself.** Core v1 is a *profile* (`core-v1`)
   introduced at protocol **0.21.0**, not a new protocol version. Engine A2
   then activated per-fact provenance, node valid time and fact-level writes
-  as protocol **0.22.0** (see [Protocol 0.22.0](#protocol-0220-engine-a2)).
-  The compiler emits `weave_contract::VERSION`, now `0.22.0`, equal to the
+  as protocol **0.22.0** (see [Protocol 0.22.0](#protocol-0220-engine-a2)),
+  and engine A3 activated the `expand`, `as_of` and `changes` query operators
+  as protocol **0.23.0** (see [Protocol 0.23.0](#protocol-0230-engine-a3)).
+  The compiler emits `weave_contract::VERSION`, now `0.23.0`, equal to the
   vendored crate version.
 - **Every emitted plan is checked against v1.** A golden test compiles every
   entry source in `examples/` and decodes the plan and its templates with the
   contract's strict decoder (`tests/core_v1_contract.rs`).
 - **The engine's golden fixtures run in language CI.** The vendored crate now
-  ships `fixtures/core-v1/` (20 positive and 19 negative JSON fixtures plus a
-  hash manifest at 0.22.0) and
+  ships `fixtures/core-v1/` (25 positive and 22 negative JSON fixtures plus a
+  hash manifest at 0.23.0) and
   `tests/core_v1_fixtures.rs`.
 - **`weave describe FILE --contract`** reports which core v1, extension and
   deferred features a source compiles to.
@@ -29,9 +31,9 @@ This note covers what changes for weave-language users and tools.
 |---|---|---|
 | Specification | 21 additive notes (`docs/contract/v0.1` to `v0.21`) | One consolidated document for everything classified core v1. The notes still govern extension and deferred features |
 | Decoding | serde decoding, one generic input error | `weave_contract::decode_program` checks size, strict JSON (no duplicate keys), then `version`, then structure, with stable codes `E_BUDGET`, `E_DECODE`, `E_VERSION`, `E_UNKNOWN_FIELD` and `E_UNKNOWN_VARIANT`. A program with an unknown version is never partially decoded. `weave-engine run` now reports these codes instead of `E_INPUT` |
-| Versions | Implicit | `SUPPORTED_VERSIONS` is the closed set 0.1.0 to 0.22.0. Each version keeps its published semantics, and a feature newer than the declared version fails with `E_VERSION` |
+| Versions | Implicit | `SUPPORTED_VERSIONS` is the closed set 0.1.0 to 0.23.0. Each version keeps its published semantics, and a feature newer than the declared version fails with `E_VERSION` |
 | Feature status | Every feature equal | Each feature is *core v1*, *extension* or *deferred* (table below). No semantics change because of the class |
-| Reserved names | None | Rejected and reserved for later epics: `reader_groups` on fact records (B1); `GraphData.embedding_spaces` and `embeddings`; result fields `candidates` and `exactness`; expressions `expand`, `changes`, `nearest` and `similar_candidates`; the `weave:` predicate and ID namespace |
+| Reserved names | None | Rejected and reserved for later epics: `reader_groups` on fact records (B1); `GraphData.embedding_spaces` and `embeddings`; result fields `candidates` and `exactness`; expressions `nearest` and `similar_candidates` (A4); A3 released `expand` and `changes` in 0.23.0; the `weave:` predicate and ID namespace |
 | Provenance and embeddings | Not modelled | Records (`FactProvenance`, `ClaimedProvenance`, `EmbeddingSpace`, `EmbeddingFact`, `CandidateRelation`) are defined. Engine A2 activated provenance in 0.22.0. Embedding records are not accepted by any program until A4 |
 | Compatibility | Additive by convention | Written policy: before 1.0.0 every wire change is an additive minor bump; protocol 1.0.0 is cut at the engine Phase A release |
 
@@ -42,7 +44,7 @@ is a guide and the command is authoritative.
 
 | Class | Constructs | Contract features |
 |---|---|---|
-| core v1 | `graph`, `transaction`, schemas with string, integer, float and boolean properties, claims and assertions (including a claim's `context graph`), attachments, `lens`, `pin`, live handles, `join`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, functions over graphs, `recorded_handle`, `recorded_range` | `commit`, `commit_batch`, `query`, `join`, `bind`, `evaluate`, expressions `query`, `reference`, `filter`, `join`, `metadata`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, `recorded_query`, command `recorded_range`, command `write` (0.22, never emitted by this compiler) |
+| core v1 | `graph`, `transaction`, schemas with string, integer, float and boolean properties, claims and assertions (including a claim's `context graph`), attachments, `lens`, `pin`, live handles, `join`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, functions over graphs, `recorded_handle`, `recorded_range` | `commit`, `commit_batch`, `query`, `join`, `bind`, `evaluate`, expressions `query`, `reference`, `filter`, `join`, `metadata`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, `recorded_query`, command `recorded_range`, command `write` (0.22), expressions `expand`, `as_of` and `changes` (0.23). The compiler emits none of the 0.22 and 0.23 features yet |
 | extension | `rules` and rule application, context selection and contextual attachments, typed contexts, `decimal` and `quantity` schema properties, geometry and typed-vector `distance` (including embedding-role vectors), `counterparts`, `resolve_identity`, `accepted_history`, `accepted_range`, `accepted`, `view_current`, view templates | `reason`, `context`, `attachment_context`, `context_scope`, `context_typing`, `typed_context`, `decimal`, `quantity`, `geometry`, `counterparts`, `resolve_identity`, `accepted_history`, `accepted_range`, `accepted_graph`, `current_view`, `compiled_view_template` |
 | deferred | `cluster_navigation`, handler templates | `cluster`, `compiled_handler_template` |
 
@@ -73,6 +75,38 @@ For weave-language:
   provenance. `describe --contract` classifies them (`write` as a core v1
   command; node `valid_time` and `provenance` as core v1 data, so they are not
   listed), so plans built through the protocol directly classify correctly.
+
+## Protocol 0.23.0 (engine A3)
+
+Engine A3 ([weave-engine#4](https://github.com/weave-graph/weave-engine/issues/4))
+activated three query operators as protocol 0.23.0
+([version note](contract/v0.23/README.md)). Engine core-v1.md section 12
+classifies all of them as **core v1** (section 5 `time.as_of`, section 8
+`query.expand` and `query.changes`):
+
+- the `expand` expression: the exact k-hop neighbourhood of seed nodes, by
+  direction, predicate and valid time, at a revision, the head or an `as_of`
+  recorded time;
+- the `as_of` expression (and the `as_of` field of `expand`): a query of the
+  branch as the replica knew it at a recorded time, authorized record by
+  record;
+- the `changes` expression: the facts asserted, retracted or corrected between
+  two bounds (`as_of`, `cursor` or `head`), returned in the new optional
+  `QueryResult.changes` change set. A change set is terminal.
+
+For weave-language:
+
+- Plans, view templates and handler artifacts are labelled `0.23.0`. Their
+  commands and data are byte-for-byte what 0.22.0 and 0.21.0 emitted. The
+  engine still accepts 0.22.0 and older programs and artifacts.
+- Compiled plans never produce `QueryResult.changes`, because the compiler
+  emits no `changes` expression. Views and handler recipes reject all three
+  operators.
+- There is no source syntax yet for `expand`, `as_of` or `changes`; that is
+  language epic LA1 ([#3](https://github.com/weave-graph/weave-language/issues/3)).
+  `describe --contract` classifies all three as core v1 expressions (`since`
+  0.23), so plans built through the protocol directly classify correctly. The
+  `as_of` field of `expand` is core v1 data and is not listed separately.
 
 ## `describe --contract`
 
@@ -112,7 +146,7 @@ keeps its output (a JSON array of schemas) and behaviour. The library API is
   emit), attachment `context`, `context_typing`, and decimal and quantity
   schema types. It checks the same node and attachment fields in the facts of
   `write` changes. Other data fields, including 0.22 node `valid_time` and
-  `provenance`, are core v1.
+  `provenance` and the 0.23 `as_of` field of `expand`, are core v1.
 - The compiler SDK (C ABI and WASM) does not expose `--contract` yet.
 - The compiler does not reject author-written `weave:` predicates or IDs. The
   namespace is reserved for the engine.
