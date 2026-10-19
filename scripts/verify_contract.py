@@ -8,7 +8,16 @@ import re
 root = Path(__file__).resolve().parents[1]
 manifest = json.loads((root / "vendor/manifest.json").read_text())
 vendor = root / "vendor/weave-contract"
-actual_files = {path.relative_to(vendor).as_posix() for path in vendor.rglob("*") if path.is_file()}
+# Running the vendored fixture harness in place writes a lockfile (and, without
+# --target-dir, a target directory). They are build outputs, never vendored.
+BUILD_OUTPUTS = {"Cargo.lock"}
+actual_files = {
+    relative
+    for path in vendor.rglob("*")
+    if path.is_file()
+    and (relative := path.relative_to(vendor).as_posix()) not in BUILD_OUTPUTS
+    and not relative.startswith("target/")
+}
 expected_files = set(manifest["files"])
 if actual_files != expected_files:
     raise SystemExit(f"Contract file set differs: missing {expected_files - actual_files}, unexpected {actual_files - expected_files}")

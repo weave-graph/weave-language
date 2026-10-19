@@ -303,6 +303,13 @@ impl LinkedProgram {
             })
             .collect()
     }
+    /// Linked counterpart of [`crate::describe_contract`].
+    pub fn describe_contract(&self) -> Result<crate::ContractDescription, ModuleDiagnostic> {
+        Ok(crate::ContractDescription {
+            schemas: self.schemas(),
+            contract: self.compile_artifacts()?.contract_profile(),
+        })
+    }
     fn locate(&self, error: Diagnostic) -> ModuleDiagnostic {
         let location = self
             .locations

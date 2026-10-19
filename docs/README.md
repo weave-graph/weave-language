@@ -1,6 +1,7 @@
 # Weave Language documentation
 
-The compiler targets engine contract **0.21.0**. Many feature documents were
+The compiler targets engine contract **0.21.0** and its core v1 profile
+([CORE_V1.md](CORE_V1.md)). Many feature documents were
 written when the feature was introduced and name the protocol version of that
 release ("protocol 0.18", "0.15 candidate" and so on). Read those numbers as
 *introduced in*, not as the current version. The current version and supported
@@ -37,6 +38,7 @@ behavior are in [STATUS.md](STATUS.md).
 | [History selection](HISTORY_SELECTION.md) | Recorded handles, accepted history, recorded/accepted ranges | 0.20–0.21 |
 | [Native services](NATIVE_SERVICES.md) | Cluster navigation and other native service bindings | 0.13 |
 | [Formatter](FORMATTER.md) | `weave fmt` | — |
+| [Core contract v1](CORE_V1.md) | 0.21 → v1 migration note, feature classes, `describe --contract` | 0.21 (core-v1) |
 | [Shared protocol](contract/v0.21/README.md) | The current contract notes. Earlier versions are in `contract/v0.*` | 0.21 |
 
 ## Planning and release
