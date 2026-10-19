@@ -2,6 +2,7 @@
 //! No source program can invoke host effects: compilation only emits a plan.
 pub mod bytes;
 pub mod context_axes;
+pub mod contract_profile;
 pub mod decimal;
 mod format;
 mod functions;
@@ -207,6 +208,40 @@ impl CompiledArtifacts {
         )
         .map_err(|e| diagnostic(&e.code, e.message, (0, 0)))
     }
+}
+impl CompiledArtifacts {
+    /// Classify the emitted plan and templates against core contract v1
+    /// (engine `docs/contract/core-v1.md` section 12).
+    pub fn contract_profile(&self) -> contract_profile::ContractProfile {
+        contract_profile::classify(&self.program, &self.view_templates, &self.handler_templates)
+    }
+}
+/// Source schema descriptors plus the core contract v1 classification of
+/// everything the source compiles to (`weave describe --contract`).
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct ContractDescription {
+    pub schemas: Vec<GraphSchema>,
+    pub contract: contract_profile::ContractProfile,
+}
+/// Describe a source, including its host templates, against core contract v1.
+/// Unlike [`describe`], view and handler templates are compiled and reported
+/// (as extension and deferred features) instead of rejected.
+pub fn describe_contract(source: &str) -> Result<ContractDescription, Diagnostic> {
+    let artifacts = compile_artifacts(source)?;
+    Ok(ContractDescription {
+        schemas: source_schemas(parse(source)?),
+        contract: artifacts.contract_profile(),
+    })
+}
+fn source_schemas(parsed: syntax::Program) -> Vec<GraphSchema> {
+    parsed
+        .statements
+        .into_iter()
+        .filter_map(|s| match s {
+            Statement::Schema { definition, .. } => Some(definition),
+            _ => None,
+        })
+        .collect()
 }
 pub fn compile_artifacts(source: &str) -> Result<CompiledArtifacts, Diagnostic> {
     compile_artifacts_parsed(parse(source)?)
@@ -1681,17 +1716,7 @@ fn lower_artifacts(
 /// Discover validated source schema descriptors without executing a plan.
 pub fn describe(source: &str) -> Result<Vec<GraphSchema>, Diagnostic> {
     compile(source)?;
-    Ok(parse(source)?
-        .statements
-        .into_iter()
-        .filter_map(|s| {
-            if let Statement::Schema { definition, .. } = s {
-                Some(definition)
-            } else {
-                None
-            }
-        })
-        .collect())
+    Ok(source_schemas(parse(source)?))
 }
 
 /// Canonical structural plan identity, including checked source function revisions.

@@ -95,6 +95,8 @@ Legacy anonymous `metadata graph ... revision ...` remains available for compati
 
 `weave describe FILE` validates the file and emits its source schema descriptors as JSON without executing a plan. This is source-level discovery, not a privileged inventory of remote graphs. The engine's graph results carry their own schema descriptor; runtime authorization still governs access.
 
+`weave describe FILE --contract` (core v1, LA0) prints `{"schemas": [...], "contract": {...}}`. The `contract` object classifies every command, expression, data field and template the source compiles to as `core-v1`, `extension` or `deferred`, following the engine's core-v1.md section 12, with plan locations. It compiles view and handler templates instead of rejecting them. See [core contract v1](CORE_V1.md).
+
 Both compiler and direct runtime clients use the same portable validator. Supported scalar schema types are string, signed 64-bit integer, finite binary64 float and boolean; nullable values are explicit. Exact decimal, vector/quantity, graph-valued metadata field schemas, variance and disconnected migrations remain open. The grammar's schema revision is an explicit identity, not a claim that a field rename or unit change is safe.
 
 ## Graph algebra (protocol 0.5)

@@ -1,10 +1,13 @@
 # Current status
 
-As of **17 October 2026**: an experimental compiler at `main` targeting engine
-contract **0.21.0**. It vendors 37 contract files, which `scripts/verify_contract.py`
-checks against `vendor/manifest.json`. `cargo test --workspace --locked` passes
-198 tests locally. CI runs Linux, macOS and Windows plus WASM parity
-(`.github/workflows/ci.yml`).
+As of **19 October 2026**: an experimental compiler at `main` targeting engine
+contract **0.21.0** and its **core v1** profile (LA0, see
+[CORE_V1.md](CORE_V1.md)). It vendors the complete 76-file contract crate from
+engine `ec2ada7bccb0`, including the core v1 golden fixtures, which
+`scripts/verify_contract.py` checks against `vendor/manifest.json`.
+`cargo test --workspace --locked` passes 202 tests locally. CI runs Linux, macOS
+and Windows plus WASM parity, and runs the engine's core v1 fixture harness on
+the vendored crate (`.github/workflows/ci.yml`).
 
 The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
 
@@ -13,6 +16,12 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
 - CLI commands: `check`, `plan`, `ast`, `describe`, `fingerprint`, `values`,
   `artifacts`, `view-plan`, `handler-plan` and `fmt`. Pinned modules are
   linked with `--modules`.
+- **Core contract v1:** every plan and template emitted for `examples/`
+  decodes with the contract's strict decoder (`decode_program` for plans,
+  `decode` for templates) and re-encodes unchanged.
+  `weave describe FILE --contract` classifies what a source compiles to as
+  core v1, extension or deferred (engine core-v1.md section 12), with exact
+  plan locations. See [CORE_V1.md](CORE_V1.md) for the classes and limits.
 - **Graphs:** nodes with entity and space, first-class edges, claims and
   assertions, graph-valued metadata attachments, pinned and live references,
   and atomic transactions.
@@ -46,6 +55,12 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
   resolution, stratified negation and aggregation.
 - Distributed and offline governance, clustering as a language feature, and
   general geometry. These are deferred.
+
+Constructs classified *extension* (rules, contexts, typed contexts, decimals
+and quantities, geometry and typed vectors, counterparts, identity resolution,
+accepted reads, views) stay supported, but engine Phase A does not build on
+them. Constructs classified *deferred* (`cluster_navigation`, handler
+templates) are maintained without new development.
 
 The syntax is provisional. Emitted plans are validated and authorized by the
 engine; the compiler is never a security boundary.

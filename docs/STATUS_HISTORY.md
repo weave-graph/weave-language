@@ -4,6 +4,19 @@
 > protocol 0.21, moved from `STATUS.md` on 2026-10-17. Each entry is accurate for
 > its stated protocol version. Current status: [STATUS.md](STATUS.md).
 
+## Core contract v1 (protocol 0.21.0, profile core-v1), 2026-10-19
+
+LA0 ([#1](https://github.com/weave-graph/weave-language/issues/1)) re-vendored the
+complete 76-file contract crate from engine
+`ec2ada7bccb0f4a2327099b75985b59dd62d1d9d` (A1). It adds the strict wire decoder, the provenance and embedding
+records, 34 golden fixtures with a hash manifest, and the fixture harness. No wire
+bytes changed. Local results: `verify_contract.py` passes for the exact 76-file set;
+the vendored harness passes 8 tests; `cargo test --workspace --locked --all-targets`
+passes 202 tests, including the golden test that every plan and template emitted for
+`examples/` decodes as core v1. fmt, Clippy with `-D warnings`, the SDK and interval
+oracles, the wasm32 check and native/WASM scalar and SDK parity pass. See
+[CORE_V1.md](CORE_V1.md).
+
 ## Accepted history and recorded/accepted ranges (protocol0.21)
 
 Source `accepted_history` binds one genuine local accepted-time or exact-decision

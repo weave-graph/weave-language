@@ -1,10 +1,16 @@
 mod module_files;
 use std::{env, fs, io::Read, process};
 fn main() {
-    let args: Vec<_> = env::args().skip(1).collect();
+    let mut args: Vec<_> = env::args().skip(1).collect();
+    // `describe --contract` adds the core contract v1 classification.
+    let contract = args.first().is_some_and(|arg| arg == "describe")
+        && args.iter().filter(|arg| *arg == "--contract").count() == 1;
+    if contract {
+        args.retain(|arg| arg != "--contract");
+    }
     let usage = || {
         eprintln!(
-            "Usage: weave <check|plan|ast|describe|fingerprint|values|artifacts|view-plan|handler-plan> FILE.weave [--modules MAP.json] [--template NAME|--handler NAME]\nview-plan requires --template; handler-plan requires --handler; compilation never installs host artifacts.\nweave fmt FILE.weave [--check|--write] formats one source file."
+            "Usage: weave <check|plan|ast|describe|fingerprint|values|artifacts|view-plan|handler-plan> FILE.weave [--modules MAP.json] [--template NAME|--handler NAME] [--contract]\nview-plan requires --template; handler-plan requires --handler; --contract is for describe only; compilation never installs host artifacts.\nweave fmt FILE.weave [--check|--write] formats one source file."
         );
         process::exit(2);
     };
@@ -87,6 +93,10 @@ fn main() {
                 );
             }
             "ast" => println!("{}", serde_json::to_string_pretty(linked.ast()).unwrap()),
+            "describe" if contract => {
+                let description = linked.describe_contract().unwrap_or_else(module_fail);
+                println!("{}", serde_json::to_string_pretty(&description).unwrap());
+            }
             "describe" => {
                 linked.require_no_artifacts().unwrap_or_else(module_fail);
                 linked.compile().unwrap_or_else(module_fail);
@@ -125,6 +135,11 @@ fn main() {
     } else if args[0] == "fingerprint" {
         match weave_language::fingerprint(&source) {
             Ok(id) => println!("{}", serde_json::json!({"plan_fingerprint":id})),
+            Err(e) => fail(e),
+        }
+    } else if args[0] == "describe" && contract {
+        match weave_language::describe_contract(&source) {
+            Ok(description) => println!("{}", serde_json::to_string_pretty(&description).unwrap()),
             Err(e) => fail(e),
         }
     } else if args[0] == "describe" {

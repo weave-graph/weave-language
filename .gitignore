@@ -1,4 +1,7 @@
 /target
+# Build outputs of the vendored contract's own fixture harness.
+/vendor/weave-contract/Cargo.lock
+/vendor/weave-contract/target/
 .DS_Store
 /docs/source/conversation.md
 *.db
