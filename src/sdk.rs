@@ -54,10 +54,31 @@ pub fn compile_request(input: &[u8]) -> Vec<u8> {
 /// Native unwinding panics become a fixed diagnostic. Allocator aborts and WASM traps
 /// are outside the recoverable contract; hosts must discard the failed instance.
 pub fn compile_response(input: &[u8]) -> Response {
-    std::panic::catch_unwind(|| compile_inner(input))
+    compile_response_with_floor(input, &PolicyFloor::default())
+}
+
+/// Policy rules a host applies to every request, whatever the request's own
+/// `policy` says (LB1). A request can add rules to the floor, never remove
+/// them. The default floor adds nothing, so responses equal [`compile_response`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PolicyFloor {
+    pub untrusted: bool,
+    pub read_only: bool,
+}
+
+/// [`compile_response`] under a host [`PolicyFloor`] (`weave sdk --untrusted
+/// --read-only`).
+pub fn compile_response_with_floor(input: &[u8], floor: &PolicyFloor) -> Response {
+    std::panic::catch_unwind(|| compile_inner(input, floor))
         .unwrap_or_else(|_| transport("E_SDK_INTERNAL", "Compiler failed internally"))
 }
-fn compile_inner(input: &[u8]) -> Response {
+
+/// A complete failure response for a transport problem the byte API cannot
+/// see itself, such as unreadable input (`code` should be an `E_SDK_*` code).
+pub fn transport_failure(code: &str, message: &str) -> Response {
+    transport(code, message)
+}
+fn compile_inner(input: &[u8], floor: &PolicyFloor) -> Response {
     let request = match decode_request(input) {
         Ok(r) => r,
         Err(e) => return transport(e.0, e.1),
@@ -73,7 +94,8 @@ fn compile_inner(input: &[u8]) -> Response {
         .iter()
         .any(|s| matches!(s, crate::syntax::Statement::Import { .. }));
     // Only a request with a policy pays for keeping the entry AST.
-    let parsed_entry = request.policy.as_ref().map(|_| parsed.clone());
+    let checked = request.policy.is_some() || *floor != PolicyFloor::default();
+    let parsed_entry = checked.then(|| parsed.clone());
     let compiled = if !has_imports {
         crate::compile_artifacts_parsed(parsed).map_err(|e| local_error(&request.entry, e))
     } else {
@@ -88,7 +110,7 @@ fn compile_inner(input: &[u8]) -> Response {
             .collect();
         modules::link(&request.entry, &request.source, &units).and_then(|p| p.compile_artifacts())
     };
-    let policy = request
+    let mut policy = request
         .policy
         .map(|p| crate::policy::CompilePolicy {
             untrusted: p.untrusted,
@@ -96,6 +118,8 @@ fn compile_inner(input: &[u8]) -> Response {
             visible: p.visible,
         })
         .unwrap_or_default();
+    policy.untrusted |= floor.untrusted;
+    policy.read_only |= floor.read_only;
     let compiled = compiled.and_then(|artifacts| match &parsed_entry {
         None => Ok(artifacts),
         Some(parsed) => crate::policy::check(&request.source, parsed, &artifacts, &policy)

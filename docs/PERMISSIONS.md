@@ -174,24 +174,39 @@ without a dedicated rule (for example `recorded_handle`) are covered. A
 manifest is advisory: the engine authorizes the plan again when it runs, and
 membership can change between compilation and execution.
 
-**Where manifests come from.** Engine B3/B4 will serve the manifest of the
-authenticated caller. Until then a host assembles it: `weave-engine graphs`
-lists the graphs and permissions, a compiled `changes C from G { since as_of
-0; }` run as the principal returns the facts and embedding spaces it can see,
-and a user's groups are its `weave:member` edges in `weave:registry`. An
-agent cannot read `weave:registry` unless delegated, so the host that
-registered it supplies the groups it delegated. `weave-engine graphs` omits
-`weave:` graphs; a manifest lists `weave:registry` (with `read`) only if the
-source should be allowed to query it.
+**Where manifests come from.** Engine B4 serves the manifest of the
+authenticated caller: `GET /v1/manifest` on `weave-service` returns
+`weave-visible/1` with its discoverable graphs, permissions and branches and
+exactly the `reader_groups` a write by it may name. It omits embedding spaces
+and schemas; the MCP tool `describe_schema` with a `graph_id` returns each
+visible space descriptor under `embedding_spaces[].space`, which a host copies
+into that graph's `embedding_spaces`. `scripts/check_agent_service.py` builds
+the manifest this way.
+
+Without the service, a host assembles it: `weave-engine graphs` lists the
+graphs and permissions, a compiled `changes C from G { since as_of 0; }` run
+as the principal returns the facts and embedding spaces it can see, and a
+user's groups are its `weave:member` edges in `weave:registry`. An agent
+cannot read `weave:registry` unless delegated, so the host that registered it
+supplies the groups it delegated. `weave-engine graphs` omits `weave:`
+graphs; a manifest lists `weave:registry` (with `read`) only if the source
+should be allowed to query it.
+
+**Compiling in a sandboxed host.** A host that cannot link the compiler runs
+`weave sdk` ([COMPILER_SDK.md](COMPILER_SDK.md#subprocess-mode-weave-sdk)):
+one request with its `policy` (including the `visible` manifest) on stdin,
+one response on stdout, stable exit codes, no other I/O. `--untrusted` and
+`--read-only` on its command line set a floor the request cannot lower.
 
 ## End-to-end acceptance
 
-Both scripts need an engine built from engine `main` (B1) and enable its
-registry:
+The scripts need an engine built from engine `main` (B1 for the first two,
+B4's `weave-service` for the third) and enable its registry:
 
 ```sh
 python3 scripts/check_permissions.py --compiler target/debug/weave --engine ../weave-engine/target/debug/weave-engine
 python3 scripts/check_agent_repair.py --compiler target/debug/weave --engine ../weave-engine/target/debug/weave-engine
+python3 scripts/check_agent_service.py --compiler target/debug/weave --service ../weave-engine/target/debug/weave-service
 ```
 
 - `check_permissions.py`: group-restricted source writes, corrections and
@@ -211,6 +226,14 @@ python3 scripts/check_agent_repair.py --compiler target/debug/weave --engine ../
   rejected as implicitly public under `--untrusted`, repaired with a group
   from its manifest, hidden from a non-member. Guessed graphs and groups fail
   at compile time with `E_UNAVAILABLE`.
+- `check_agent_service.py`: the same agent scenario on the authenticated
+  service, with nothing assembled by the host. The agent authenticates with
+  its own agent token, reads its manifest from `GET /v1/manifest` and its
+  spaces and property keys from `describe_schema`, compiles every source with
+  `weave sdk` (request `policy` `{untrusted, read_only, visible}`, run with an
+  empty environment in an empty directory), runs every plan with
+  `POST /v1/execute`, and records its finding under a record ID minted by
+  `POST /v1/ids`.
 
 ## Diagnostics
 
@@ -229,9 +252,10 @@ python3 scripts/check_agent_repair.py --compiler target/debug/weave --engine ../
 
 - The compiler is not a security boundary. It checks intent and gives early
   diagnostics; the engine decides every read and write.
-- A manifest is a snapshot supplied by the host. It is not served by the
-  engine yet (B3/B4), and no engine MCP compile tool exists yet (B4); see the
-  engine roadmap.
+- A manifest is a snapshot: the engine serves it (`GET /v1/manifest`, with
+  spaces from `describe_schema`), but membership can change before the plan
+  runs, and the engine checks again. The engine's MCP server has no compile
+  tool yet; it will run `weave sdk`.
 - Readers are literals, not parameters. A `correct` cannot say "keep the
   stored readers": the contract has no such field, so the source restates
   them.

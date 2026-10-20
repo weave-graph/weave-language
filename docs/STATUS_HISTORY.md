@@ -4,6 +4,16 @@
 > protocol 1.1.0, moved from `STATUS.md` on 2026-10-17. Each entry is accurate for
 > its stated protocol version. Current status: [STATUS.md](STATUS.md).
 
+## LB1 part 2: `weave sdk` subprocess mode and the service-served manifest, 2026-10-20
+
+`weave sdk` compiles one bounded request from stdin to stdout for sandboxing
+hosts (engine B4's MCP server). Verified against engine `be7b9da` (B4 part 1):
+`scripts/check_agent_service.py` passed on `weave-service` with the manifest
+from `GET /v1/manifest` and spaces from `describe_schema`, compiling through
+`weave sdk`. `tests/sdk_mode.rs` covers hostile stdin; the `weave sdk` fuzz
+in `tests/hostile_source.rs` passed 20,000 runs locally (1,000 in CI). Local
+results are in the PR that introduced this entry.
+
 ## LB1: readers, agent-safe compilation and permission-aware diagnostics (contract 1.1.0), 2026-10-20
 
 Source syntax for `readers`, `reader_groups` and `public`, the `correct`

@@ -9,7 +9,7 @@ Phase A exit questions run from `.weave` source on a real engine
 (`scripts/check_phase_a.py`). It vendors the complete 103-file contract crate
 from engine `5a19549` (B1 part 1), including the core v1 golden fixtures, which
 `scripts/verify_contract.py` checks against `vendor/manifest.json`.
-`cargo test --workspace --locked` passes 238 tests locally. CI runs Linux, macOS
+`cargo test --workspace --locked` passes 246 tests locally. CI runs Linux, macOS
 and Windows plus WASM parity, and runs the engine's core v1 fixture harness on
 the vendored crate (`.github/workflows/ci.yml`).
 
@@ -41,9 +41,15 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
     `weave-visible/1` manifest with the engine's codes), also as the SDK
     request's `policy` member. `weave effects` lists what a plan reads and
     writes.
+  - `weave sdk`: the subprocess compiler mode for sandboxing hosts (one
+    request on stdin, one response on stdout, exit codes 0 to 3, no other
+    I/O, an optional `--untrusted`/`--read-only` floor;
+    [COMPILER_SDK.md](COMPILER_SDK.md#subprocess-mode-weave-sdk)).
   - Acceptance: `tests/permissions.rs`, `tests/hostile_source.rs` (fuzzed
     hostile source adds no commands), `scripts/check_permissions.py` and
-    `scripts/check_agent_repair.py` on a real engine with the B1 registry.
+    `scripts/check_agent_repair.py` on a real engine with the B1 registry,
+    `scripts/check_agent_service.py` on the B4 `weave-service`, and
+    `tests/sdk_mode.rs`.
 - **Protocol 0.22.0 (engine A2):** plans, view templates and handler artifacts
   are labelled 0.22.0, so engine results of compiled plans carry
   `fact_provenance` (engine-recorded writer and recorded time for each cited
@@ -124,11 +130,11 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
   concurrency, and no attachment or structural-relation facts. Results of
   compiled plans can carry engine-recorded `on_behalf_of` delegation chains
   in `fact_provenance`; the compiler never supplies them.
-- LB1 parts that wait for the engine: the engine does not yet serve a
-  principal's visible manifest (B3/B4), so hosts assemble it from
-  `weave-engine graphs` and query results; the compile tool on the engine's
-  MCP server is engine B4. Derived-fact leakage protection is engine B2.
-  Snapshot `replace` records may omit readers except under `--untrusted`.
+- LB1 parts that wait for the engine: the compile tool on the engine's MCP
+  server (engine B4, which will run `weave sdk`). The visible manifest is
+  served by engine B4 (`GET /v1/manifest`, spaces from `describe_schema`).
+  Derived-fact leakage protection is engine B2. Snapshot `replace` records may
+  omit readers except under `--untrusted`.
 - Mixed graph-to-scalar functions, general named joins with explicit
   resolution, stratified negation and aggregation.
 - Distributed and offline governance, clustering as a language feature, and

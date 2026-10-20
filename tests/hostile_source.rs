@@ -387,3 +387,147 @@ fn hostile_strings_are_data_in_the_plan() {
         assert_eq!(value["commands"][0]["graph_id"], "fleet");
     }
 }
+
+/// Run `weave sdk` once; a hang fails the test.
+fn weave_sdk(args: &[&str], input: &[u8]) -> (i32, Vec<u8>) {
+    use std::io::{Read, Write};
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_weave"))
+        .arg("sdk")
+        .args(args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    let data = input.to_vec();
+    let writer = std::thread::spawn(move || {
+        let _ = stdin.write_all(&data);
+    });
+    let mut stdout = child.stdout.take().unwrap();
+    let reader = std::thread::spawn(move || {
+        let mut out = Vec::new();
+        stdout.read_to_end(&mut out).unwrap();
+        out
+    });
+    let start = std::time::Instant::now();
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
+        if start.elapsed() > std::time::Duration::from_secs(60) {
+            child.kill().unwrap();
+            panic!("weave sdk hung");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    };
+    writer.join().unwrap();
+    (
+        status.code().expect("killed by a signal"),
+        reader.join().unwrap(),
+    )
+}
+
+/// The same hostile sources, and hostile request envelopes, through the
+/// subprocess mode a host sandboxes (`weave sdk`): every run exits 0 or 1 with
+/// exactly the in-process SDK response, a passing response's plan is the
+/// ordinary compiled plan, and a read-only one never writes.
+#[test]
+fn fuzzed_hostile_source_through_weave_sdk() {
+    use weave_language::sdk::{PolicyFloor, compile_response_with_floor};
+    let mut files = Vec::new();
+    sources(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("examples"),
+        &mut files,
+    );
+    files.sort();
+    let mut corpus: Vec<String> = files
+        .iter()
+        .map(|f| std::fs::read_to_string(f).unwrap())
+        .collect();
+    corpus.extend(SMALL.iter().map(|s| s.to_string()));
+    let runs: usize = std::env::var("WEAVE_SDK_FUZZ_RUNS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1_000);
+    let mut rng = Rng(0x0b1b_5d4d_0001);
+    let (mut passed, mut failed) = (0, 0);
+    for run in 0..runs {
+        let seed = &corpus[rng.below(corpus.len())];
+        let source = mutate(&mut rng, seed, &corpus);
+        let (policy, read_only) = match rng.below(4) {
+            0 => (None, false),
+            1 => (Some(serde_json::json!({"read_only": true})), true),
+            2 => (Some(serde_json::json!({"untrusted": true})), false),
+            _ => (
+                Some(serde_json::json!({"untrusted": true, "read_only": true})),
+                true,
+            ),
+        };
+        let mut body = serde_json::json!({"format": "weave-compiler-request/1",
+            "entry_id": "fuzz", "source": source, "modules": []});
+        if let Some(policy) = policy {
+            body["policy"] = policy;
+        }
+        let mut input = serde_json::to_vec(&body).unwrap();
+        // Every fourth request also has its envelope bytes mutated.
+        if run % 4 == 3 && !input.is_empty() {
+            for _ in 0..1 + rng.below(4) {
+                let at = rng.below(input.len());
+                let bytes = b"{}[]\",:\\\x00\xff9 ";
+                input[at] = bytes[rng.below(bytes.len())];
+            }
+        }
+        let floor = if rng.below(5) == 0 {
+            PolicyFloor {
+                untrusted: false,
+                read_only: true,
+            }
+        } else {
+            PolicyFloor::default()
+        };
+        let args: &[&str] = if floor.read_only {
+            &["--read-only"]
+        } else {
+            &[]
+        };
+        let (code, stdout) = weave_sdk(args, &input);
+        let expected = compile_response_with_floor(&input, &floor);
+        assert_eq!(stdout, expected.bytes, "weave sdk differs from the SDK");
+        let response: Value = serde_json::from_slice(&stdout).expect("one JSON response");
+        assert_ne!(response["error"]["code"], "E_SDK_INTERNAL", "panicked");
+        if !expected.ok {
+            assert_eq!(code, 1);
+            failed += 1;
+            continue;
+        }
+        assert_eq!(code, 0);
+        passed += 1;
+        let program: weave_contract::Program =
+            serde_json::from_value(response["artifacts"]["program"].clone()).unwrap();
+        let bytes = serde_json::to_vec(&response["artifacts"]["program"]).unwrap();
+        decode_program(&bytes).expect("a strict core v1 plan");
+        if let Ok(request) = serde_json::from_slice::<Value>(&input)
+            && let Some(source) = request["source"].as_str()
+            && request["modules"].as_array().is_some_and(|m| m.is_empty())
+        {
+            if let Ok(plain) = weave_language::compile(source) {
+                assert_eq!(program, plain, "a policy changed a passing plan");
+            }
+            let mut declared = Vec::new();
+            if let Ok(parsed) = weave_language::parse(source) {
+                declared_writes(&parsed.statements, &mut declared);
+            }
+            let writes = plan_effects(&program)
+                .iter()
+                .filter(|e| e.access == Access::Write)
+                .count();
+            if read_only || floor.read_only {
+                assert_eq!(writes, 0, "read-only response wrote: {source}");
+            }
+            assert_eq!(writes, declared.len(), "{source}");
+        }
+    }
+    eprintln!("weave sdk fuzz: {runs} runs, {passed} passed, {failed} failed");
+    assert!(passed > 0 && failed > 0);
+}

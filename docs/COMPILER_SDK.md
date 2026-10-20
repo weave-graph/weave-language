@@ -102,6 +102,53 @@ For artifact inspection use a lossless JSON decoder. Native forwarding can use a
 exact JSON parser, or preserve response bytes verbatim. This profile copies two
 bytes per ABI call; it is bounded and pointer-free, with no zero-copy promise.
 
+## Subprocess mode: `weave sdk`
+
+Introduced by LB1 ([#5](https://github.com/weave-graph/weave-language/issues/5)) for
+hosts that cannot link the compiler, such as the engine's MCP server (engine B4),
+which runs it as a sandboxed child process:
+
+```sh
+weave sdk [--untrusted] [--read-only] < request.json > response.json
+```
+
+- **Input.** Exactly one `weave-compiler-request/1` on stdin, read to its end. At
+  most 8 MiB is read: one byte more and the response is `E_SDK_BUDGET` without
+  reading the rest. Trailing data after the JSON value (a second request, say) is
+  `E_SDK_REQUEST`. An unreadable stdin is `E_SDK_IO`.
+- **Output.** Exactly one response on stdout: the bytes of
+  `weave_language::sdk::compile_response_with_floor` for that input, so it equals
+  the Rust, C ABI and WASM responses. Diagnostics carry the same `source_id`, exact
+  UTF-8 byte `start`/`end` and traces. Nothing is written to stderr except the usage
+  message.
+- **Exit codes** (stable):
+
+  | Code | Meaning |
+  |---|---|
+  | 0 | Response written, `ok: true` |
+  | 1 | Response written, `ok: false` (a compiler diagnostic or an `E_SDK_*` transport error) |
+  | 2 | Invalid command line (unknown or repeated flag, any argument); no response |
+  | 3 | The response could not be written to stdout |
+
+- **No other I/O.** The mode opens no file and no socket, and no environment
+  variable affects compilation: modules come only from the request's `modules`, and a manifest only
+  from its `policy.visible`. It ignores the working directory. A host should still
+  sandbox it (empty directory, empty environment, no network, CPU and memory
+  limits, a wall-clock deadline), since compilation has no cooperative
+  cancellation.
+- **Policy.** The request's optional `policy` (`untrusted`, `read_only`, `visible`)
+  applies as for every SDK entry point ([PERMISSIONS.md](PERMISSIONS.md)).
+  `--untrusted` and `--read-only` set a host **floor**: a request can add rules but
+  never remove these. A request that passes gets the same response bytes with or
+  without a floor.
+- **Hostile input.** `tests/sdk_mode.rs` drives the binary with empty, malformed,
+  non-UTF-8, NUL-filled, concatenated, oversized (to 32 MiB) and deeply nested
+  input (a million nested JSON arrays, source literal and call nesting past their
+  depth budgets, a 100,000-token flood, 65 modules) and requires one well-formed
+  failure, exit code 1, no panic and no hang. `tests/hostile_source.rs` sends
+  fuzzed hostile sources and corrupted envelopes through `weave sdk` and compares
+  every response with the in-process API.
+
 ## Limits and failure model
 
 - Raw UTF-8 request: 8 MiB. Serde's temporary escape-decoding allocation is bounded
