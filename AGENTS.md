@@ -47,7 +47,7 @@ python3 scripts/verify_contract.py      # vendored contract matches manifest
 python3 scripts/verify_spaces.py
 cargo fmt --check
 cargo clippy --locked --all-targets -- -D warnings
-cargo test --workspace --locked         # about 246 tests
+cargo test --workspace --locked         # about 249 tests
 cargo check --locked --lib --target wasm32-unknown-unknown   # portable core
 ```
 

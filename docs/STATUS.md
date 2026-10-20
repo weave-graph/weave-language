@@ -1,15 +1,15 @@
 # Current status
 
 As of **20 October 2026**: **the language is at Phase A parity, on contract
-1.1.0.** The compiler at `main` targets engine contract **1.1.0** (engine B1
-part 1: group readers and delegation provenance) and its **core v1** profile (LA0, see
+1.2.0.** The compiler at `main` targets engine contract **1.2.0** (engine B2
+part 2: write-time propagation, after B1's group readers) and its **core v1** profile (LA0, see
 [CORE_V1.md](CORE_V1.md)). Every Phase A operator has source syntax (LA1,
 [#3](https://github.com/weave-graph/weave-language/issues/3)), and the five
 Phase A exit questions run from `.weave` source on a real engine
-(`scripts/check_phase_a.py`). It vendors the complete 103-file contract crate
-from engine `5a19549` (B1 part 1), including the core v1 golden fixtures, which
+(`scripts/check_phase_a.py`). It vendors the complete 108-file contract crate
+from engine `b46c93c` (B2 part 2), including the core v1 golden fixtures, which
 `scripts/verify_contract.py` checks against `vendor/manifest.json`.
-`cargo test --workspace --locked` passes 246 tests locally. CI runs Linux, macOS
+`cargo test --workspace --locked` passes 249 tests locally. CI runs Linux, macOS
 and Windows plus WASM parity, and runs the engine's core v1 fixture harness on
 the vendored crate (`.github/workflows/ci.yml`).
 
@@ -35,6 +35,8 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
     engine resolves groups and enforces them.
   - A `correct` must state its readers or `public` (`E_VISIBILITY_REQUIRED`),
     so a correction can no longer publish a restricted fact by omission.
+    `widen_readers` (contract 1.2.0) states the intent to publish wider; the
+    untrusted policy rejects it (`E_READERS_WIDENED`).
   - Compile policies `--untrusted` (every written record states its readers;
     no host templates), `--read-only` (no writes) and `--visible MANIFEST.json`
     (graph, group and space references checked against one principal's
@@ -57,6 +59,13 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
   command with node valid time ([HYBRID.md](HYBRID.md)). There is no source
   syntax for claimed `provenance` (readers are LB1, above), and the compiler
   never supplies a writer or recorded time.
+- **Protocol 1.2.0 (engine B2 part 2):** plans, view templates and handler
+  artifacts are labelled 1.2.0, with the same commands and data as 1.1.0
+  except that a source `correct` may now carry `widen_readers`. 1.2.0
+  corrections that widen readers without it fail with `E_READERS_WIDENED`,
+  and facts broader than restricted evidence they cite with
+  `E_DERIVED_READERS` (source cannot cite evidence). `describe --contract`
+  lists `widen_readers` as a core v1 field (since 1.2).
 - **Protocol 1.1.0 (engine B1 part 1):** plans, view templates and handler
   artifacts are labelled 1.1.0, with the same commands and data as 1.0.0.
   Since LB1 the compiler emits `reader_groups` where source declares them,

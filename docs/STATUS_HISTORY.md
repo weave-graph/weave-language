@@ -4,6 +4,17 @@
 > protocol 1.1.0, moved from `STATUS.md` on 2026-10-17. Each entry is accurate for
 > its stated protocol version. Current status: [STATUS.md](STATUS.md).
 
+## Contract 1.2.0 (B2 write-time propagation) and `widen_readers`, 2026-10-20
+
+Re-vendored the complete 108-file contract crate from engine `b46c93c` (B2
+part 2, [weave-engine#75](https://github.com/weave-graph/weave-engine/pull/75)).
+The compiler labels plans and artifacts 1.2.0. Source gains `widen_readers` on
+`correct` (LB1, [#5](https://github.com/weave-graph/weave-language/issues/5));
+the untrusted policy rejects it. `scripts/check_permissions.py` (121 checks)
+covers `E_READERS_WIDENED` and `E_DERIVED_READERS` on that engine. Local
+results and the engine integration lines are in the PR that introduced this
+entry.
+
 ## LB1 part 2: `weave sdk` subprocess mode and the service-served manifest, 2026-10-20
 
 `weave sdk` compiles one bounded request from stdin to stdout for sandboxing

@@ -1,7 +1,7 @@
 //! Core contract v1 classification of emitted plans and artifacts.
 //!
 //! The engine's `docs/contract/core-v1.md` section 12 classifies every contract
-//! feature from 0.1 to 1.1 as *core v1*, *extension* or *deferred*. This module
+//! feature from 0.1 to 1.2 as *core v1*, *extension* or *deferred*. This module
 //! walks what the compiler actually emitted (commands, graph expressions, the
 //! data-level extension fields and host templates) and reports each feature
 //! with that class and the exact JSON locations that use it.
@@ -105,7 +105,28 @@ impl Collector {
                 self.add("write", "0.22", CoreV1, at);
                 for (index, change) in changes.iter().enumerate() {
                     let fact = match change {
-                        FactChange::Assert { fact } | FactChange::Correct { fact, .. } => fact,
+                        FactChange::Assert { fact } => fact,
+                        FactChange::Correct {
+                            fact,
+                            widen_readers,
+                            ..
+                        } => {
+                            // `widen_readers` (1.2, B2; core v1 section 4
+                            // `fact.propagation`): listed like `reader_groups`,
+                            // because it is gated after the 1.0.0 freeze
+                            // (`E_VERSION` under older programs). Omitted when
+                            // false, and then not reported.
+                            if *widen_readers {
+                                self.construct = "field";
+                                self.add(
+                                    "widen_readers",
+                                    "1.2",
+                                    CoreV1,
+                                    &format!("{at}/changes/{index}/widen_readers"),
+                                );
+                            }
+                            fact
+                        }
                         FactChange::Retract { .. } => continue,
                     };
                     self.fact(fact, &format!("{at}/changes/{index}/fact"));

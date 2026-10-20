@@ -1,6 +1,6 @@
 # Bytes and exact reference values
 
-> Written for protocol 0.18. Version statements below describe that release; the compiler now targets 1.1.0 ([status](STATUS.md)).
+> Written for protocol 0.18. Version statements below describe that release; the compiler now targets 1.2.0 ([status](STATUS.md)).
 
 Source-only Bytes and typed pinned references implement the ordinary value portion
 of paper §4. They pass through pure functions, explicit unary callbacks, partial

@@ -188,7 +188,7 @@ try:
         if not readers:
             public_embeddings[f'emb-{i}'] = vector
     for graph in [GRAPH, HIDDEN]:
-        status, out = http('POST', '/v1/execute', ROOT, {'version': '1.1.0', 'commands': [
+        status, out = http('POST', '/v1/execute', ROOT, {'version': '1.2.0', 'commands': [
             {'op': 'write', 'graph_id': graph, 'branch_id': 'main', 'changes': changes}]})
         check('host data written', status == 200, out)
 

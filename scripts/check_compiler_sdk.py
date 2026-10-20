@@ -86,6 +86,8 @@ cases.append(('policy-read-only-write',request(restricted,policy={'read_only':Tr
 cases.append(('policy-visible-ok',request(restricted,policy={'untrusted':True,'visible':manifest})))
 cases.append(('policy-visible-hidden-group',request(restricted.replace('maintenance','finance'),policy={'visible':manifest})))
 cases.append(('policy-visible-hidden-graph',request('use G graph "payroll"; lens L from G { }',policy={'read_only':True,'visible':manifest})))
+cases.append(('policy-untrusted-widen',request('write W graph "fleet" { correct node "n" entity "N" space "s" public widen_readers; }',policy={'untrusted':True})))
+cases.append(('widen-on-assert',request('write W graph "fleet" { assert node "n" entity "N" space "s" public widen_readers; }')))
 cases.append(('policy-unknown-field',request('',policy={'trusted':True})))
 b='module "b" revision "1"; import a module "a" revision "1" sha256 "'+('0'*64)+'";'
 a_unit='module "a" revision "1";'+imp('b','b',b)
@@ -144,7 +146,7 @@ with tempfile.TemporaryDirectory(prefix='weave-sdk-') as tmp:
    expected=json.loads(subprocess.check_output([str(a.compiler.resolve()),'artifacts',str(fixtures[name])]))
    result=json.loads(actual);assert result['ok'] and result['artifacts']==expected['artifacts'] and result['artifact_fingerprint']==expected['artifact_fingerprint'],name
   if name in ['policy-visible-ok','exact-integers','diamond-modules','near-4MiB-decoded-budget','large-output','all-octets','recorded-handle-pin','recorded-checkpoint-view']:assert json.loads(actual)['ok'],actual
-  expected_errors={'bad-reference':'E_REFERENCE_VALUE','bad-bytes':'E_BYTES_LITERAL','missing-module':'E_MODULE_MISSING','recorded-hidden-read-denial':'E_FUNCTION_EFFECT','changes-terminal':'E_CHANGES_OPERAND','expand-hidden-read-denial':'E_FUNCTION_EFFECT','nearest-space-mismatch':'E_SPACE_MISMATCH','write-hidden-effect-denial':'E_FUNCTION_EFFECT','wrong-pin':'E_MODULE_DIGEST','correct-without-readers':'E_VISIBILITY_REQUIRED','policy-untrusted-implicit-public':'E_VISIBILITY_REQUIRED','policy-read-only-write':'E_EFFECT_DENIED','policy-visible-hidden-group':'E_UNAVAILABLE','policy-visible-hidden-graph':'E_UNAVAILABLE','policy-unknown-field':'E_SDK_REQUEST','cycle':'E_MODULE_CYCLE','invalid-utf8':'E_SDK_UTF8','invalid-json':'E_SDK_REQUEST','duplicate-fields':'E_SDK_REQUEST','decoded-bound':'E_SDK_BUDGET'}
+  expected_errors={'bad-reference':'E_REFERENCE_VALUE','bad-bytes':'E_BYTES_LITERAL','missing-module':'E_MODULE_MISSING','recorded-hidden-read-denial':'E_FUNCTION_EFFECT','changes-terminal':'E_CHANGES_OPERAND','expand-hidden-read-denial':'E_FUNCTION_EFFECT','nearest-space-mismatch':'E_SPACE_MISMATCH','write-hidden-effect-denial':'E_FUNCTION_EFFECT','wrong-pin':'E_MODULE_DIGEST','correct-without-readers':'E_VISIBILITY_REQUIRED','policy-untrusted-implicit-public':'E_VISIBILITY_REQUIRED','policy-read-only-write':'E_EFFECT_DENIED','policy-visible-hidden-group':'E_UNAVAILABLE','policy-visible-hidden-graph':'E_UNAVAILABLE','policy-unknown-field':'E_SDK_REQUEST','policy-untrusted-widen':'E_READERS_WIDENED','widen-on-assert':'E_VISIBILITY','cycle':'E_MODULE_CYCLE','invalid-utf8':'E_SDK_UTF8','invalid-json':'E_SDK_REQUEST','duplicate-fields':'E_SDK_REQUEST','decoded-bound':'E_SDK_BUDGET'}
   if name in expected_errors:assert json.loads(actual)['error']['code']==expected_errors[name],actual
   if name in ['source-error','original-module-diagnostic']:assert json.loads(actual)['ok'] is False,actual
   reports.append({'name':name,'request_bytes':len(raw),'response_bytes':len(actual),'native_abi':timing})

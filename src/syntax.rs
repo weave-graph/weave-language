@@ -311,7 +311,7 @@ pub enum WriteKind {
     Correct,
     Retract,
 }
-/// Who may read a record a source writes (LB1, protocol 1.1.0).
+/// Who may read a record a source writes (LB1, protocol 1.1.0; `widen_readers` 1.2.0).
 ///
 /// `readers` are literal principal IDs and `reader_groups` are registry groups;
 /// together they are one disjunction, exactly as on the contract records. An
@@ -327,11 +327,20 @@ pub struct Visibility {
     pub readers: Vec<(String, Span)>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reader_groups: Vec<(String, Span)>,
+    /// Span of a `widen_readers` clause (contract 1.2.0): the `correct` may
+    /// make the fact readable by more principals than the version it replaces.
+    /// Valid only on `correct`; it is intent, not a reader statement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub widen: Option<Span>,
 }
 impl Visibility {
     /// Whether the source states the record's readers (or `public`) explicitly.
     pub fn is_stated(&self) -> bool {
         self.public.is_some() || !self.readers.is_empty() || !self.reader_groups.is_empty()
+    }
+    /// Whether the record has no clause at all, `widen_readers` included.
+    pub fn is_empty(&self) -> bool {
+        self.is_unstated() && self.widen.is_none()
     }
     pub fn is_unstated(&self) -> bool {
         !self.is_stated()
@@ -361,7 +370,7 @@ pub enum WriteFact {
         valid: Option<(i64, Option<i64>)>,
         metadata: Vec<Metadata>,
         properties: BTreeMap<String, LiteralExpr>,
-        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        #[serde(default, skip_serializing_if = "Visibility::is_empty")]
         visibility: Visibility,
     },
     Edge {
@@ -374,7 +383,7 @@ pub enum WriteFact {
         valid_to: Option<i64>,
         metadata: Vec<Metadata>,
         properties: BTreeMap<String, LiteralExpr>,
-        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        #[serde(default, skip_serializing_if = "Visibility::is_empty")]
         visibility: Visibility,
     },
     /// `space Name`: the declared embedding space descriptor as a fact.
@@ -388,7 +397,7 @@ pub enum WriteFact {
         vector_span: Span,
         valid_from: i64,
         valid_to: Option<i64>,
-        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        #[serde(default, skip_serializing_if = "Visibility::is_empty")]
         visibility: Visibility,
     },
     /// The target of a retraction.
@@ -613,7 +622,7 @@ pub enum Item {
         predicate: String,
         metadata: Vec<Metadata>,
         properties: BTreeMap<String, LiteralExpr>,
-        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        #[serde(default, skip_serializing_if = "Visibility::is_empty")]
         visibility: Visibility,
     },
     Claim {
@@ -627,7 +636,7 @@ pub enum Item {
         valid_to: Option<i64>,
         metadata: Vec<Metadata>,
         properties: BTreeMap<String, LiteralExpr>,
-        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        #[serde(default, skip_serializing_if = "Visibility::is_empty")]
         visibility: Visibility,
     },
     Attachment {
@@ -642,7 +651,7 @@ pub enum Item {
         valid_from: i64,
         valid_to: Option<i64>,
         required: bool,
-        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        #[serde(default, skip_serializing_if = "Visibility::is_empty")]
         visibility: Visibility,
     },
     Node {
@@ -653,7 +662,7 @@ pub enum Item {
         space: String,
         metadata: Vec<Metadata>,
         properties: BTreeMap<String, LiteralExpr>,
-        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        #[serde(default, skip_serializing_if = "Visibility::is_empty")]
         visibility: Visibility,
     },
     Edge {
@@ -668,7 +677,7 @@ pub enum Item {
         valid_to: Option<i64>,
         metadata: Vec<Metadata>,
         properties: BTreeMap<String, LiteralExpr>,
-        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        #[serde(default, skip_serializing_if = "Visibility::is_empty")]
         visibility: Visibility,
     },
 }
@@ -1505,11 +1514,26 @@ impl Parser {
             return Ok(false);
         };
         let word = word.clone();
-        if !matches!(word.as_str(), "public" | "readers" | "reader_groups") {
+        if !matches!(
+            word.as_str(),
+            "public" | "readers" | "reader_groups" | "widen_readers"
+        ) {
             return Ok(false);
         }
         self.take();
         let span = (keyword.start, keyword.end);
+        if word == "widen_readers" {
+            if visibility.widen.is_some() {
+                return Err(Diagnostic::new(
+                    "E_DUPLICATE",
+                    "Duplicate 'widen_readers' clause",
+                    span.0,
+                    span.1,
+                ));
+            }
+            visibility.widen = Some(span);
+            return Ok(true);
+        }
         let duplicate = match word.as_str() {
             "public" => visibility.public.is_some(),
             "readers" => !visibility.readers.is_empty(),
@@ -2159,6 +2183,18 @@ impl Parser {
                 }
             };
             let end = self.peek().end;
+            if let WriteFact::Node { visibility, .. }
+            | WriteFact::Edge { visibility, .. }
+            | WriteFact::Embedding { visibility, .. } = &fact
+                && let (Some(widen), false) = (visibility.widen, change == WriteKind::Correct)
+            {
+                return Err(Diagnostic::new(
+                    "E_VISIBILITY",
+                    "'widen_readers' applies only to 'correct', which replaces a fact's readers",
+                    widen.0,
+                    widen.1,
+                ));
+            }
             if change == WriteKind::Correct {
                 let stated = match &fact {
                     WriteFact::Node { visibility, .. }
@@ -3874,6 +3910,20 @@ impl Parser {
                             }
                             _ => return Err(self.error("Expected node or edge declaration")),
                         };
+                        if let Item::Structural { visibility, .. }
+                        | Item::Claim { visibility, .. }
+                        | Item::Attachment { visibility, .. }
+                        | Item::Node { visibility, .. }
+                        | Item::Edge { visibility, .. } = &value
+                            && let Some(widen) = visibility.widen
+                        {
+                            return Err(Diagnostic::new(
+                                "E_VISIBILITY",
+                                "'widen_readers' applies only to 'correct' in a write; a snapshot record has no earlier version to widen",
+                                widen.0,
+                                widen.1,
+                            ));
+                        }
                         self.symbol(';')?;
                         items.push(value);
                     }

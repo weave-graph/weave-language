@@ -2128,6 +2128,13 @@ fn lower_change(
 ) -> Result<weave_contract::FactChange, Diagnostic> {
     use weave_contract::{Fact, FactChange, FactTarget};
     let span = change.span;
+    // `widen_readers` (1.2.0): explicit intent to publish a correction wider.
+    let widen = match &change.fact {
+        syntax::WriteFact::Node { visibility, .. }
+        | syntax::WriteFact::Edge { visibility, .. }
+        | syntax::WriteFact::Embedding { visibility, .. } => visibility.widen.is_some(),
+        _ => false,
+    };
     let interval = |start: i64, end: Option<i64>| {
         let valid = Interval { start, end };
         if valid.valid() {
@@ -2257,6 +2264,7 @@ fn lower_change(
         syntax::WriteKind::Correct => FactChange::Correct {
             fact,
             expected: None,
+            widen_readers: widen,
         },
         syntax::WriteKind::Retract => unreachable!("retractions return above"),
     })
