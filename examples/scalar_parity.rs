@@ -26,7 +26,9 @@ fn bytes() -> &'static [u8] {
         let handler_source = include_str!("handlers.weave");
         let handlers = weave_language::compile_artifacts(handler_source).expect("fixed handler fixture");
         let handler_error = weave_language::compile(handler_source).unwrap_err();
-        serde_json::to_vec(&serde_json::json!({"profile":"weave-source-scalar-artifact-parity-v5","cases":cases,"vectors":vectors,"vector_boundaries":vector_boundaries,"vector_error":vector_error,"vector_fingerprint":vectors.fingerprint().unwrap(),"intervals":intervals,"interval_fingerprint":intervals.fingerprint().unwrap(),"interval_errors":interval_errors,"errors":errors,"artifacts":artifacts,"artifact_fingerprint":artifacts.fingerprint().unwrap(),"artifact_error":artifact_error,"handlers":handlers,"handler_fingerprint":handlers.fingerprint().unwrap(),"handler_error":handler_error})).unwrap()
+        let traversal = weave_language::compile_artifacts(include_str!("traversal/fleet_questions.weave")).expect("fixed traversal fixture");
+        let traversal_errors:Vec<_>=["use G graph \"g\"; changes D from G { since head; } explain W from D;","use G graph \"g\"; expand E from G { seeds \"a\"; hops 17; }","use G graph \"g\" revision \"r\" as_of 5;"].iter().map(|s|weave_language::compile_artifacts(s).unwrap_err()).collect();
+        serde_json::to_vec(&serde_json::json!({"profile":"weave-source-scalar-artifact-parity-v5","cases":cases,"vectors":vectors,"vector_boundaries":vector_boundaries,"vector_error":vector_error,"vector_fingerprint":vectors.fingerprint().unwrap(),"intervals":intervals,"interval_fingerprint":intervals.fingerprint().unwrap(),"interval_errors":interval_errors,"errors":errors,"artifacts":artifacts,"artifact_fingerprint":artifacts.fingerprint().unwrap(),"artifact_error":artifact_error,"handlers":handlers,"handler_fingerprint":handlers.fingerprint().unwrap(),"handler_error":handler_error,"traversal":traversal,"traversal_fingerprint":traversal.fingerprint().unwrap(),"traversal_errors":traversal_errors})).unwrap()
     })
 }
 #[unsafe(no_mangle)]

@@ -1,0 +1,14 @@
+// Phase A exit question 2 (engine ROADMAP.md); run by scripts/check_traversal.py.
+use Known graph "fleet" as_of 1760000000000;
+use Fleet graph "fleet";
+// Units at site S with the firmware each ran at valid date D, as known at K.
+expand AtSite from Known {
+  seeds "site-1";
+  hops 2;
+  direction both;
+  match relation "located_at", "runs";
+  at 1000;
+}
+explain WhyAtSite from AtSite;
+// What changed for unit U between K and the head.
+changes ForUnit from Fleet { between as_of 1760000000000 and head; entities "UNIT-2"; }

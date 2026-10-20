@@ -4,6 +4,19 @@
 > protocol 0.23, moved from `STATUS.md` on 2026-10-17. Each entry is accurate for
 > its stated protocol version. Current status: [STATUS.md](STATUS.md).
 
+## LA1 part 1: as_of, expand and changes source syntax (protocol 0.23.0), 2026-10-20
+
+Source syntax for the engine A3 operators ([#3](https://github.com/weave-graph/weave-language/issues/3)):
+`use ... as_of`, `expand`, `changes` and `explain` over them, see
+[TRAVERSAL.md](TRAVERSAL.md). No vendor change. Local results:
+`cargo test --workspace --locked --all-targets` passes 213 tests; fmt, Clippy
+with `-D warnings`, contract, spaces and sources verification, the vendored
+fixture harness (8 tests), the SDK (40 cases) and interval oracles, the wasm32
+check, native/WASM scalar parity (21,127 identical bytes) and SDK parity
+(566,439 identical bytes, zero imports) pass. Against engine `1084384`, all 43
+lines of the engine's `compiler-runtime` job, the 4 Linux `compiler-host`
+script lines and the new `scripts/check_traversal.py` pass with this compiler.
+
 ## Traversal, as-of reads and change sets (protocol 0.23.0), 2026-10-20
 
 Re-vendored the complete 91-file contract crate from engine

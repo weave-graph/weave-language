@@ -44,7 +44,7 @@ is a guide and the command is authoritative.
 
 | Class | Constructs | Contract features |
 |---|---|---|
-| core v1 | `graph`, `transaction`, schemas with string, integer, float and boolean properties, claims and assertions (including a claim's `context graph`), attachments, `lens`, `pin`, live handles, `join`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, functions over graphs, `recorded_handle`, `recorded_range` | `commit`, `commit_batch`, `query`, `join`, `bind`, `evaluate`, expressions `query`, `reference`, `filter`, `join`, `metadata`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, `recorded_query`, command `recorded_range`, command `write` (0.22), expressions `expand`, `as_of` and `changes` (0.23). The compiler emits none of the 0.22 and 0.23 features yet |
+| core v1 | `graph`, `transaction`, schemas with string, integer, float and boolean properties, claims and assertions (including a claim's `context graph`), attachments, `lens`, `pin`, live handles, `join`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, functions over graphs, `recorded_handle`, `recorded_range`, `use ... as_of`, `expand`, `changes` (LA1) | `commit`, `commit_batch`, `query`, `join`, `bind`, `evaluate`, expressions `query`, `reference`, `filter`, `join`, `metadata`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, `recorded_query`, command `recorded_range`, command `write` (0.22), expressions `expand`, `as_of` and `changes` (0.23, from `use ... as_of`, `expand` and `changes` source declarations). The compiler emits none of the 0.22 features yet |
 | extension | `rules` and rule application, context selection and contextual attachments, typed contexts, `decimal` and `quantity` schema properties, geometry and typed-vector `distance` (including embedding-role vectors), `counterparts`, `resolve_identity`, `accepted_history`, `accepted_range`, `accepted`, `view_current`, view templates | `reason`, `context`, `attachment_context`, `context_scope`, `context_typing`, `typed_context`, `decimal`, `quantity`, `geometry`, `counterparts`, `resolve_identity`, `accepted_history`, `accepted_range`, `accepted_graph`, `current_view`, `compiled_view_template` |
 | deferred | `cluster_navigation`, handler templates | `cluster`, `compiled_handler_template` |
 
@@ -96,17 +96,19 @@ classifies all of them as **core v1** (section 5 `time.as_of`, section 8
 
 For weave-language:
 
-- Plans, view templates and handler artifacts are labelled `0.23.0`. Their
-  commands and data are byte-for-byte what 0.22.0 and 0.21.0 emitted. The
-  engine still accepts 0.22.0 and older programs and artifacts.
-- Compiled plans never produce `QueryResult.changes`, because the compiler
-  emits no `changes` expression. Views and handler recipes reject all three
-  operators.
-- There is no source syntax yet for `expand`, `as_of` or `changes`; that is
-  language epic LA1 ([#3](https://github.com/weave-graph/weave-language/issues/3)).
-  `describe --contract` classifies all three as core v1 expressions (`since`
-  0.23), so plans built through the protocol directly classify correctly. The
-  `as_of` field of `expand` is core v1 data and is not listed separately.
+- Plans, view templates and handler artifacts are labelled `0.23.0`. Sources
+  that use none of the LA1 declarations emit byte-for-byte what 0.22.0 and
+  0.21.0 emitted. The engine still accepts 0.22.0 and older programs and
+  artifacts.
+- LA1 part 1 ([#3](https://github.com/weave-graph/weave-language/issues/3))
+  adds source syntax for all three ([TRAVERSAL.md](TRAVERSAL.md)):
+  `use ... as_of T` (a lens over it lowers to `as_of`), `expand` and
+  `changes`. Plans with `changes` produce `QueryResult.changes`. Views and
+  handler recipes cannot contain them (the declarations are top-level only,
+  and the engine rejects all three operators in recipes).
+- `describe --contract` classifies all three as core v1 expressions (`since`
+  0.23). The `as_of` field of `expand` is core v1 data and is not listed
+  separately.
 
 ## `describe --contract`
 

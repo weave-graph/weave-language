@@ -252,7 +252,21 @@ pub enum Statement {
         name: String,
         name_span: Span,
         graph: String,
+        /// Branch to read; absent means `main` (LA1).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        branch: Option<String>,
         revision: Option<String>,
+        /// Read the branch as the replica knew it at this recorded time (LA1, protocol 0.23 `as_of`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        as_of: Option<i64>,
+    },
+    /// Store reads over a stored graph reference (LA1, protocol 0.23 A3).
+    Traversal {
+        name: String,
+        name_span: Span,
+        source: String,
+        source_span: Span,
+        operation: TraversalOperation,
     },
     Lens {
         name: String,
@@ -263,6 +277,28 @@ pub enum Statement {
         valid_at: Option<TimeExpr>,
         include_metadata: bool,
         max_depth: u32,
+    },
+}
+/// An A3 store read declared over a stored graph reference (LA1).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "operator", rename_all = "snake_case")]
+pub enum TraversalOperation {
+    /// `expand`: the exact k-hop neighbourhood of seed nodes.
+    Expand {
+        seeds: Vec<String>,
+        hops: u32,
+        direction: weave_contract::Direction,
+        predicates: Vec<String>,
+        valid_at: Option<i64>,
+        limit: Option<u32>,
+    },
+    /// `changes`: the facts asserted, retracted or corrected between two bounds.
+    Changes {
+        from: weave_contract::ChangeBound,
+        to: weave_contract::ChangeBound,
+        entities: Vec<String>,
+        predicates: Vec<String>,
+        limit: Option<u32>,
     },
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1583,6 +1619,189 @@ impl Parser {
             definition,
         })
     }
+    /// Comma-separated selector strings: `"a", "b"`.
+    fn selector_list(&mut self) -> Result<Vec<String>, Diagnostic> {
+        let mut values = vec![self.selector_string()?];
+        while self.peek().kind == Kind::Symbol(',') {
+            self.take();
+            values.push(self.selector_string()?);
+        }
+        Ok(values)
+    }
+    fn change_bound(&mut self) -> Result<weave_contract::ChangeBound, Diagnostic> {
+        match self.name()?.as_str() {
+            "as_of" => Ok(weave_contract::ChangeBound::AsOf {
+                unix_millis: self.number()?,
+            }),
+            "cursor" => Ok(weave_contract::ChangeBound::Cursor {
+                revision: self.selector_string()?,
+            }),
+            "head" => Ok(weave_contract::ChangeBound::Head),
+            _ => {
+                self.cursor -= 1;
+                Err(self.error("Expected a change bound: as_of TIME, cursor \"revision\" or head"))
+            }
+        }
+    }
+    /// The `{ ... }` body of `expand` or `changes` (LA1). Each clause appears
+    /// at most once; bounds mirror `weave_contract::traversal`.
+    fn traversal_body(
+        &mut self,
+        expand: bool,
+        name_span: Span,
+    ) -> Result<TraversalOperation, Diagnostic> {
+        use weave_contract::traversal::{MAX_HOPS, MAX_LIMIT, MAX_SCOPE, MAX_SEEDS};
+        self.symbol('{')?;
+        let mut seen = BTreeMap::new();
+        let mut seeds = Vec::new();
+        let mut hops = None;
+        let mut direction = weave_contract::Direction::Out;
+        let mut predicates = Vec::new();
+        let mut entities = Vec::new();
+        let mut valid_at = None;
+        let mut limit = None;
+        let mut bounds = None;
+        while self.peek().kind != Kind::Symbol('}') {
+            let clause = self.peek().clone();
+            let clause_span = (clause.start, clause.end);
+            let word = self.name()?;
+            let allowed: &[&str] = if expand {
+                &["seeds", "hops", "direction", "match", "at", "limit"]
+            } else {
+                &["between", "since", "entities", "match", "limit"]
+            };
+            if !allowed.contains(&word.as_str()) {
+                self.cursor -= 1;
+                return Err(self.error(if expand {
+                    "Expand allows seeds, hops, direction, match relation, at and limit"
+                } else {
+                    "Changes allows between, since, entities, match relation and limit"
+                }));
+            }
+            let key = if word == "since" {
+                "between"
+            } else {
+                word.as_str()
+            };
+            if seen.insert(key.to_owned(), clause_span).is_some() {
+                return Err(Diagnostic::new(
+                    "E_DUPLICATE",
+                    format!("Duplicate '{word}' clause"),
+                    clause_span.0,
+                    clause_span.1,
+                ));
+            }
+            let list_bound = |values: &Vec<String>, max: usize, what: &str| {
+                if values.len() > max {
+                    Err(Diagnostic::new(
+                        "E_BUDGET",
+                        format!("At most {max} {what} are allowed"),
+                        clause_span.0,
+                        clause_span.1,
+                    ))
+                } else {
+                    Ok(())
+                }
+            };
+            match word.as_str() {
+                "seeds" => {
+                    seeds = self.selector_list()?;
+                    list_bound(&seeds, MAX_SEEDS, "seeds")?;
+                }
+                "hops" => {
+                    let token = self.peek().clone();
+                    let value = self.number()?;
+                    if !(1..=i64::from(MAX_HOPS)).contains(&value) {
+                        return Err(Diagnostic::new(
+                            if value < 1 { "E_EXPAND" } else { "E_BUDGET" },
+                            format!("Expand traverses 1 to {MAX_HOPS} hops"),
+                            token.start,
+                            token.end,
+                        ));
+                    }
+                    hops = Some(value as u32);
+                }
+                "direction" => {
+                    direction = match self.name()?.as_str() {
+                        "out" => weave_contract::Direction::Out,
+                        "in" => weave_contract::Direction::In,
+                        "both" => weave_contract::Direction::Both,
+                        _ => {
+                            self.cursor -= 1;
+                            return Err(self.error("Expected direction out, in or both"));
+                        }
+                    };
+                }
+                "match" => {
+                    self.word("relation")?;
+                    predicates = self.selector_list()?;
+                    list_bound(&predicates, MAX_SCOPE, "relations")?;
+                }
+                "entities" => {
+                    entities = self.selector_list()?;
+                    list_bound(&entities, MAX_SCOPE, "entities")?;
+                }
+                "at" => valid_at = Some(self.number()?),
+                "limit" => {
+                    let token = self.peek().clone();
+                    let value = self.number()?;
+                    if !(1..=i64::from(MAX_LIMIT)).contains(&value) {
+                        return Err(Diagnostic::new(
+                            "E_BUDGET",
+                            format!("Limit must be between 1 and {MAX_LIMIT}"),
+                            token.start,
+                            token.end,
+                        ));
+                    }
+                    limit = Some(value as u32);
+                }
+                "between" => {
+                    let from = self.change_bound()?;
+                    self.word("and")?;
+                    bounds = Some((from, self.change_bound()?));
+                }
+                "since" => bounds = Some((self.change_bound()?, weave_contract::ChangeBound::Head)),
+                _ => unreachable!("clause checked above"),
+            }
+            self.symbol(';')?;
+        }
+        let close = self.peek().clone();
+        self.symbol('}')?;
+        if expand {
+            if seeds.is_empty() || hops.is_none() {
+                return Err(Diagnostic::new(
+                    "E_EXPAND",
+                    "Expand requires 'seeds' and 'hops' clauses",
+                    name_span.0,
+                    name_span.1,
+                ));
+            }
+            Ok(TraversalOperation::Expand {
+                seeds,
+                hops: hops.unwrap_or(1),
+                direction,
+                predicates,
+                valid_at,
+                limit,
+            })
+        } else {
+            let Some((from, to)) = bounds else {
+                return Err(Diagnostic::new(
+                    "E_CHANGES_BOUND",
+                    "Changes requires a 'between FROM and TO' or 'since FROM' clause",
+                    close.start,
+                    close.end,
+                ));
+            };
+            Ok(TraversalOperation::Changes {
+                from,
+                to,
+                entities,
+                predicates,
+                limit,
+            })
+        }
+    }
     fn program(&mut self, context: u8) -> Result<Program, Diagnostic> {
         let mut statements = Vec::new();
         while self.peek().kind != Kind::End
@@ -1591,6 +1810,7 @@ impl Parser {
             if context == 2 && self.peek().kind == Kind::Word("return".into()) {
                 break;
             }
+            let kind_span = (self.peek().start, self.peek().end);
             let kind = self.name()?;
             let name_span = (self.peek().start, self.peek().end);
             if kind == "module" {
@@ -1659,6 +1879,8 @@ impl Parser {
                         | "live_handle"
                         | "pin"
                         | "import"
+                        | "expand"
+                        | "changes"
                 )
             {
                 return Err(Diagnostic::new(
@@ -2989,19 +3211,72 @@ impl Parser {
                 "use" => {
                     self.word("graph")?;
                     let graph = self.string()?;
-                    let revision = if self.peek().kind == Kind::Word("revision".into()) {
-                        self.word("revision")?;
-                        Some(self.string()?)
+                    let branch = if self.peek().kind == Kind::Word("branch".into()) {
+                        self.word("branch")?;
+                        Some(self.selector_string()?)
                     } else {
                         None
                     };
+                    let mut revision = None;
+                    let mut as_of = None;
+                    loop {
+                        let clause = self.peek().clone();
+                        let selected = if clause.kind == Kind::Word("revision".into()) {
+                            self.take();
+                            revision = Some(self.string()?);
+                            true
+                        } else if clause.kind == Kind::Word("as_of".into()) {
+                            self.take();
+                            as_of = Some(self.number()?);
+                            true
+                        } else {
+                            false
+                        };
+                        if !selected {
+                            break;
+                        }
+                        if revision.is_some() && as_of.is_some() {
+                            return Err(Diagnostic::new(
+                                "E_HISTORY_SELECTOR",
+                                "Choose a revision or an as_of recorded time, not both",
+                                clause.start,
+                                clause.end,
+                            ));
+                        }
+                    }
                     self.symbol(';')?;
                     statements.push(Statement::Use {
                         name,
                         name_span,
                         graph,
+                        branch,
                         revision,
+                        as_of,
                     });
+                }
+                "expand" | "changes" => {
+                    self.word("from")?;
+                    let source_span = (self.peek().start, self.peek().end);
+                    let source = self.name()?;
+                    let operation = self.traversal_body(kind == "expand", name_span)?;
+                    statements.push(Statement::Traversal {
+                        name,
+                        name_span,
+                        source,
+                        source_span,
+                        operation,
+                    });
+                }
+                "nearest" | "similar_candidates" => {
+                    return Err(Diagnostic::new(
+                        "E_NOT_YET_SUPPORTED",
+                        format!(
+                            "'{kind}' needs the engine A4 embeddings layer, which protocol {} does not provide yet",
+                            weave_contract::VERSION
+                        ),
+                        kind_span.0,
+                        kind_span.1,
+                    ));
                 }
                 "window" | "sequence" => {
                     self.word("from")?;

@@ -1,0 +1,11 @@
+// Time travel: a query of the branch as known at a recorded time (LA1).
+// Mirrors the engine core v1 fixture `as-of-partially-visible`: a reader who
+// cannot see every record gets the visible subset as known then.
+use Then graph "g" as_of 15;
+use Later graph "g" as_of 25;
+lens LocatedThen from Then {
+  match relation "located_at";
+}
+lens LocatedLater from Later {
+  match relation "located_at";
+}

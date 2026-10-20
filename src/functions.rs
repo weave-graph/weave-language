@@ -226,6 +226,9 @@ pub(crate) fn declaration(statement: &Statement) -> (&str, Span) {
         | Statement::Use {
             name, name_span, ..
         }
+        | Statement::Traversal {
+            name, name_span, ..
+        }
         | Statement::Lens {
             name, name_span, ..
         } => (name, *name_span),

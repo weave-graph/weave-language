@@ -75,6 +75,8 @@ impl Handle {
 struct Lens {
     query: QueryPlan,
     recorded: Option<weave_contract::RecordedSelection>,
+    /// A stored read of the branch as known at this recorded time (LA1, 0.23 `as_of`).
+    as_of: Option<i64>,
     input: Option<GraphExpression>,
     typed: Option<bool>,
     relation: Option<String>,
@@ -85,6 +87,7 @@ impl Lens {
         Self {
             query,
             recorded: None,
+            as_of: None,
             input: None,
             typed: None,
             relation: None,
@@ -101,12 +104,16 @@ impl Lens {
                 }
             }
             Some(input) => input.clone(),
-            None => match &self.recorded {
-                Some(selection) => GraphExpression::RecordedQuery {
+            None => match (&self.recorded, self.as_of) {
+                (Some(selection), _) => GraphExpression::RecordedQuery {
                     query: self.query.clone(),
                     selection: selection.clone(),
                 },
-                None => GraphExpression::Query {
+                (None, Some(unix_millis)) => GraphExpression::AsOf {
+                    query: self.query.clone(),
+                    unix_millis,
+                },
+                (None, None) => GraphExpression::Query {
                     query: self.query.clone(),
                 },
             },
@@ -315,6 +322,7 @@ fn lower_artifacts(
         }
     }
     let mut active_batch: Option<(String, usize, Vec<SnapshotCommit>)> = None;
+    let mut change_sets = BTreeSet::new();
     for (statement_index, statement) in statements.into_iter().enumerate() {
         if let Some((name, count)) = batches.remove(&statement_index) {
             active_batch = Some((name, count, Vec::new()));
@@ -419,6 +427,9 @@ fn lower_artifacts(
             | Statement::Use {
                 name, name_span, ..
             }
+            | Statement::Traversal {
+                name, name_span, ..
+            }
             | Statement::Lens {
                 name, name_span, ..
             }
@@ -450,6 +461,19 @@ fn lower_artifacts(
                 "E_DUPLICATE",
                 format!("Duplicate graph or lens '{name}'"),
                 name_span,
+            ));
+        }
+        // A change set is terminal (contract 0.23): no operator takes one as input.
+        if let Some((input, span)) = graph_inputs(&statement)
+            .into_iter()
+            .find(|(input, _)| change_sets.contains(*input))
+        {
+            return Err(diagnostic(
+                "E_CHANGES_OPERAND",
+                format!(
+                    "Change set '{input}' is terminal and cannot be the input of another operator"
+                ),
+                span,
             ));
         }
         match statement {
@@ -1491,9 +1515,108 @@ fn lower_artifacts(
                 name,
                 name_span: _,
                 graph,
+                branch,
                 revision,
+                as_of,
             } => {
-                names.insert(name, Lens::concrete(base_query(graph, revision)));
+                let mut query = base_query(graph, revision);
+                if let Some(branch) = branch {
+                    query.branch_id = branch;
+                }
+                let mut lens = Lens::concrete(query);
+                lens.as_of = as_of;
+                names.insert(name, lens);
+            }
+            Statement::Traversal {
+                name,
+                name_span: _,
+                source,
+                source_span,
+                operation,
+            } => {
+                let Some(lens) = names.get(&source) else {
+                    return Err(diagnostic(
+                        "E_UNKNOWN_GRAPH",
+                        format!("Unknown graph reference '{source}'"),
+                        source_span,
+                    ));
+                };
+                let changes = matches!(operation, syntax::TraversalOperation::Changes { .. });
+                // Both operators read the store directly, so their source must be a
+                // stored graph reference (`use` or `graph`) with no filters applied.
+                if lens.input.is_some()
+                    || lens.recorded.is_some()
+                    || lens.relation.is_some()
+                    || lens.time.is_some()
+                    || lens.query.predicate.is_some()
+                    || lens.query.valid_at.is_some()
+                    || lens.query.include_metadata
+                {
+                    return Err(diagnostic(
+                        if changes {
+                            "E_CHANGES_SOURCE"
+                        } else {
+                            "E_EXPAND_SOURCE"
+                        },
+                        "Expand and changes read a stored graph reference declared with 'use' or 'graph'; put filters in their own clauses",
+                        source_span,
+                    ));
+                }
+                let query = lens.query.clone();
+                let as_of = lens.as_of;
+                let expression = match operation {
+                    syntax::TraversalOperation::Expand {
+                        seeds,
+                        hops,
+                        direction,
+                        predicates,
+                        valid_at,
+                        limit,
+                    } => GraphExpression::Expand(weave_contract::ExpandPlan {
+                        graph_id: query.graph_id,
+                        branch_id: query.branch_id,
+                        revision: query.revision,
+                        as_of,
+                        seeds,
+                        hops,
+                        direction,
+                        predicates,
+                        valid_at,
+                        limit: limit.unwrap_or(weave_contract::traversal::DEFAULT_LIMIT),
+                    }),
+                    syntax::TraversalOperation::Changes {
+                        from,
+                        to,
+                        entities,
+                        predicates,
+                        limit,
+                    } => {
+                        if query.revision.is_some() || as_of.is_some() {
+                            return Err(diagnostic(
+                                "E_CHANGES_SOURCE",
+                                "A change set selects its own bounds; its source must not pin a revision or as_of time",
+                                source_span,
+                            ));
+                        }
+                        GraphExpression::Changes(weave_contract::ChangesPlan {
+                            graph_id: query.graph_id,
+                            branch_id: query.branch_id,
+                            from,
+                            to,
+                            entities,
+                            predicates,
+                            limit: limit.unwrap_or(weave_contract::traversal::DEFAULT_LIMIT),
+                        })
+                    }
+                };
+                let mut lens = Lens::concrete(base_query(String::new(), None));
+                lens.input = Some(expression);
+                lens.emit(&name, &mut commands);
+                if changes {
+                    change_sets.insert(name);
+                } else {
+                    names.insert(name, lens);
+                }
             }
             Statement::Lens {
                 name,
@@ -1717,6 +1840,82 @@ fn lower_artifacts(
             commands,
         },
     })
+}
+
+/// The graph values a lowered statement consumes, with their source spans.
+fn graph_inputs(statement: &Statement) -> Vec<(&str, syntax::Span)> {
+    match statement {
+        Statement::Temporal {
+            source,
+            source_span,
+            sequence,
+            ..
+        } => {
+            let mut inputs = vec![(source.as_str(), *source_span)];
+            if let Some(selection) = sequence {
+                inputs.push((selection.right.as_str(), selection.right_span));
+            }
+            inputs
+        }
+        Statement::Algebra {
+            source,
+            source_span,
+            operation,
+            ..
+        } => {
+            let mut inputs = vec![(source.as_str(), *source_span)];
+            if let AlgebraOperation::Union { right, right_span }
+            | AlgebraOperation::Diff { right, right_span }
+            | AlgebraOperation::Distance {
+                right, right_span, ..
+            }
+            | AlgebraOperation::Transform {
+                right, right_span, ..
+            } = operation
+            {
+                inputs.push((right.as_str(), *right_span));
+            }
+            inputs
+        }
+        Statement::Join {
+            left,
+            left_span,
+            right,
+            right_span,
+            ..
+        } => vec![(left.as_str(), *left_span), (right.as_str(), *right_span)],
+        Statement::Reason {
+            source,
+            source_span,
+            ..
+        }
+        | Statement::Lens {
+            source,
+            source_span,
+            ..
+        }
+        | Statement::Bind {
+            source,
+            source_span,
+            ..
+        }
+        | Statement::Metadata {
+            source,
+            source_span,
+            ..
+        }
+        | Statement::TypedContext {
+            source,
+            source_span,
+            ..
+        }
+        | Statement::Traversal {
+            source,
+            source_span,
+            ..
+        } => vec![(source.as_str(), *source_span)],
+        _ => vec![],
+    }
 }
 
 /// Discover validated source schema descriptors without executing a plan.
