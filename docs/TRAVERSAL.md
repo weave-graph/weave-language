@@ -189,8 +189,8 @@ change set cannot be explained (it is terminal); its entries' `before` and
   units running F are those with a `runs` edge to F in that result.
 - Fact-level writes (assert, correct, retract) still have no source syntax.
 - **Hybrid search is not yet supported.** `nearest` and `similar_candidates`
-  are reserved declaration keywords that fail with `E_NOT_YET_SUPPORTED`
-  until the engine A4 embeddings layer
-  ([weave-engine#13](https://github.com/weave-graph/weave-engine/issues/13))
-  ships its contract. They will be added as further `expand`-style
+  are reserved declaration keywords that fail with `E_NOT_YET_SUPPORTED`.
+  The engine A4 operators exist since protocol 0.24.0
+  ([weave-engine#13](https://github.com/weave-graph/weave-engine/issues/13)).
+  They will be added as further `expand`-style
   declarations over a stored reference (LA1 part 2).

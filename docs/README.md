@@ -1,6 +1,6 @@
 # Weave Language documentation
 
-The compiler targets engine contract **0.23.0** and its core v1 profile
+The compiler targets engine contract **0.24.0** and its core v1 profile
 ([CORE_V1.md](CORE_V1.md)). Many feature documents were
 written when the feature was introduced and name the protocol version of that
 release ("protocol 0.18", "0.15 candidate" and so on). Read those numbers as
@@ -39,8 +39,8 @@ behavior are in [STATUS.md](STATUS.md).
 | [Time travel, traversal and change sets](TRAVERSAL.md) | `use ... as_of`, `expand`, `changes` and `explain` over them (LA1) | 0.23 |
 | [Native services](NATIVE_SERVICES.md) | Cluster navigation and other native service bindings | 0.13 |
 | [Formatter](FORMATTER.md) | `weave fmt` | — |
-| [Core contract v1](CORE_V1.md) | 0.21 → v1 migration note, 0.22 fact provenance, 0.23 traversal operators, feature classes, `describe --contract` | 0.21–0.23 (core-v1) |
-| [Shared protocol](contract/v0.23/README.md) | The current contract notes. Earlier versions are in `contract/v0.*` | 0.23 |
+| [Core contract v1](CORE_V1.md) | 0.21 → v1 migration note, 0.22 fact provenance, 0.23 traversal operators, 0.24 embeddings, feature classes, `describe --contract` | 0.21–0.24 (core-v1) |
+| [Shared protocol](contract/v0.24/README.md) | The current contract notes. Earlier versions are in `contract/v0.*` | 0.24 |
 
 ## Planning and release
 
@@ -58,7 +58,7 @@ These are accurate as dated records:
   [workflow.json](workflow.json): the original white-paper gate plan
   (superseded for scheduling).
 - [Status history](STATUS_HISTORY.md): the per-version ledger of verified
-  checkpoints through 0.23.
+  checkpoints through 0.24.
 - [Protocol 0.15 pairing](PROTOCOL_015.md), [verification 0.17](VERIFICATION_017.md)
   and [source reconciliation](SOURCE_RECONCILIATION.md).
 - `proposals/`: design proposals. Most are implemented; each says so in its

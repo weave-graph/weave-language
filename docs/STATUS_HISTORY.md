@@ -1,8 +1,17 @@
 # Status history (verified checkpoint ledger)
 
 > **Historical record.** Newest-first ledger of verified checkpoints through
-> protocol 0.23, moved from `STATUS.md` on 2026-10-17. Each entry is accurate for
+> protocol 0.24, moved from `STATUS.md` on 2026-10-17. Each entry is accurate for
 > its stated protocol version. Current status: [STATUS.md](STATUS.md).
+
+## Embedding facts and hybrid retrieval (protocol 0.24.0), 2026-10-20
+
+Re-vendored the complete 98-file contract crate from engine
+`5e2a1d9bbf715e7d7d1d636595ab4c7e9e28406c` (A4 parts 1 and 2,
+[weave-engine#13](https://github.com/weave-graph/weave-engine/issues/13)). The
+compiler now labels plans and artifacts 0.24.0 without emitting any 0.24-only
+feature. `describe --contract` classifies `nearest` and `similar_candidates` as
+core v1. Local results are in the PR that introduced this entry.
 
 ## LA1 part 1: as_of, expand and changes source syntax (protocol 0.23.0), 2026-10-20
 

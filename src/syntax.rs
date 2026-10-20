@@ -3271,8 +3271,7 @@ impl Parser {
                     return Err(Diagnostic::new(
                         "E_NOT_YET_SUPPORTED",
                         format!(
-                            "'{kind}' needs the engine A4 embeddings layer, which protocol {} does not provide yet",
-                            weave_contract::VERSION
+                            "'{kind}' (engine A4, protocol 0.24) has no source syntax yet; build it through the protocol"
                         ),
                         kind_span.0,
                         kind_span.1,

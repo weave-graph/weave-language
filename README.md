@@ -28,8 +28,8 @@ graph functions, rules and explanations.
 
 ## Status
 
-The compiler is experimental, with 213 tests passing, and it targets engine
-contract **0.23.0** and its core v1 profile
+The compiler is experimental, with 214 tests passing, and it targets engine
+contract **0.24.0** and its core v1 profile
 ([migration note](docs/CORE_V1.md)). The syntax is provisional.
 
 | Works today | Not yet |

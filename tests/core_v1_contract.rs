@@ -371,8 +371,7 @@ fn describe_contract_classifies_fact_writes_and_provenance_as_core_v1() {
 
 #[test]
 fn describe_contract_classifies_expand_as_of_and_changes_as_core_v1() {
-    // The compiler has no source syntax for the 0.23 operators (LA1); classify
-    // the engine's golden programs, built through the protocol directly.
+    // Classify the engine's golden programs, built through the protocol directly.
     let mut seen = BTreeSet::new();
     for (name, expected) in [
         ("expand-k-hop", &["evaluate", "expand", "write"][..]),
@@ -420,4 +419,49 @@ fn describe_contract_classifies_expand_as_of_and_changes_as_core_v1() {
         }
     }
     assert_eq!(seen, BTreeSet::from(["as_of", "changes", "expand"]));
+}
+
+#[test]
+fn describe_contract_classifies_nearest_and_similar_candidates_as_core_v1() {
+    // The 0.24 (A4) operators and the embedding write kinds, classified on the
+    // engine's golden programs. Their candidate values are walked as inputs.
+    for (name, expected) in [
+        (
+            "embedding-write-and-nearest",
+            &["evaluate", "nearest", "write"][..],
+        ),
+        (
+            "nearest-composition",
+            &["evaluate", "expand", "nearest", "write"][..],
+        ),
+        (
+            "similar-candidates",
+            &["evaluate", "similar_candidates", "write"][..],
+        ),
+    ] {
+        let fixture: Value = serde_json::from_slice(
+            &std::fs::read(root().join(format!(
+                "vendor/weave-contract/fixtures/core-v1/positive/{name}.json"
+            )))
+            .unwrap(),
+        )
+        .unwrap();
+        let input = &fixture["input"];
+        assert_eq!(input["version"], "0.24.0", "{name}");
+        let program = decode_program(&serde_json::to_vec(input).unwrap())
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
+        let profile = weave_language::contract_profile::classify(
+            &program,
+            &Default::default(),
+            &Default::default(),
+        );
+        assert!(profile.core_only, "{name}: {:?}", profile.features);
+        let features: BTreeSet<_> = profile.features.iter().map(|f| f.feature).collect();
+        assert_eq!(features, expected.iter().copied().collect(), "{name}");
+        for feature in &profile.features {
+            if ["nearest", "similar_candidates"].contains(&feature.feature) {
+                assert_eq!((feature.since, feature.construct), ("0.24", "expression"));
+            }
+        }
+    }
 }
