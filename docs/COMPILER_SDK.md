@@ -15,11 +15,19 @@ let response_bytes = weave_language::sdk::compile_request(request_bytes);
 // Or compile_response(request_bytes) for { ok, bytes } without decoding output.
 ```
 
-All request fields are required; duplicate/unknown fields reject:
+All request fields except `policy` are required; duplicate/unknown fields reject:
 
 ```json
 {"format":"weave-compiler-request/1","entry_id":"editor","source":"value Count 9007199254740993;","modules":[]}
 ```
+
+An optional `policy` member (LB1) adds compile-time rules for untrusted source:
+`{"untrusted": true, "read_only": true, "visible": {...weave-visible/1 manifest}}`,
+each member optional and unknown members rejected (`E_SDK_REQUEST`). Policy
+diagnostics are ordinary compiler failures (`E_VISIBILITY_REQUIRED`,
+`E_EFFECT_DENIED`, `E_UNAVAILABLE`, ...); a passing source returns exactly the
+response it returns without a policy. See [PERMISSIONS.md](PERMISSIONS.md). The JS
+adapter's `compileSource` passes a `policy` object through unchanged.
 
 Each optional supplied module entry has exactly `id`, `revision`, `source` string
 fields. The `modules` array itself is required. Use the existing source `import`

@@ -311,6 +311,45 @@ pub enum WriteKind {
     Correct,
     Retract,
 }
+/// Who may read a record a source writes (LB1, protocol 1.1.0).
+///
+/// `readers` are literal principal IDs and `reader_groups` are registry groups;
+/// together they are one disjunction, exactly as on the contract records. An
+/// explicit `public` clause states that the record has no restriction. A record
+/// with no clause at all is public too, except where a rule requires a stated
+/// clause (`correct`, and every record under the untrusted policy).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Visibility {
+    /// Span of an explicit `public` clause.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub public: Option<Span>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub readers: Vec<(String, Span)>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reader_groups: Vec<(String, Span)>,
+}
+impl Visibility {
+    /// Whether the source states the record's readers (or `public`) explicitly.
+    pub fn is_stated(&self) -> bool {
+        self.public.is_some() || !self.readers.is_empty() || !self.reader_groups.is_empty()
+    }
+    pub fn is_unstated(&self) -> bool {
+        !self.is_stated()
+    }
+    /// The contract `readers` field, in source order.
+    pub fn reader_ids(&self) -> Vec<String> {
+        self.readers.iter().map(|(id, _)| id.clone()).collect()
+    }
+    /// The contract `reader_groups` field, in source order.
+    pub fn group_ids(&self) -> Vec<String> {
+        self.reader_groups
+            .iter()
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+}
+/// Most entries one `readers` or `reader_groups` clause may list.
+pub const MAX_VISIBILITY_ENTRIES: usize = 256;
 /// The fact of a source write change, before lowering.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -322,6 +361,8 @@ pub enum WriteFact {
         valid: Option<(i64, Option<i64>)>,
         metadata: Vec<Metadata>,
         properties: BTreeMap<String, LiteralExpr>,
+        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        visibility: Visibility,
     },
     Edge {
         id: String,
@@ -333,6 +374,8 @@ pub enum WriteFact {
         valid_to: Option<i64>,
         metadata: Vec<Metadata>,
         properties: BTreeMap<String, LiteralExpr>,
+        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        visibility: Visibility,
     },
     /// `space Name`: the declared embedding space descriptor as a fact.
     Space { space: String, space_span: Span },
@@ -345,6 +388,8 @@ pub enum WriteFact {
         vector_span: Span,
         valid_from: i64,
         valid_to: Option<i64>,
+        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        visibility: Visibility,
     },
     /// The target of a retraction.
     Target {
@@ -568,6 +613,8 @@ pub enum Item {
         predicate: String,
         metadata: Vec<Metadata>,
         properties: BTreeMap<String, LiteralExpr>,
+        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        visibility: Visibility,
     },
     Claim {
         id: String,
@@ -580,6 +627,8 @@ pub enum Item {
         valid_to: Option<i64>,
         metadata: Vec<Metadata>,
         properties: BTreeMap<String, LiteralExpr>,
+        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        visibility: Visibility,
     },
     Attachment {
         context: Option<weave_contract::GraphRef>,
@@ -593,6 +642,8 @@ pub enum Item {
         valid_from: i64,
         valid_to: Option<i64>,
         required: bool,
+        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        visibility: Visibility,
     },
     Node {
         id: String,
@@ -602,6 +653,8 @@ pub enum Item {
         space: String,
         metadata: Vec<Metadata>,
         properties: BTreeMap<String, LiteralExpr>,
+        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        visibility: Visibility,
     },
     Edge {
         id: String,
@@ -615,6 +668,8 @@ pub enum Item {
         valid_to: Option<i64>,
         metadata: Vec<Metadata>,
         properties: BTreeMap<String, LiteralExpr>,
+        #[serde(default, skip_serializing_if = "Visibility::is_unstated")]
+        visibility: Visibility,
     },
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1404,10 +1459,18 @@ impl Parser {
             Ok((None, Some(self.scalar_type()?)))
         }
     }
-    fn metadata(&mut self) -> Result<(Vec<Metadata>, BTreeMap<String, LiteralExpr>), Diagnostic> {
+    /// `metadata`, `property` and visibility clauses of one record, in any order.
+    #[allow(clippy::type_complexity)]
+    fn metadata(
+        &mut self,
+    ) -> Result<(Vec<Metadata>, BTreeMap<String, LiteralExpr>, Visibility), Diagnostic> {
         let mut result = Vec::new();
         let mut properties = BTreeMap::new();
+        let mut visibility = Visibility::default();
         loop {
+            if self.visibility_clause(&mut visibility)? {
+                continue;
+            }
             if self.peek().kind == Kind::Word("metadata".into()) {
                 self.word("metadata")?;
                 self.word("graph")?;
@@ -1432,7 +1495,83 @@ impl Parser {
                 break;
             }
         }
-        Ok((result, properties))
+        Ok((result, properties, visibility))
+    }
+    /// One `public`, `readers "p", ...` or `reader_groups "g", ...` clause (LB1).
+    /// Returns false, consuming nothing, when the next token starts none of them.
+    fn visibility_clause(&mut self, visibility: &mut Visibility) -> Result<bool, Diagnostic> {
+        let keyword = self.peek().clone();
+        let Kind::Word(word) = &keyword.kind else {
+            return Ok(false);
+        };
+        let word = word.clone();
+        if !matches!(word.as_str(), "public" | "readers" | "reader_groups") {
+            return Ok(false);
+        }
+        self.take();
+        let span = (keyword.start, keyword.end);
+        let duplicate = match word.as_str() {
+            "public" => visibility.public.is_some(),
+            "readers" => !visibility.readers.is_empty(),
+            _ => !visibility.reader_groups.is_empty(),
+        };
+        if duplicate {
+            return Err(Diagnostic::new(
+                "E_DUPLICATE",
+                format!("Duplicate '{word}' clause"),
+                span.0,
+                span.1,
+            ));
+        }
+        let conflict = if word == "public" {
+            !visibility.readers.is_empty() || !visibility.reader_groups.is_empty()
+        } else {
+            visibility.public.is_some()
+        };
+        if conflict {
+            return Err(Diagnostic::new(
+                "E_VISIBILITY",
+                "A record is either 'public' or restricted by 'readers' and 'reader_groups', not both",
+                span.0,
+                span.1,
+            ));
+        }
+        if word == "public" {
+            visibility.public = Some(span);
+            return Ok(true);
+        }
+        let mut entries: Vec<(String, Span)> = Vec::new();
+        loop {
+            let token = self.peek().clone();
+            let id = self.selector_string()?;
+            if entries.iter().any(|(existing, _)| *existing == id) {
+                return Err(Diagnostic::new(
+                    "E_DUPLICATE",
+                    format!("Duplicate entry '{id}' in '{word}'"),
+                    token.start,
+                    token.end,
+                ));
+            }
+            if entries.len() == MAX_VISIBILITY_ENTRIES {
+                return Err(Diagnostic::new(
+                    "E_BUDGET",
+                    format!("'{word}' lists at most {MAX_VISIBILITY_ENTRIES} entries"),
+                    token.start,
+                    token.end,
+                ));
+            }
+            entries.push((id, (token.start, token.end)));
+            if self.peek().kind != Kind::Symbol(',') {
+                break;
+            }
+            self.take();
+        }
+        if word == "readers" {
+            visibility.readers = entries;
+        } else {
+            visibility.reader_groups = entries;
+        }
+        Ok(true)
     }
     fn schema_properties(
         &mut self,
@@ -1917,7 +2056,7 @@ impl Parser {
                         } else {
                             None
                         };
-                        let (metadata, properties) = self.metadata()?;
+                        let (metadata, properties, visibility) = self.metadata()?;
                         WriteFact::Node {
                             id,
                             entity,
@@ -1925,6 +2064,7 @@ impl Parser {
                             valid,
                             metadata,
                             properties,
+                            visibility,
                         }
                     }
                     "edge" => {
@@ -1948,7 +2088,7 @@ impl Parser {
                             false
                         };
                         let (valid_from, valid_to) = self.valid_interval()?;
-                        let (metadata, properties) = self.metadata()?;
+                        let (metadata, properties, visibility) = self.metadata()?;
                         WriteFact::Edge {
                             id,
                             from,
@@ -1959,6 +2099,7 @@ impl Parser {
                             valid_to,
                             metadata,
                             properties,
+                            visibility,
                         }
                     }
                     "space" => {
@@ -1993,6 +2134,8 @@ impl Parser {
                         self.word("vector")?;
                         let (vector, vector_span) = self.number_list()?;
                         let (valid_from, valid_to) = self.valid_interval()?;
+                        let mut visibility = Visibility::default();
+                        while self.visibility_clause(&mut visibility)? {}
                         WriteFact::Embedding {
                             id,
                             space,
@@ -2002,6 +2145,7 @@ impl Parser {
                             vector_span,
                             valid_from,
                             valid_to,
+                            visibility,
                         }
                     }
                     _ => {
@@ -2014,6 +2158,23 @@ impl Parser {
                     }
                 }
             };
+            let end = self.peek().end;
+            if change == WriteKind::Correct {
+                let stated = match &fact {
+                    WriteFact::Node { visibility, .. }
+                    | WriteFact::Edge { visibility, .. }
+                    | WriteFact::Embedding { visibility, .. } => visibility.is_stated(),
+                    _ => true,
+                };
+                if !stated {
+                    return Err(Diagnostic::new(
+                        "E_VISIBILITY_REQUIRED",
+                        "'correct' replaces the fact's readers too: restate them with 'readers' or 'reader_groups', or write 'public' to publish the new version",
+                        start,
+                        end,
+                    ));
+                }
+            }
             if change == WriteKind::Correct && matches!(fact, WriteFact::Space { .. }) {
                 return Err(Diagnostic::new(
                     "E_CONFLICT",
@@ -2022,7 +2183,6 @@ impl Parser {
                     kind_token.end,
                 ));
             }
-            let end = self.peek().end;
             self.symbol(';')?;
             changes.push(WriteChange {
                 change,
@@ -3494,7 +3654,7 @@ impl Parser {
                                 let to = self.string()?;
                                 self.word("predicate")?;
                                 let predicate = self.string()?;
-                                let (metadata, properties) = self.metadata()?;
+                                let (metadata, properties, visibility) = self.metadata()?;
                                 Item::Structural {
                                     id,
                                     id_span,
@@ -3504,6 +3664,7 @@ impl Parser {
                                     predicate,
                                     metadata,
                                     properties,
+                                    visibility,
                                 }
                             }
                             "claim" => {
@@ -3546,7 +3707,7 @@ impl Parser {
                                 } else {
                                     Some(self.number()?)
                                 };
-                                let (metadata, properties) = self.metadata()?;
+                                let (metadata, properties, visibility) = self.metadata()?;
                                 Item::Claim {
                                     id,
                                     id_span,
@@ -3558,6 +3719,7 @@ impl Parser {
                                     valid_to,
                                     metadata,
                                     properties,
+                                    visibility,
                                 }
                             }
                             "attachment" => {
@@ -3629,6 +3791,8 @@ impl Parser {
                                 } else {
                                     None
                                 };
+                                let mut visibility = Visibility::default();
+                                while self.visibility_clause(&mut visibility)? {}
                                 Item::Attachment {
                                     context,
                                     id,
@@ -3640,6 +3804,7 @@ impl Parser {
                                     valid_from,
                                     valid_to,
                                     required,
+                                    visibility,
                                 }
                             }
                             "node" => {
@@ -3647,7 +3812,7 @@ impl Parser {
                                 let entity = self.string()?;
                                 self.word("space")?;
                                 let space = self.string()?;
-                                let (metadata, properties) = self.metadata()?;
+                                let (metadata, properties, visibility) = self.metadata()?;
                                 Item::Node {
                                     id,
                                     id_span,
@@ -3656,6 +3821,7 @@ impl Parser {
                                     space,
                                     metadata,
                                     properties,
+                                    visibility,
                                 }
                             }
                             "edge" => {
@@ -3690,7 +3856,7 @@ impl Parser {
                                 } else {
                                     Some(self.number()?)
                                 };
-                                let (metadata, properties) = self.metadata()?;
+                                let (metadata, properties, visibility) = self.metadata()?;
                                 Item::Edge {
                                     id,
                                     id_span,
@@ -3703,6 +3869,7 @@ impl Parser {
                                     valid_to,
                                     metadata,
                                     properties,
+                                    visibility,
                                 }
                             }
                             _ => return Err(self.error("Expected node or edge declaration")),

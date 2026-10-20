@@ -200,14 +200,18 @@ with tempfile.TemporaryDirectory(prefix='weave-phase-a-') as directory:
         execute(store, program({'op': 'write', 'graph_id': GRAPH, 'changes': base}), WRITER, [GRAPH])
 
     # ---- Question 1: 1,000 individual fact writes from source, equal to JSON writes.
+    # A source `correct` must state the readers it replaces (LB1); these facts are public.
+    def vis(change):
+        return ' public' if change == 'correct' else ''
+
     def edge_source(change, f):
         end = 'infinity' if f['valid_time']['end'] is None else f['valid_time']['end']
         return (f'{change} edge "{f["id"]}" from "{f["from"]}" to "{f["to"]}" relation "{f["predicate"]}" '
-                f'valid {f["valid_time"]["start"]} until {end};')
+                f'valid {f["valid_time"]["start"]} until {end}{vis(change)};')
 
     def node_source(change, f):
         props = ' '.join(f'property {json.dumps(k)} {json.dumps(v)}' for k, v in sorted(f['properties'].items()))
-        return f'{change} node "{f["id"]}" entity "{f["entity_id"]}" space "{f["space_id"]}" {props};'
+        return f'{change} node "{f["id"]}" entity "{f["entity_id"]}" space "{f["space_id"]}" {props}{vis(change)};'
 
     updates = []  # (source text, JSON changes)
     # The example itself is update 1: a rollout of unit 2 and a correction of unit 3.

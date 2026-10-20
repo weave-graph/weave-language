@@ -38,6 +38,7 @@ behavior are in [STATUS.md](STATUS.md).
 | [History selection](HISTORY_SELECTION.md) | Recorded handles, accepted history, recorded/accepted ranges | 0.20–0.21 |
 | [Time travel, traversal and change sets](TRAVERSAL.md) | `use ... as_of`, `expand`, `changes` and `explain` over them (LA1) | 0.23 |
 | [Fact writes, embeddings and hybrid retrieval](HYBRID.md) | `write`, `embedding_space`, `nearest`, `similar_candidates`, `seeds from`, Phase A exit questions (LA1) | 0.24 |
+| [Readers and agent-safe compilation](PERMISSIONS.md) | `readers`, `reader_groups`, `public`, the `correct` rule, `--untrusted`/`--read-only`/`--visible` policies, `weave effects` (LB1) | 1.1 |
 | [Native services](NATIVE_SERVICES.md) | Cluster navigation and other native service bindings | 0.13 |
 | [Formatter](FORMATTER.md) | `weave fmt` | — |
 | [Core contract v1](CORE_V1.md) | 0.21 → v1 migration note, 0.22 fact provenance, 0.23 traversal operators, 0.24 embeddings, 1.0.0 freeze, 1.1.0 group readers, feature classes, `describe --contract` | 0.21–1.1 (core-v1) |

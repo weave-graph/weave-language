@@ -13,7 +13,7 @@ embedding_space Notes id "hw-notes" revision "1" encoder "text-embedding-3-small
   version "2024-01-25" preprocessing "weave-chunk/512-tokens/v1" dimensions 3 metric cosine_distance;
 
 write Rollout graph "fleet" {
-  correct edge "runs:unit-2:0" from "unit-2" to "fw-2" relation "runs" valid 0 until 2000;
+  correct edge "runs:unit-2:0" from "unit-2" to "fw-2" relation "runs" valid 0 until 2000 public;
   assert edge "runs:unit-2:1" from "unit-2" to "fw-3" relation "runs" valid 2000 until infinity;
   assert space Notes;
   assert embedding "emb:note-1" in Notes subject node "note-1" vector [0.9, 0.1, 0.0] valid 100 until infinity;
@@ -66,19 +66,23 @@ write = "write", identifier, "graph", string, [ "branch", string ],
         [ "expected", ( "head", string | "new" ) ], "{", change, { change }, "}" ;
 change = ( "assert" | "correct" ), fact, ";"
        | "retract", ( "node" | "edge" | "attachment" | "embedding" ), string, ";" ;
-fact = "node", string, "entity", string, "space", string, [ interval ], { metadata | property }
+fact = "node", string, "entity", string, "space", string, [ interval ], { metadata | property | visibility }
      | "edge", string, "from", string, "to", string, "relation", string,
-       [ "polarity", ( "positive" | "negative" ) ], interval, { metadata | property }
+       [ "polarity", ( "positive" | "negative" ) ], interval, { metadata | property | visibility }
      | "space", identifier
      | "embedding", string, "in", identifier,
-       "subject", ( "node" | "entity" | "edge" ), string, "vector", vector, interval ;
+       "subject", ( "node" | "entity" | "edge" ), string, "vector", vector, interval, { visibility } ;
+visibility = "public" | "readers", string, { ",", string } | "reader_groups", string, { ",", string } ;
 interval = "valid", integer, "until", ( integer | "infinity" ) ;
 ```
 
 Each `write` lowers to one `write` command, which is one atomic fact
 revision. `assert` adds a fact that is not live. `correct` replaces the live
 version of the fact with that kind and ID, so it restates the whole fact.
-`retract` ends the live version; history keeps every version. `expected head
+`retract` ends the live version; history keeps every version. Since LB1 a
+fact may declare `readers`, `reader_groups` or `public`
+([PERMISSIONS.md](PERMISSIONS.md)), and a `correct` must declare one
+(`E_VISIBILITY_REQUIRED`), because it replaces the readers too. `expected head
 "r"` requires that head, `expected new` requires a new branch, and omitting
 it performs no head check. A node's optional `valid` interval is node valid
 time (0.22). The engine owns the writer and the recorded time; the compiler
@@ -154,6 +158,7 @@ the acceptance scripts check this.
 | `E_SCALAR_TYPE` | `vector value X` where `X` is not a typed vector | The name |
 | `E_CONFLICT` | `correct space` | `space` |
 | `E_INTERVAL` | An empty valid interval | The change |
+| `E_VISIBILITY_REQUIRED` | A `correct` without `readers`, `reader_groups` or `public` (LB1) | The change |
 | `E_FUNCTION_EFFECT` | `write`, `nearest`, `similar_candidates` or `embedding_space` inside a pure function | The name |
 
 ## Phase A exit questions
@@ -163,7 +168,7 @@ the acceptance scripts check this.
 in at most 15 lines. `scripts/check_phase_a.py --compiler PATH --engine PATH`
 runs all five on a real engine over a synthetic fleet:
 
-1. `q1_fact_writes.weave`: a rollout and a correction. The script applies
+1. `q1_fact_writes.weave`: a rollout and a correction (both `public`). The script applies
    1,000 updates as individual source writes (1,001 fact revisions), checks
    them against the same writes made in JSON, and compares the head for two
    readers.
@@ -193,10 +198,10 @@ on a real engine.
 
 ## Limits
 
-- **Writes are public.** Source writes cannot set `readers`, gates or
-  claimed provenance; permission syntax is LB1 (Phase B). Correcting a
-  restricted fact from source would therefore make its new version public.
-  Write restricted data through the protocol.
+- **Readers.** Since LB1, source writes set `readers` and `reader_groups`,
+  and a `correct` must restate them or say `public`
+  ([PERMISSIONS.md](PERMISSIONS.md)). Gates and claimed provenance have no
+  source syntax.
 - Per-fact `expected` concurrency (`absent`, `unchanged_since`) and
   attachment and structural-relation facts are not yet in the write syntax.
   Retraction accepts attachments.
