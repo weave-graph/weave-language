@@ -302,6 +302,11 @@ impl<'a> Resolver<'a> {
                 source,
                 source_span,
                 ..
+            }
+            | Statement::Traversal {
+                source,
+                source_span,
+                ..
             } => Self::local_graph(source, *source_span)?,
             Statement::Algebra {
                 source,

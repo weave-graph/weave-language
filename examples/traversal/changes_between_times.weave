@@ -1,0 +1,13 @@
+// Change sets between two recorded times (LA1). Mirrors the engine core v1
+// fixture `changes-between-times`. A change set is terminal: no later
+// declaration can take one as its input.
+use G graph "g";
+// Everything that changed since recorded time 15, up to the head.
+changes SinceFifteen from G {
+  since as_of 15;
+}
+// What changed for entity A between recorded times 5 and 15.
+changes ForA from G {
+  between as_of 5 and as_of 15;
+  entities "A";
+}

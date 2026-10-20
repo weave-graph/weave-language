@@ -1,0 +1,19 @@
+// k-hop traversal at a recorded time and at a valid time (LA1). Mirrors the
+// engine core v1 fixture `expand-valid-time-as-of`.
+// `as_of` is recorded time: what the store knew. `at` is valid time: what
+// was true in the world. They are independent.
+use Known graph "g" as_of 15;
+use G graph "g";
+expand AsKnownThen from Known {
+  seeds "a";
+  hops 2;
+}
+expand AtHead from G {
+  seeds "a";
+  hops 2;
+}
+expand ValidLater from G {
+  seeds "a";
+  hops 2;
+  at 60;
+}

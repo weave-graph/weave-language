@@ -5,7 +5,7 @@ contract **0.23.0** and its **core v1** profile (LA0, see
 [CORE_V1.md](CORE_V1.md)). It vendors the complete 91-file contract crate from
 engine `5976d47d6ab8` (A3 part 1), including the core v1 golden fixtures, which
 `scripts/verify_contract.py` checks against `vendor/manifest.json`.
-`cargo test --workspace --locked` passes 204 tests locally. CI runs Linux, macOS
+`cargo test --workspace --locked` passes 213 tests locally. CI runs Linux, macOS
 and Windows plus WASM parity, and runs the engine's core v1 fixture harness on
 the vendored crate (`.github/workflows/ci.yml`).
 
@@ -28,12 +28,23 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
   source fact). The compiler emits no 0.22-only field: it has no syntax for
   the `write` command, node `valid_time` or claimed `provenance`, and it never
   supplies a writer or recorded time.
-- **Protocol 0.23.0 (engine A3):** plans, view templates and handler
-  artifacts are labelled 0.23.0, with the same commands and data as 0.22.0.
-  `describe --contract` classifies the new `expand`, `as_of` and `changes`
-  expressions as core v1 when a program built through the protocol uses them.
-  Compiled plans never yield `QueryResult.changes`, because the compiler emits
-  none of these operators.
+- **Protocol 0.23.0 (engine A3) and LA1 part 1 query syntax**
+  ([TRAVERSAL.md](TRAVERSAL.md)): plans, view templates and handler
+  artifacts are labelled 0.23.0.
+  - Time travel: `use G graph "g" as_of T;` reads the branch as known at
+    recorded time T and lowers a lens over it to `as_of`; `at` keeps selecting
+    valid time.
+  - k-hop traversal: `expand E from G { seeds ...; hops N; direction ...;
+    match relation ...; at T; limit N; }` lowers to `expand`, at the head, a
+    pinned revision or an `as_of` time.
+  - Change sets: `changes C from G { between B1 and B2; entities ...; }` (or
+    `since B`), with `as_of T`, `cursor "R"` and `head` bounds, lowers to
+    `changes`. A change set is terminal (`E_CHANGES_OPERAND`).
+  - `explain` and every graph operator compose over `expand` and `as_of`
+    values. `describe --contract` classifies all three operators as core v1.
+  - Acceptance: golden plan tests and fixture equality (`tests/traversal.rs`)
+    and `scripts/check_traversal.py`, which runs the engine's core v1 oracle
+    fixtures and Phase A question 2 on a real engine.
 - **Graphs:** nodes with entity and space, first-class edges, claims and
   assertions, graph-valued metadata attachments, pinned and live references,
   and atomic transactions.
@@ -57,12 +68,15 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
 
 ## Not supported, mapped to the [engine roadmap](https://github.com/weave-graph/weave-engine/blob/main/docs/ROADMAP.md)
 
-- Source syntax for k-hop traversal (`expand`), as-of reads (`as_of`) and
-  change sets (`changes`, "what changed between K1 and K2"). The engine
-  operators exist since protocol 0.23.0 (A3); the syntax is planned as LA1
-  ([#3](https://github.com/weave-graph/weave-language/issues/3)).
-- Vector search and hybrid retrieval. These wait for engine A4 and are also
-  planned as LA1.
+- **Hybrid search and embeddings: not yet supported.** `nearest`, candidate
+  relations and the space-descriptor check wait for engine A4
+  ([weave-engine#13](https://github.com/weave-graph/weave-engine/issues/13))
+  and are LA1 part 2 ([#3](https://github.com/weave-graph/weave-language/issues/3)).
+  The keywords `nearest` and `similar_candidates` are reserved and fail with
+  `E_NOT_YET_SUPPORTED`.
+- Parameters for the LA1 clauses: seeds, relations, entities, times and
+  limits are literals, not function, `bind` or scalar parameters. `expand`
+  and `changes` are top-level declarations only.
 - Source syntax for fact-level writes (`write`: assert, correct, retract),
   node valid time and claimed per-fact provenance (engine A2, protocol 0.22).
   Source `graph` and `transaction` still lower to snapshot `commit` and

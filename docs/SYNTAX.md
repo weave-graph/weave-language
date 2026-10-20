@@ -5,7 +5,7 @@ This is implemented experimental syntax, **not recovered white-paper syntax**. T
 The core declaration grammar below is an excerpt; later sections define explicit assertions, functions, algebra, rules, contexts and geometry.
 
 ```ebnf
-program = { schema | transaction | graph | use | lens | bind | join | metadata_query } ;
+program = { schema | transaction | graph | use | lens | bind | join | metadata_query | expand | changes } ;
 transaction = "transaction", identifier, "{", graph, { graph }, "}" ;
 metadata_query = "metadata", identifier, "from", identifier, "on", host, "key", string, ";" ;
 host = ("node" | "edge" | "assertion" | "entity"), string | "graph" ;
@@ -26,7 +26,7 @@ property = "property", string, literal ;
 literal = string | integer | float | "true" | "false" | "null" | array | object ;
 array = "[", [ literal, { ",", literal } ], "]" ;
 object = "{", [ string, ":", literal, { ",", string, ":", literal } ], "}" ;
-use = "use", identifier, "graph", string, [ "revision", string ], ";" ;
+use = "use", identifier, "graph", string, [ "branch", string ], [ "revision", string | "as_of", integer ], ";" ;
 lens = "lens", identifier, "from", identifier, "{", { filter }, "}" ;
 filter = "match", "relation", (string | "param", identifier), ";"
        | "at", (integer | "param", identifier), ";"
@@ -40,7 +40,7 @@ Identifiers use ASCII letters or underscore followed by letters, digits or under
 
 Declarations are sequential; graph/lens names and object IDs within each graph cannot repeat. An edge must reference nodes declared in the same graph, regardless of declaration order. Node and edge IDs share a namespace within a graph. A graph declaration compiles to a **whole-snapshot initial commit**, not a patch; no expected head means the branch must not exist. Re-running the example on an existing database therefore conflicts by design. Use a fresh database for the bootstrap example.
 
-`use` imports a graph reference without reading or writing it during compilation. A `revision` clause pins the system snapshot; `at` filters valid time. Omitting revision asks the engine to resolve the current branch head at query time. Those operations are deliberately distinct.
+`use` imports a graph reference without reading or writing it during compilation. A `revision` clause pins the system snapshot; `as_of` (protocol 0.23) reads the branch as the engine knew it at a recorded time; `at` filters valid time. Omitting both asks the engine to resolve the current branch head at query time. Those operations are deliberately distinct. `expand` and `changes` are defined in [time travel, traversal and change sets](TRAVERSAL.md).
 
 A bootstrap `lens` produces a graph value from a stored query or a previously computed value. Composing one with an earlier lens combines compatible relation/time filters and inherits metadata options; conflicting filters are rejected. Named string/relation and time parameters use `param name`. A `bind` declaration specializes any subset with typed values. Unbound templates emit no evaluation; fully bound lenses evaluate once and bind an immutable program-local graph value. Unknown, duplicate and incorrectly typed bindings fail compilation. This small filter language is **not yet general graph-valued functions or a rule evaluator**. Unknown operations, including writes or host authority fields inside a lens, fail parsing.
 
@@ -304,3 +304,16 @@ Protocol 0.18 adds entry-level `handler Name revision "1" using Function { input
 Typed physical and embedding vector declarations, parameters and payloads are documented in [typed vectors](TYPED_VECTORS.md).
 
 [Bytes and reference scalar types](BYTES_AND_REFERENCES.md) add `bytes "00ff"`, explicit `node_ref`/`edge_ref`/`assertion_ref`/`snapshot_ref` constructors and `object_ref` widening; they lower only to literal data without resolving graphs.
+
+## Time travel, traversal and change sets (protocol 0.23, LA1)
+
+```weave
+use Known graph "fleet" as_of 1759000000000;
+lens Located from Known { match relation "located_at"; at 1758000000000; }
+expand Near from Known { seeds "unit-7"; hops 2; direction both; match relation "runs"; at 1760000000000; }
+explain Why from Near;
+use Fleet graph "fleet";
+changes Delta from Fleet { between as_of 1759000000000 and head; entities "UNIT-7"; }
+```
+
+`use ... as_of T` selects recorded time and `at` valid time. `expand` lowers to the engine's k-hop `expand`, `changes` to its change set, and a lens over an `as_of` reference to `as_of`. A change set is terminal (`E_CHANGES_OPERAND`). `nearest` and `similar_candidates` are reserved and fail with `E_NOT_YET_SUPPORTED` until engine A4. See [the reference](TRAVERSAL.md) and [examples/traversal](../examples/traversal).

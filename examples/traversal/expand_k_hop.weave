@@ -1,0 +1,21 @@
+// k-hop traversal (LA1). Mirrors the engine core v1 fixture `expand-k-hop`:
+// the compiled expressions equal the fixture's, and scripts/check_traversal.py
+// checks the engine results against the fixture's recorded results.
+use G graph "g";
+// Two hops along "feeds" edges leaving the seed.
+expand FeedsTwoHops from G {
+  seeds "a";
+  hops 2;
+  match relation "feeds";
+}
+// One hop in both directions, along every predicate.
+expand AroundC from G {
+  seeds "c";
+  hops 1;
+  direction both;
+}
+// A seed the reader cannot see makes the result partial, never an error.
+expand FromHidden from G {
+  seeds "h";
+  hops 1;
+}
