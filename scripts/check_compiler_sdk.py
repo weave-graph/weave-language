@@ -31,7 +31,10 @@ def native_abi(data):
  t3=time.perf_counter()
  return bytes(result),{'transfer_ms':round(1000*(t1-t0+t3-t2),3),'compile_ms':round(1000*(t2-t1),3)}
 
-def request(source,modules=()):return json.dumps({'format':'weave-compiler-request/1','entry_id':'sdk-fixture','source':source,'modules':list(modules)},ensure_ascii=False,separators=(',',':')).encode()
+def request(source,modules=(),policy=None):
+ body={'format':'weave-compiler-request/1','entry_id':'sdk-fixture','source':source,'modules':list(modules)}
+ if policy is not None:body['policy']=policy
+ return json.dumps(body,ensure_ascii=False,separators=(',',':')).encode()
 def unit(id,source):return {'id':id,'revision':'1','source':source}
 def imp(alias,id,source):return f'import {alias} module "{id}" revision "1" sha256 "{hashlib.sha256(source.encode()).hexdigest()}";'
 core='module "core" revision "1"; function Keep revision "1" (integer input) returns integer {return param input;}'
@@ -67,11 +70,23 @@ for path in sorted((root/'examples/traversal').glob('*.weave')):fixtures['traver
 for directory in ['hybrid','phase_a']:
  for path in sorted((root/'examples'/directory).glob('*.weave')):fixtures[directory+'-'+path.stem]=path
 fixtures['embeddings']=root/'examples/embeddings.weave'
+# LB1: readers, reader groups and explicit public on writes and snapshot records.
+for path in sorted((root/'examples/permissions').glob('*.weave')):fixtures['permissions-'+path.stem]=path
 notes_space='embedding_space Notes id "notes" revision "1" encoder "enc" version "v1" preprocessing "words/v1" dimensions 3 metric cosine_distance; use G graph "g"; '
 cases.append(('nearest-space-mismatch',request(notes_space+'nearest N from G { space Notes; vector [1.0, 0.0]; k 1; }')))
 cases.append(('write-hidden-effect-denial',request('function F revision "1" (graph input) { write W graph "g" { retract node "n"; } return input; }')))
 cases.append(('changes-terminal',request('use G graph "g"; changes D from G { since head; } explain W from D;')))
 cases.append(('expand-hidden-read-denial',request('function F revision "1" (graph input) { expand E from input { seeds "a"; hops 1; } return E; }')))
+# LB1 policy requests: the same bytes from safe Rust, the C ABI and WASM.
+restricted='write W graph "fleet" { assert node "n" entity "N" space "s" reader_groups "maintenance"; }'
+manifest={'format':'weave-visible/1','principal':'agent-1','graphs':[{'graph_id':'fleet','permission':'write'}],'reader_groups':['maintenance']}
+cases.append(('correct-without-readers',request('write W graph "g" { correct node "n" entity "N" space "s"; }')))
+cases.append(('policy-untrusted-implicit-public',request('write W graph "g" { assert node "n" entity "N" space "s"; }',policy={'untrusted':True})))
+cases.append(('policy-read-only-write',request(restricted,policy={'read_only':True})))
+cases.append(('policy-visible-ok',request(restricted,policy={'untrusted':True,'visible':manifest})))
+cases.append(('policy-visible-hidden-group',request(restricted.replace('maintenance','finance'),policy={'visible':manifest})))
+cases.append(('policy-visible-hidden-graph',request('use G graph "payroll"; lens L from G { }',policy={'read_only':True,'visible':manifest})))
+cases.append(('policy-unknown-field',request('',policy={'trusted':True})))
 b='module "b" revision "1"; import a module "a" revision "1" sha256 "'+('0'*64)+'";'
 a_unit='module "a" revision "1";'+imp('b','b',b)
 cases.append(('cycle',request(imp('a','a',a_unit),[unit('a',a_unit),unit('b',b)])))
@@ -128,8 +143,8 @@ with tempfile.TemporaryDirectory(prefix='weave-sdk-') as tmp:
   if name in fixtures:
    expected=json.loads(subprocess.check_output([str(a.compiler.resolve()),'artifacts',str(fixtures[name])]))
    result=json.loads(actual);assert result['ok'] and result['artifacts']==expected['artifacts'] and result['artifact_fingerprint']==expected['artifact_fingerprint'],name
-  if name in ['exact-integers','diamond-modules','near-4MiB-decoded-budget','large-output','all-octets','recorded-handle-pin','recorded-checkpoint-view']:assert json.loads(actual)['ok'],actual
-  expected_errors={'bad-reference':'E_REFERENCE_VALUE','bad-bytes':'E_BYTES_LITERAL','missing-module':'E_MODULE_MISSING','recorded-hidden-read-denial':'E_FUNCTION_EFFECT','changes-terminal':'E_CHANGES_OPERAND','expand-hidden-read-denial':'E_FUNCTION_EFFECT','nearest-space-mismatch':'E_SPACE_MISMATCH','write-hidden-effect-denial':'E_FUNCTION_EFFECT','wrong-pin':'E_MODULE_DIGEST','cycle':'E_MODULE_CYCLE','invalid-utf8':'E_SDK_UTF8','invalid-json':'E_SDK_REQUEST','duplicate-fields':'E_SDK_REQUEST','decoded-bound':'E_SDK_BUDGET'}
+  if name in ['policy-visible-ok','exact-integers','diamond-modules','near-4MiB-decoded-budget','large-output','all-octets','recorded-handle-pin','recorded-checkpoint-view']:assert json.loads(actual)['ok'],actual
+  expected_errors={'bad-reference':'E_REFERENCE_VALUE','bad-bytes':'E_BYTES_LITERAL','missing-module':'E_MODULE_MISSING','recorded-hidden-read-denial':'E_FUNCTION_EFFECT','changes-terminal':'E_CHANGES_OPERAND','expand-hidden-read-denial':'E_FUNCTION_EFFECT','nearest-space-mismatch':'E_SPACE_MISMATCH','write-hidden-effect-denial':'E_FUNCTION_EFFECT','wrong-pin':'E_MODULE_DIGEST','correct-without-readers':'E_VISIBILITY_REQUIRED','policy-untrusted-implicit-public':'E_VISIBILITY_REQUIRED','policy-read-only-write':'E_EFFECT_DENIED','policy-visible-hidden-group':'E_UNAVAILABLE','policy-visible-hidden-graph':'E_UNAVAILABLE','policy-unknown-field':'E_SDK_REQUEST','cycle':'E_MODULE_CYCLE','invalid-utf8':'E_SDK_UTF8','invalid-json':'E_SDK_REQUEST','duplicate-fields':'E_SDK_REQUEST','decoded-bound':'E_SDK_BUDGET'}
   if name in expected_errors:assert json.loads(actual)['error']['code']==expected_errors[name],actual
   if name in ['source-error','original-module-diagnostic']:assert json.loads(actual)['ok'] is False,actual
   reports.append({'name':name,'request_bytes':len(raw),'response_bytes':len(actual),'native_abi':timing})

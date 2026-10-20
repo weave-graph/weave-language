@@ -46,8 +46,9 @@ export function createCompiler(exports) {
       if (handle) api.drop(handle);
     }
   }
-  function compileSource({ entryId, source, modules = [] }) {
-    if (typeof entryId !== 'string' || typeof source !== 'string' || !Array.isArray(modules) || modules.length > 64) {
+  function compileSource({ entryId, source, modules = [], policy }) {
+    if (typeof entryId !== 'string' || typeof source !== 'string' || !Array.isArray(modules) || modules.length > 64
+      || (policy !== undefined && (policy === null || typeof policy !== 'object' || Array.isArray(policy)))) {
       throw new TypeError('Expected source strings and at most 64 exact module units');
     }
     const encoder = new TextEncoder();
@@ -69,7 +70,11 @@ export function createCompiler(exports) {
       boundedString(id, 128); boundedString(revision, 128); boundedString(source, 1024 * 1024, true);
       return { id, revision, source };
     });
-    return compileBytes(new TextEncoder().encode(JSON.stringify({ format: 'weave-compiler-request/1', entry_id: entryId, source, modules: units })));
+    // An optional LB1 policy ({untrusted, read_only, visible}) passes through unchanged;
+    // the compiler validates it strictly and the 8 MiB transport bound applies.
+    const request = { format: 'weave-compiler-request/1', entry_id: entryId, source, modules: units };
+    if (policy !== undefined) request.policy = policy;
+    return compileBytes(new TextEncoder().encode(JSON.stringify(request)));
   }
   return Object.freeze({ compileBytes, compileSource });
 }

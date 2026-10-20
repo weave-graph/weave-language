@@ -191,9 +191,13 @@ For weave-language:
   version after the freeze, so tools need to see it. Empty lists are not
   reported. `on_behalf_of` is engine-recorded result data that no program can
   carry, so it is not classified.
-- There is no source syntax for group readers; that is LB1
-  ([#5](https://github.com/weave-graph/weave-language/issues/5)). Source
-  records stay public, and the compiler never emits `reader_groups`.
+- LB1 ([#5](https://github.com/weave-graph/weave-language/issues/5)) adds
+  the source syntax: `readers`, `reader_groups` and `public` on written and
+  snapshot records ([PERMISSIONS.md](PERMISSIONS.md)). The compiler emits
+  `reader_groups` only where source declares them, so public records keep
+  their 1.0.0 bytes, and `describe --contract` lists every emitted group
+  field (for example, six locations for
+  `examples/permissions/restricted_writes.weave`).
 
 ## `describe --contract`
 

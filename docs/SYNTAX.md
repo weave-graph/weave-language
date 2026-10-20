@@ -15,13 +15,14 @@ edge_schema = "edge", identifier, "from", identifier, "to", identifier, [ "cross
 shape = "{", { "property", string, scalar_type, ("required" | "optional"), ["nullable"], ";" | "open", ";" }, "}" ;
 scalar_type = "string" | "integer" | "float" | "boolean" ;
 graph = "graph", identifier, [ "schema", identifier ], "{", { node | edge | attachment }, "}" ;
-node = "node", string, [ "type", identifier ], "entity", string, "space", string, { metadata | property }, ";" ;
+node = "node", string, [ "type", identifier ], "entity", string, "space", string, { metadata | property | visibility }, ";" ;
 edge = "edge", string, [ "type", identifier ], "from", string, "to", string,
        "relation", string, [ "polarity", ("positive" | "negative") ], "valid", integer, "until", (integer | "infinity"),
-       { metadata | property }, ";" ;
+       { metadata | property | visibility }, ";" ;
+visibility = "public" | "readers", string, { ",", string } | "reader_groups", string, { ",", string } ;
 metadata = "metadata", "graph", string, "revision", string ;
 attachment = "attachment", string, "on", host, "key", string, "graph", string,
-             "revision", string, "valid", integer, "until", (integer | "infinity"), [ "required" ], [ "context", "graph", string, "revision", string ], ";" ;
+             "revision", string, "valid", integer, "until", (integer | "infinity"), [ "required" ], [ "context", "graph", string, "revision", string ], { visibility }, ";" ;
 property = "property", string, literal ;
 literal = string | integer | float | "true" | "false" | "null" | array | object ;
 array = "[", [ literal, { ",", literal } ], "]" ;
@@ -44,7 +45,7 @@ Declarations are sequential; graph/lens names and object IDs within each graph c
 
 A bootstrap `lens` produces a graph value from a stored query or a previously computed value. Composing one with an earlier lens combines compatible relation/time filters and inherits metadata options; conflicting filters are rejected. Named string/relation and time parameters use `param name`. A `bind` declaration specializes any subset with typed values. Unbound templates emit no evaluation; fully bound lenses evaluate once and bind an immutable program-local graph value. Unknown, duplicate and incorrectly typed bindings fail compilation. This small filter language is **not yet general graph-valued functions or a rule evaluator**. Unknown operations, including writes or host authority fields inside a lens, fail parsing.
 
-All bootstrap source-created nodes and edges are public because the grammar does not yet expose visibility declarations. The engine protocol supports restricted readers and must enforce host authority independently. Do not use this source subset to express a private graph until permission syntax is implemented; create such fixtures through the explicit protocol instead.
+Records are public unless they declare readers (LB1, contract 1.1.0): `readers "p", ...` names principals, `reader_groups "g", ...` names registry groups, and `public` states that a record is unrestricted. The clauses lower to the contract's `readers` and `reader_groups` and apply to snapshot nodes, edges, relations, claims and attachments and to written nodes, edges and embeddings. A `correct` must state one (`E_VISIBILITY_REQUIRED`), because it replaces the readers of the fact it corrects. The engine resolves groups and enforces every clause; the compiler grants nothing. See [readers and agent-safe compilation](PERMISSIONS.md).
 
 Metadata graph revisions are opaque references. The compiler does not pretend to verify their existence; the engine reports unavailable or depth-limited metadata as partial coverage. Cyclic metadata is never recursively inlined into the plan.
 
@@ -64,6 +65,8 @@ weave-engine run --db /tmp/weave-demo.json --actor demo --write Fleet fleet.plan
 ```
 
 Use a new database path. The engine's current CLI host authority flags are a local development trust boundary; a submitted source file cannot set them. The language does not launch adapters or external programs.
+
+For source the host does not trust, `--untrusted`, `--read-only` and `--visible MANIFEST.json` add compile-time policy checks to every compiling command, and `weave effects FILE` lists every graph the plan reads, references or writes (LB1, [PERMISSIONS.md](PERMISSIONS.md)).
 
 Diagnostics are JSON on stderr with `code`, `message`, and UTF-8 byte `start`/`end` offsets. Lexical/parser offsets identify the failing token. Semantic checks retain AST source spans and identify the actual offending declaration or graph reference, including quoted Unicode identities.
 
@@ -324,7 +327,7 @@ changes Delta from Fleet { between as_of 1759000000000 and head; entities "UNIT-
 embedding_space Notes id "hw-notes" revision "1" encoder "enc" version "1"
   preprocessing "words/v1" dimensions 3 metric cosine_distance;
 write Rollout graph "fleet" {
-  correct edge "runs:0" from "unit-2" to "fw-2" relation "runs" valid 0 until 2000;
+  correct edge "runs:0" from "unit-2" to "fw-2" relation "runs" valid 0 until 2000 public;
   assert edge "runs:1" from "unit-2" to "fw-3" relation "runs" valid 2000 until infinity;
   assert space Notes;
   assert embedding "emb:n1" in Notes subject node "n1" vector [0.9, 0.1, 0.0] valid 0 until infinity;
@@ -337,3 +340,15 @@ similar_candidates Pairs from Fleet { space Notes; k 1; exclude_linked; }
 ```
 
 Each `write` is one fact revision (assert, correct, retract). An `embedding_space` declares the complete descriptor, and every vector is checked against it at compile time (`E_SPACE_MISMATCH`). `nearest` ranks one space's embeddings, `candidates` and `seeds from` compose it with `expand`, and `similar_candidates` returns candidate relations. See [the reference](HYBRID.md), [examples/hybrid](../examples/hybrid) and the Phase A exit questions in [examples/phase_a](../examples/phase_a).
+
+## Readers, agent-safe compilation and visible manifests (contract 1.1.0, LB1)
+
+```weave
+write Shared graph "fleet" {
+  assert node "note-1" entity "NOTE-1" space "notes" property "text" "bearing noise" reader_groups "maintenance";
+  assert node "memo-1" entity "MEMO-1" space "notes" readers "bob";
+  correct node "unit-1" entity "UNIT-1" space "fleet" property "status" "serviced" public;
+}
+```
+
+`readers`, `reader_groups` and `public` declare who may read each record; `correct` must state one. `--untrusted` requires a clause on every written record and rejects host templates, `--read-only` rejects every write, and `--visible` checks graphs, groups and spaces against one principal's visible manifest with the engine's codes. See [the reference](PERMISSIONS.md) and [examples/permissions](../examples/permissions).

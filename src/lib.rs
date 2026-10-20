@@ -9,6 +9,7 @@ mod functions;
 mod graph_types;
 pub mod interval;
 pub mod modules;
+pub mod policy;
 pub mod references;
 pub mod scalars;
 pub mod sdk;
@@ -252,6 +253,29 @@ fn source_schemas(parsed: syntax::Program) -> Vec<GraphSchema> {
 }
 pub fn compile_artifacts(source: &str) -> Result<CompiledArtifacts, Diagnostic> {
     compile_artifacts_parsed(parse(source)?)
+}
+/// Compile under a [`policy::CompilePolicy`] (LB1): the ordinary compilation,
+/// then the policy's rules against the source and the emitted plan. The
+/// default policy adds nothing.
+pub fn compile_artifacts_with_policy(
+    source: &str,
+    policy: &policy::CompilePolicy,
+) -> Result<CompiledArtifacts, Diagnostic> {
+    let parsed = parse(source)?;
+    let artifacts = compile_artifacts_parsed(parsed.clone())?;
+    policy::check(source, &parsed, &artifacts, policy)?;
+    Ok(artifacts)
+}
+/// [`compile`] under a [`policy::CompilePolicy`].
+pub fn compile_with_policy(
+    source: &str,
+    policy: &policy::CompilePolicy,
+) -> Result<Program, Diagnostic> {
+    let parsed = parse(source)?;
+    reject_artifacts(&parsed)?;
+    let artifacts = compile_artifacts_parsed(parsed.clone())?;
+    policy::check(source, &parsed, &artifacts, policy)?;
+    Ok(artifacts.program)
 }
 pub(crate) fn compile_artifacts_parsed(
     parsed: syntax::Program,
@@ -1014,6 +1038,7 @@ fn lower_artifacts(
                             predicate,
                             metadata,
                             properties,
+                            visibility,
                         } => {
                             if data.profile != GraphProfile::Explicit {
                                 return Err(diagnostic(
@@ -1041,8 +1066,8 @@ fn lower_artifacts(
                                     .into_iter()
                                     .map(|(k, v)| (k, v.into_json()))
                                     .collect(),
-                                readers: Vec::new(),
-                                reader_groups: Vec::new(),
+                                readers: visibility.reader_ids(),
+                                reader_groups: visibility.group_ids(),
                             });
                         }
                         Item::Claim {
@@ -1056,6 +1081,7 @@ fn lower_artifacts(
                             valid_to,
                             metadata,
                             properties,
+                            visibility,
                         } => {
                             if data.profile != GraphProfile::Explicit {
                                 return Err(diagnostic(
@@ -1099,8 +1125,8 @@ fn lower_artifacts(
                                     .map(|(k, v)| (k, v.into_json()))
                                     .collect(),
                                 metadata: refs(&metadata),
-                                readers: vec![],
-                                reader_groups: Vec::new(),
+                                readers: visibility.reader_ids(),
+                                reader_groups: visibility.group_ids(),
                                 derived_from: vec![],
                                 derived_snapshots: Vec::new(),
                                 derived_nodes: vec![],
@@ -1118,6 +1144,7 @@ fn lower_artifacts(
                             valid_from,
                             valid_to,
                             required,
+                            visibility,
                         } => {
                             let valid_time = Interval {
                                 start: valid_from,
@@ -1143,8 +1170,8 @@ fn lower_artifacts(
                                 value,
                                 valid_time,
                                 origin: None,
-                                readers: Vec::new(),
-                                reader_groups: Vec::new(),
+                                readers: visibility.reader_ids(),
+                                reader_groups: visibility.group_ids(),
                                 required,
                                 schema_revision: None,
                             });
@@ -1157,6 +1184,7 @@ fn lower_artifacts(
                             space,
                             metadata,
                             properties,
+                            visibility,
                         } => data.nodes.push(Node {
                             provenance: None,
                             valid_time: None,
@@ -1174,8 +1202,8 @@ fn lower_artifacts(
                                 .map(|(k, v)| (k, v.into_json()))
                                 .collect(),
                             metadata: refs(&metadata),
-                            readers: Vec::new(),
-                            reader_groups: Vec::new(),
+                            readers: visibility.reader_ids(),
+                            reader_groups: visibility.group_ids(),
                         }),
                         Item::Edge {
                             id,
@@ -1189,6 +1217,7 @@ fn lower_artifacts(
                             valid_to,
                             metadata,
                             properties,
+                            visibility,
                         } => {
                             if !node_ids.contains(&from) || !node_ids.contains(&to) {
                                 return Err(diagnostic(
@@ -1239,8 +1268,8 @@ fn lower_artifacts(
                                     .map(|(k, v)| (k, v.into_json()))
                                     .collect(),
                                 metadata: refs(&metadata),
-                                readers: Vec::new(),
-                                reader_groups: Vec::new(),
+                                readers: visibility.reader_ids(),
+                                reader_groups: visibility.group_ids(),
                                 derived_from: Vec::new(),
                                 derived_snapshots: Vec::new(),
                                 derived_nodes: Vec::new(),
@@ -2139,10 +2168,12 @@ fn lower_change(
             valid,
             metadata,
             properties: values,
+            visibility,
         } => {
             let valid_time = valid.map(|(a, b)| interval(a, b)).transpose()?;
             let value = serde_json::json!({"kind": "node", "id": id, "entity_id": entity, "space_id": space,
-                "valid_time": valid_time, "properties": properties(values), "metadata": refs(&metadata), "readers": []});
+                "valid_time": valid_time, "properties": properties(values), "metadata": refs(&metadata),
+                "readers": visibility.reader_ids(), "reader_groups": visibility.group_ids()});
             let mut value = value;
             if valid_time.is_none() {
                 value.as_object_mut().unwrap().remove("valid_time");
@@ -2160,6 +2191,7 @@ fn lower_change(
             valid_to,
             metadata,
             properties: values,
+            visibility,
         } => Fact::Edge(Edge {
             provenance: None,
             derivations: Vec::new(),
@@ -2182,8 +2214,8 @@ fn lower_change(
             },
             properties: properties(values),
             metadata: refs(&metadata),
-            readers: Vec::new(),
-            reader_groups: Vec::new(),
+            readers: visibility.reader_ids(),
+            reader_groups: visibility.group_ids(),
             derived_from: Vec::new(),
         }),
         syntax::WriteFact::Space { space, space_span } => {
@@ -2198,6 +2230,7 @@ fn lower_change(
             vector_span,
             valid_from,
             valid_to,
+            visibility,
         } => {
             let space = space_of(&space, space_span)?;
             let fact = weave_contract::embedding::EmbeddingFact {
@@ -2206,8 +2239,8 @@ fn lower_change(
                 subject,
                 vector: checked_vector(&space, &vector, vector_span)?,
                 valid_time: interval(valid_from, valid_to)?,
-                readers: Vec::new(),
-                reader_groups: Vec::new(),
+                readers: visibility.reader_ids(),
+                reader_groups: visibility.group_ids(),
                 derived_from: Vec::new(),
                 derived_nodes: Vec::new(),
                 derived_snapshots: Vec::new(),

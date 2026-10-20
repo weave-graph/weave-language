@@ -9,7 +9,7 @@ Phase A exit questions run from `.weave` source on a real engine
 (`scripts/check_phase_a.py`). It vendors the complete 103-file contract crate
 from engine `5a19549` (B1 part 1), including the core v1 golden fixtures, which
 `scripts/verify_contract.py` checks against `vendor/manifest.json`.
-`cargo test --workspace --locked` passes 224 tests locally. CI runs Linux, macOS
+`cargo test --workspace --locked` passes 238 tests locally. CI runs Linux, macOS
 and Windows plus WASM parity, and runs the engine's core v1 fixture harness on
 the vendored crate (`.github/workflows/ci.yml`).
 
@@ -26,18 +26,35 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
   `weave describe FILE --contract` classifies what a source compiles to as
   core v1, extension or deferred (engine core-v1.md section 12), with exact
   plan locations. See [CORE_V1.md](CORE_V1.md) for the classes and limits.
+- **Readers and agent-safe compilation (LB1, contract 1.1.0,
+  [#5](https://github.com/weave-graph/weave-language/issues/5),
+  [PERMISSIONS.md](PERMISSIONS.md)):**
+  - `readers`, `reader_groups` and `public` on written nodes, edges and
+    embeddings and on snapshot nodes, edges, relations, claims and
+    attachments. They lower to the contract fields of the same names; the
+    engine resolves groups and enforces them.
+  - A `correct` must state its readers or `public` (`E_VISIBILITY_REQUIRED`),
+    so a correction can no longer publish a restricted fact by omission.
+  - Compile policies `--untrusted` (every written record states its readers;
+    no host templates), `--read-only` (no writes) and `--visible MANIFEST.json`
+    (graph, group and space references checked against one principal's
+    `weave-visible/1` manifest with the engine's codes), also as the SDK
+    request's `policy` member. `weave effects` lists what a plan reads and
+    writes.
+  - Acceptance: `tests/permissions.rs`, `tests/hostile_source.rs` (fuzzed
+    hostile source adds no commands), `scripts/check_permissions.py` and
+    `scripts/check_agent_repair.py` on a real engine with the B1 registry.
 - **Protocol 0.22.0 (engine A2):** plans, view templates and handler artifacts
   are labelled 0.22.0, so engine results of compiled plans carry
   `fact_provenance` (engine-recorded writer and recorded time for each cited
   source fact). Since LA1 part 2 the `write` declaration emits the `write`
   command with node valid time ([HYBRID.md](HYBRID.md)). There is no source
-  syntax for claimed `provenance` or `readers`, and the compiler never
-  supplies a writer or recorded time.
+  syntax for claimed `provenance` (readers are LB1, above), and the compiler
+  never supplies a writer or recorded time.
 - **Protocol 1.1.0 (engine B1 part 1):** plans, view templates and handler
   artifacts are labelled 1.1.0, with the same commands and data as 1.0.0.
-  The compiler never emits `reader_groups`, so its plans have no group
-  readers; `describe --contract` lists `reader_groups` as a core v1 field
-  (since 1.1) where a program built through the protocol uses it.
+  Since LB1 the compiler emits `reader_groups` where source declares them,
+  and `describe --contract` lists each as a core v1 field (since 1.1).
 - **Protocol 1.0.0 (engine v1.0.0, A6):** plans, view templates and handler
   artifacts are labelled 1.0.0, with the same commands and data as 0.24.0.
   1.0.0 freezes core v1 as published in 0.24.0: there is no wire change.
@@ -103,19 +120,15 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
   vectors and limits are literals (or typed vector values), not function or
   `bind` parameters. The store reads and `write` are top-level declarations
   only.
-- Source writes are public: no `readers`, gates, claimed provenance or
-  per-fact `expected` concurrency, and no attachment or structural-relation
-  facts. Correcting a restricted fact from source would publish its new
-  version, so write restricted data through the protocol (permission syntax
-  is LB1).
-- **Group readers (`reader_groups`, contract 1.1.0): not yet supported in
-  source.** Group-reader and other permission syntax is LB1
-  ([#5](https://github.com/weave-graph/weave-language/issues/5)). Results of
+- Source writes have no gates, claimed provenance or per-fact `expected`
+  concurrency, and no attachment or structural-relation facts. Results of
   compiled plans can carry engine-recorded `on_behalf_of` delegation chains
   in `fact_provenance`; the compiler never supplies them.
-- Permission syntax and agent-facing workflows (Phase B, planned as LB1). All
-  source-created records are public; restricted fixtures are built through the
-  protocol directly.
+- LB1 parts that wait for the engine: the engine does not yet serve a
+  principal's visible manifest (B3/B4), so hosts assemble it from
+  `weave-engine graphs` and query results; the compile tool on the engine's
+  MCP server is engine B4. Derived-fact leakage protection is engine B2.
+  Snapshot `replace` records may omit readers except under `--untrusted`.
 - Mixed graph-to-scalar functions, general named joins with explicit
   resolution, stratified negation and aggregation.
 - Distributed and offline governance, clustering as a language feature, and

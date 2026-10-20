@@ -547,7 +547,7 @@ fn describe_contract_lists_reader_groups_as_a_core_v1_field() {
     }
     let empty = classify("positive/reader-groups-omitted-when-empty");
     assert!(!empty.features.iter().any(|f| f.feature == "reader_groups"));
-    // Source syntax never emits groups (LB1): every example plan has none.
+    // Source emits groups only where it declares them (LB1).
     let plan =
         weave_language::compile(include_str!("../examples/phase_a/q1_fact_writes.weave")).unwrap();
     assert!(
@@ -555,4 +555,28 @@ fn describe_contract_lists_reader_groups_as_a_core_v1_field() {
             .unwrap()
             .contains("reader_groups")
     );
+    let source = include_str!("../examples/permissions/restricted_writes.weave");
+    let description = weave_language::describe_contract(source).unwrap();
+    let groups = description
+        .contract
+        .features
+        .iter()
+        .find(|f| f.feature == "reader_groups")
+        .expect("source reader_groups are listed");
+    assert_eq!(
+        (groups.class, groups.since, groups.construct),
+        (FeatureClass::CoreV1, "1.1", "field")
+    );
+    assert_eq!(
+        groups.locations,
+        [
+            "/program/commands/0/changes/2/fact/reader_groups",
+            "/program/commands/0/changes/3/fact/reader_groups",
+            "/program/commands/0/changes/4/fact/reader_groups",
+            "/program/commands/1/changes/0/fact/reader_groups",
+            "/program/commands/2/data/nodes/0/reader_groups",
+            "/program/commands/2/data/edges/0/reader_groups",
+        ]
+    );
+    assert!(description.contract.core_only);
 }

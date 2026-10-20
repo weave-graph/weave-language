@@ -4,6 +4,18 @@
 > protocol 1.1.0, moved from `STATUS.md` on 2026-10-17. Each entry is accurate for
 > its stated protocol version. Current status: [STATUS.md](STATUS.md).
 
+## LB1: readers, agent-safe compilation and permission-aware diagnostics (contract 1.1.0), 2026-10-20
+
+Source syntax for `readers`, `reader_groups` and `public`, the `correct`
+restatement rule, the `--untrusted`, `--read-only` and `--visible` compile
+policies and `weave effects`, see [PERMISSIONS.md](PERMISSIONS.md), for
+[#5](https://github.com/weave-graph/weave-language/issues/5). Verified against
+engine `d6ed2de` (B1 part 2) with the registry enabled:
+`scripts/check_permissions.py` (84 checks) and `scripts/check_agent_repair.py`
+(22 checks, nine seeds). `tests/hostile_source.rs` passed 200,000 fuzzed
+mutants locally (20,000 in CI). Local results and the engine integration lines
+run against the branch are in the PR that introduced this entry.
+
 ## Contract 1.1.0 (B1 group readers and delegation provenance), 2026-10-20
 
 Re-vendored the complete 103-file contract crate from engine

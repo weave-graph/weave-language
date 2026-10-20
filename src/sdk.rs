@@ -29,6 +29,20 @@ struct Request {
     source: String,
     #[serde(rename = "modules", deserialize_with = "bounded_units")]
     units: Vec<Unit>,
+    /// Optional LB1 compile policy; absent means the default policy.
+    #[serde(default)]
+    policy: Option<PolicyRequest>,
+}
+/// The `policy` member of a request (LB1).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PolicyRequest {
+    #[serde(default)]
+    untrusted: bool,
+    #[serde(default)]
+    read_only: bool,
+    #[serde(default)]
+    visible: Option<crate::policy::VisibleManifest>,
 }
 
 /// Exact JSON response bytes, including ordinary compiler diagnostics.
@@ -58,6 +72,8 @@ fn compile_inner(input: &[u8]) -> Response {
         .statements
         .iter()
         .any(|s| matches!(s, crate::syntax::Statement::Import { .. }));
+    // Only a request with a policy pays for keeping the entry AST.
+    let parsed_entry = request.policy.as_ref().map(|_| parsed.clone());
     let compiled = if !has_imports {
         crate::compile_artifacts_parsed(parsed).map_err(|e| local_error(&request.entry, e))
     } else {
@@ -72,6 +88,20 @@ fn compile_inner(input: &[u8]) -> Response {
             .collect();
         modules::link(&request.entry, &request.source, &units).and_then(|p| p.compile_artifacts())
     };
+    let policy = request
+        .policy
+        .map(|p| crate::policy::CompilePolicy {
+            untrusted: p.untrusted,
+            read_only: p.read_only,
+            visible: p.visible,
+        })
+        .unwrap_or_default();
+    let compiled = compiled.and_then(|artifacts| match &parsed_entry {
+        None => Ok(artifacts),
+        Some(parsed) => crate::policy::check(&request.source, parsed, &artifacts, &policy)
+            .map(|()| artifacts)
+            .map_err(|e| local_error(&request.entry, e)),
+    });
     match compiled {
         Err(error) => failure(error),
         Ok(artifacts) => match artifacts.fingerprint() {

@@ -37,8 +37,8 @@ fn writes_lower_to_one_fact_write_command_each() {
   assert embedding "emb-1" in Notes subject node "n1" vector [1.0, 0.1, 0.0] valid 5 until infinity;
 }}
 write Fix graph "g" expected head "fact:sha256:00" {{
-  correct edge "e1" from "n1" to "u1" relation "about" polarity negative valid 5 until 60;
-  correct embedding "emb-1" in Notes subject entity "N1" vector [0.0, 1.0, 0.0] valid 5 until 9;
+  correct edge "e1" from "n1" to "u1" relation "about" polarity negative valid 5 until 60 public;
+  correct embedding "emb-1" in Notes subject entity "N1" vector [0.0, 1.0, 0.0] valid 5 until 9 public;
   retract node "u1";
   retract edge "e1";
   retract embedding "emb-1";

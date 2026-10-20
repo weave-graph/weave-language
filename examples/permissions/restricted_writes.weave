@@ -1,0 +1,26 @@
+// LB1: sharing intent in source. `readers` (principals) and `reader_groups`
+// (registry groups) lower to the contract fields of the same names; the engine
+// resolves group membership and enforces both on every request.
+embedding_space Notes id "maint-notes" revision "1" encoder "word-hash" version "1"
+  preprocessing "words/v1" dimensions 3 metric cosine_distance;
+
+write Shared graph "fleet" {
+  assert space Notes;
+  assert node "unit-1" entity "UNIT-1" space "fleet" property "status" "active" public;
+  assert node "note-1" entity "NOTE-1" space "notes" property "text" "bearing noise" reader_groups "maintenance";
+  assert edge "about:1" from "note-1" to "unit-1" relation "about" valid 0 until infinity reader_groups "maintenance";
+  assert embedding "emb:note-1" in Notes subject node "note-1" vector [0.9, 0.1, 0.0] valid 0 until infinity reader_groups "maintenance";
+  assert node "memo-1" entity "MEMO-1" space "notes" property "text" "for bob only" readers "bob";
+}
+
+// `correct` replaces the fact's readers too, so it must restate them.
+write Revise graph "fleet" {
+  correct node "note-1" entity "NOTE-1" space "notes" property "text" "bearing replaced" reader_groups "maintenance";
+}
+
+// Snapshot records take the same clauses.
+graph Workshop {
+  node "bay-1" entity "BAY-1" space "site" reader_groups "maintenance";
+  node "bay-2" entity "BAY-2" space "site" public;
+  edge "next" from "bay-1" to "bay-2" relation "adjacent" valid 0 until infinity readers "alice" reader_groups "maintenance";
+}

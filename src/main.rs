@@ -8,9 +8,22 @@ fn main() {
     if contract {
         args.retain(|arg| arg != "--contract");
     }
+    // LB1 compile policy: `--untrusted`, `--read-only` and `--visible MANIFEST.json`.
+    let mut policy = weave_language::policy::CompilePolicy::default();
+    for (flag, field) in [
+        ("--untrusted", &mut policy.untrusted),
+        ("--read-only", &mut policy.read_only),
+    ] {
+        let count = args.iter().filter(|arg| *arg == flag).count();
+        if count > 1 {
+            args.clear();
+        }
+        *field = count == 1;
+        args.retain(|arg| arg != flag);
+    }
     let usage = || {
         eprintln!(
-            "Usage: weave <check|plan|ast|describe|fingerprint|values|artifacts|view-plan|handler-plan> FILE.weave [--modules MAP.json] [--template NAME|--handler NAME] [--contract]\nview-plan requires --template; handler-plan requires --handler; --contract is for describe only; compilation never installs host artifacts.\nweave fmt FILE.weave [--check|--write] formats one source file."
+            "Usage: weave <check|plan|ast|describe|fingerprint|values|artifacts|view-plan|handler-plan|effects> FILE.weave [--modules MAP.json] [--template NAME|--handler NAME] [--contract] [--untrusted] [--read-only] [--visible MANIFEST.json]\nview-plan requires --template; handler-plan requires --handler; --contract is for describe only; compilation never installs host artifacts.\n--untrusted, --read-only and --visible add compile-time policy checks; the engine still authorizes everything.\nweave fmt FILE.weave [--check|--write] formats one source file."
         );
         process::exit(2);
     };
@@ -29,6 +42,7 @@ fn main() {
             "artifacts",
             "view-plan",
             "handler-plan",
+            "effects",
         ]
         .contains(&args[0].as_str())
     {
@@ -36,12 +50,14 @@ fn main() {
     }
     let mut modules = None;
     let mut template = None;
+    let mut visible = None;
     for option in args[2..].chunks(2) {
         if option.len() != 2 {
             usage();
         }
         match option[0].as_str() {
             "--modules" if modules.is_none() => modules = Some(&option[1]),
+            "--visible" if visible.is_none() => visible = Some(&option[1]),
             "--template" if template.is_none() && args[0] == "view-plan" => {
                 template = Some(&option[1])
             }
@@ -61,6 +77,26 @@ fn main() {
         );
         process::exit(1)
     });
+    if let Some(path) = visible {
+        let bytes = fs::File::open(path)
+            .and_then(|file| {
+                let mut bytes = Vec::new();
+                file.take(weave_language::policy::MAX_MANIFEST_BYTES as u64 + 1)
+                    .read_to_end(&mut bytes)
+                    .map(|_| bytes)
+            })
+            .unwrap_or_else(|e| {
+                eprintln!(
+                    "{}",
+                    serde_json::json!({"code":"E_IO","message":e.to_string()})
+                );
+                process::exit(1)
+            });
+        policy.visible = Some(
+            weave_language::policy::VisibleManifest::decode(&bytes).unwrap_or_else(|e| fail(e)),
+        );
+    }
+    let effects = args[0] == "effects";
     if let Some(map) = modules {
         let units =
             module_files::load(std::path::Path::new(map), source.len()).unwrap_or_else(|e| {
@@ -80,6 +116,16 @@ fn main() {
             .collect();
         let linked =
             weave_language::modules::link("entry", &source, &supplied).unwrap_or_else(module_fail);
+        if !policy.is_default() || effects {
+            let artifacts = linked.compile_artifacts().unwrap_or_else(module_fail);
+            let parsed = weave_language::parse(&source).unwrap_or_else(|e| fail(e));
+            weave_language::policy::check(&source, &parsed, &artifacts, &policy)
+                .unwrap_or_else(|e| fail(e));
+            if effects {
+                print_effects(&artifacts.program);
+                return;
+            }
+        }
         match args[0].as_str() {
             "artifacts" | "view-plan" | "handler-plan" | "check" => {
                 let output = linked.compile_artifacts().unwrap_or_else(module_fail);
@@ -122,6 +168,14 @@ fn main() {
             }
         }
         return;
+    }
+    if !policy.is_default() || effects {
+        let artifacts = weave_language::compile_artifacts_with_policy(&source, &policy)
+            .unwrap_or_else(|e| fail(e));
+        if effects {
+            print_effects(&artifacts.program);
+            return;
+        }
     }
     if ["check", "artifacts", "view-plan", "handler-plan"].contains(&args[0].as_str()) {
         let output = weave_language::compile_artifacts(&source).unwrap_or_else(|e| fail(e));
@@ -222,6 +276,24 @@ fn show_artifacts(
             )
         }
     }
+}
+/// `weave effects`: every graph the plan reads, references or writes (LB1).
+fn print_effects(program: &weave_contract::Program) {
+    let effects = weave_language::policy::plan_effects(program);
+    let writes = effects
+        .iter()
+        .filter(|e| e.access == weave_language::policy::Access::Write)
+        .count();
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "version": program.version,
+            "commands": program.commands.len(),
+            "writes": writes,
+            "effects": effects,
+        }))
+        .unwrap()
+    );
 }
 fn module_fail<T>(error: weave_language::modules::ModuleDiagnostic) -> T {
     eprintln!("{}", serde_json::to_string(&error).unwrap());

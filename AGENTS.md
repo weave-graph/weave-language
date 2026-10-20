@@ -25,7 +25,8 @@ One Rust package (`weave-language`, binary `weave`) plus one workspace member.
 |---|---|
 | `src/syntax.rs` | Hand-written bounded lexer and parser, AST, spans |
 | `src/lib.rs` | Validation and lowering to engine Programs; diagnostics |
-| `src/main.rs` | CLI: `check`, `plan`, `ast`, `describe`, `fingerprint`, `values`, `artifacts`, `view-plan`, `handler-plan`, `fmt`; `--modules MAP.json` |
+| `src/main.rs` | CLI: `check`, `plan`, `ast`, `describe`, `fingerprint`, `values`, `artifacts`, `view-plan`, `handler-plan`, `effects`, `fmt`; `--modules MAP.json`; policy flags `--untrusted`, `--read-only`, `--visible MANIFEST.json` |
+| `src/policy.rs` | Compile policies for untrusted source, visible-manifest diagnostics and plan effects (LB1) |
 | `src/functions.rs`, `scalars.rs`, `decimal.rs`, `interval.rs`, `vectors.rs`, `vector_types.rs`, `bytes.rs`, `references.rs`, `context_axes.rs`, `graph_types.rs` | Pure compile-time semantics and value types |
 | `src/modules.rs`, `module_files.rs`, `modules/rewrite.rs` | Content-pinned source modules |
 | `src/format.rs` | Token-preserving formatter |
@@ -46,7 +47,7 @@ python3 scripts/verify_contract.py      # vendored contract matches manifest
 python3 scripts/verify_spaces.py
 cargo fmt --check
 cargo clippy --locked --all-targets -- -D warnings
-cargo test --workspace --locked         # about 198 tests
+cargo test --workspace --locked         # about 238 tests
 cargo check --locked --lib --target wasm32-unknown-unknown   # portable core
 ```
 
