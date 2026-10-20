@@ -20,11 +20,17 @@ struct Outcome {
 /// limit (which fails the test as a hang). Stdin is written from a thread so
 /// that an early exit cannot deadlock the test.
 fn sdk(args: &[&str], input: &[u8]) -> Outcome {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_weave"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_weave"));
+    command
         .arg("sdk")
         .args(args)
-        .current_dir(std::env::temp_dir())
-        .env_clear()
+        .current_dir(std::env::temp_dir());
+    // An empty environment, as a sandboxing host runs it. Windows needs its
+    // system variables to start any process.
+    if cfg!(unix) {
+        command.env_clear();
+    }
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
