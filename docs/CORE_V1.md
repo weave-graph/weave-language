@@ -1,4 +1,4 @@
-# Core contract v1: migration note from 0.21, with protocols 0.22 and 0.23
+# Core contract v1: migration note from 0.21, with protocols 0.22 to 0.24
 
 Introduced by LA0 ([#1](https://github.com/weave-graph/weave-language/issues/1)),
 which tracks engine epic A1. The normative specification is the engine's
@@ -13,14 +13,16 @@ This note covers what changes for weave-language users and tools.
   as protocol **0.22.0** (see [Protocol 0.22.0](#protocol-0220-engine-a2)),
   and engine A3 activated the `expand`, `as_of` and `changes` query operators
   as protocol **0.23.0** (see [Protocol 0.23.0](#protocol-0230-engine-a3)).
-  The compiler emits `weave_contract::VERSION`, now `0.23.0`, equal to the
+  Engine A4 activated embedding facts, `nearest` and `similar_candidates` as
+  protocol **0.24.0** (see [Protocol 0.24.0](#protocol-0240-engine-a4)).
+  The compiler emits `weave_contract::VERSION`, now `0.24.0`, equal to the
   vendored crate version.
 - **Every emitted plan is checked against v1.** A golden test compiles every
   entry source in `examples/` and decodes the plan and its templates with the
   contract's strict decoder (`tests/core_v1_contract.rs`).
 - **The engine's golden fixtures run in language CI.** The vendored crate now
-  ships `fixtures/core-v1/` (25 positive and 22 negative JSON fixtures plus a
-  hash manifest at 0.23.0) and
+  ships `fixtures/core-v1/` (29 positive and 25 negative JSON fixtures plus a
+  hash manifest at 0.24.0) and
   `tests/core_v1_fixtures.rs`.
 - **`weave describe FILE --contract`** reports which core v1, extension and
   deferred features a source compiles to.
@@ -31,10 +33,10 @@ This note covers what changes for weave-language users and tools.
 |---|---|---|
 | Specification | 21 additive notes (`docs/contract/v0.1` to `v0.21`) | One consolidated document for everything classified core v1. The notes still govern extension and deferred features |
 | Decoding | serde decoding, one generic input error | `weave_contract::decode_program` checks size, strict JSON (no duplicate keys), then `version`, then structure, with stable codes `E_BUDGET`, `E_DECODE`, `E_VERSION`, `E_UNKNOWN_FIELD` and `E_UNKNOWN_VARIANT`. A program with an unknown version is never partially decoded. `weave-engine run` now reports these codes instead of `E_INPUT` |
-| Versions | Implicit | `SUPPORTED_VERSIONS` is the closed set 0.1.0 to 0.23.0. Each version keeps its published semantics, and a feature newer than the declared version fails with `E_VERSION` |
+| Versions | Implicit | `SUPPORTED_VERSIONS` is the closed set 0.1.0 to 0.24.0. Each version keeps its published semantics, and a feature newer than the declared version fails with `E_VERSION` |
 | Feature status | Every feature equal | Each feature is *core v1*, *extension* or *deferred* (table below). No semantics change because of the class |
-| Reserved names | None | Rejected and reserved for later epics: `reader_groups` on fact records (B1); `GraphData.embedding_spaces` and `embeddings`; result fields `candidates` and `exactness`; expressions `nearest` and `similar_candidates` (A4); A3 released `expand` and `changes` in 0.23.0; the `weave:` predicate and ID namespace |
-| Provenance and embeddings | Not modelled | Records (`FactProvenance`, `ClaimedProvenance`, `EmbeddingSpace`, `EmbeddingFact`, `CandidateRelation`) are defined. Engine A2 activated provenance in 0.22.0. Embedding records are not accepted by any program until A4 |
+| Reserved names | None | Rejected and reserved for later epics: `reader_groups` on fact records (B1); A3 released `expand` and `changes` in 0.23.0; A4 released `GraphData.embedding_spaces` and `embeddings`, result fields `candidates` and `exactness` and expressions `nearest` and `similar_candidates` in 0.24.0; the `weave:` predicate and ID namespace |
+| Provenance and embeddings | Not modelled | Records (`FactProvenance`, `ClaimedProvenance`, `EmbeddingSpace`, `EmbeddingFact`, `CandidateRelation`) are defined. Engine A2 activated provenance in 0.22.0. Engine A4 activated embedding spaces, embeddings and candidate relations in 0.24.0 |
 | Compatibility | Additive by convention | Written policy: before 1.0.0 every wire change is an additive minor bump; protocol 1.0.0 is cut at the engine Phase A release |
 
 ## Language constructs by class
@@ -51,7 +53,7 @@ is a guide and the command is authoritative.
 Typed embedding vectors (see [typed vectors](TYPED_VECTORS.md)) still lower to
 the 0.9 geometry extension and legacy binary64 vector properties. They are not
 core v1 `EmbeddingFact` records, and the engine never reinterprets them as such.
-Embedding retrieval in the language waits for engine A4 and language LA1.
+Source syntax for 0.24 embedding retrieval is LA1 part 2.
 
 ## Protocol 0.22.0 (engine A2)
 
@@ -109,6 +111,33 @@ For weave-language:
 - `describe --contract` classifies all three as core v1 expressions (`since`
   0.23). The `as_of` field of `expand` is core v1 data and is not listed
   separately.
+
+## Protocol 0.24.0 (engine A4)
+
+Engine A4 ([weave-engine#13](https://github.com/weave-graph/weave-engine/issues/13))
+activated the embedding records as protocol 0.24.0
+([version note](contract/v0.24/README.md)). Engine core-v1.md section 12
+classifies all of it as **core v1** (section 7, section 8 `query.nearest` and
+`query.similar_candidates`): the `embedding_space` and `embedding` fact
+kinds of `write`, `GraphData.embedding_spaces` and `embeddings`, the
+`nearest` and `similar_candidates` expressions, `ExpandPlan.seeds_from`,
+embedding evidence and the result fields `neighbors`, `candidates` and
+`exactness`.
+
+For weave-language:
+
+- Plans, view templates and handler artifacts are labelled `0.24.0`. Their
+  commands and data are byte-for-byte what 0.23.0 emitted, and the engine
+  still accepts 0.23.0 and older programs and artifacts.
+- `describe --contract` classifies `nearest` and `similar_candidates` as
+  core v1 expressions (`since` 0.24) and walks their `candidates`, `sources`
+  and `targets` values, and the `seeds_from` value of `expand`, as inputs.
+  Embedding spaces and embeddings in `write` changes are core v1 data and
+  are not listed.
+- There is no source syntax yet for embeddings, `nearest` or
+  `similar_candidates`: the keywords stay reserved with
+  `E_NOT_YET_SUPPORTED`. That is LA1 part 2
+  ([#3](https://github.com/weave-graph/weave-language/issues/3)).
 
 ## `describe --contract`
 

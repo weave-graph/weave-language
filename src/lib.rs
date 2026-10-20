@@ -1578,6 +1578,7 @@ fn lower_artifacts(
                         revision: query.revision,
                         as_of,
                         seeds,
+                        seeds_from: None,
                         hops,
                         direction,
                         predicates,

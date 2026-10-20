@@ -1,6 +1,6 @@
 # Exact source intervals
 
-> Written for protocol 0.18. Version statements below describe that release; the compiler now targets 0.23.0 ([status](STATUS.md)).
+> Written for protocol 0.18. Version statements below describe that release; the compiler now targets 0.24.0 ([status](STATUS.md)).
 
 `Interval` is a pure source value representing a nonempty half-open range
 `[start, end)`. Its start is an existing signed 64-bit Time value; its end is a

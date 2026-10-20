@@ -1,7 +1,7 @@
 //! Core contract v1 classification of emitted plans and artifacts.
 //!
 //! The engine's `docs/contract/core-v1.md` section 12 classifies every contract
-//! feature from 0.1 to 0.23 as *core v1*, *extension* or *deferred*. This module
+//! feature from 0.1 to 0.24 as *core v1*, *extension* or *deferred*. This module
 //! walks what the compiler actually emitted (commands, graph expressions, the
 //! data-level extension fields and host templates) and reports each feature
 //! with that class and the exact JSON locations that use it.
@@ -205,9 +205,32 @@ impl Collector {
             GraphExpression::AcceptedHistory { .. } => ("accepted_history", "0.21", Extension),
             // 0.23 (A3) operators read one branch directly and take no
             // expression input. The `as_of` field of `expand` is core v1 data.
-            GraphExpression::Expand(_) => ("expand", "0.23", CoreV1),
+            GraphExpression::Expand(plan) => {
+                // `seeds_from` (0.24) is the one expression input of `expand`.
+                if let Some(seeds) = &plan.seeds_from {
+                    inputs.push((seeds, "seeds_from".into()));
+                }
+                ("expand", "0.23", CoreV1)
+            }
             GraphExpression::AsOf { .. } => ("as_of", "0.23", CoreV1),
             GraphExpression::Changes(_) => ("changes", "0.23", CoreV1),
+            // 0.24 (A4) operators: core v1 (section 12, query.nearest and
+            // query.similar_candidates). Their candidate values are inputs.
+            GraphExpression::Nearest(plan) => {
+                if let Some(candidates) = &plan.candidates {
+                    inputs.push((candidates, "candidates".into()));
+                }
+                ("nearest", "0.24", CoreV1)
+            }
+            GraphExpression::SimilarCandidates(plan) => {
+                if let Some(sources) = &plan.sources {
+                    inputs.push((sources, "sources".into()));
+                }
+                if let Some(targets) = &plan.targets {
+                    inputs.push((targets, "targets".into()));
+                }
+                ("similar_candidates", "0.24", CoreV1)
+            }
         };
         self.construct = "expression";
         self.add(feature, since, class, at);
@@ -223,7 +246,13 @@ impl Collector {
         match fact {
             Fact::Node(node) => self.node(node, at),
             Fact::Attachment(attachment) => self.attachment(attachment, at),
-            Fact::Edge(_) | Fact::StructuralEdge(_) | Fact::Assertion(_) => {}
+            // Embedding spaces and embeddings (0.24, section 7) are core v1
+            // data with no extension fields, so they are not listed.
+            Fact::Edge(_)
+            | Fact::StructuralEdge(_)
+            | Fact::Assertion(_)
+            | Fact::EmbeddingSpace(_)
+            | Fact::Embedding(_) => {}
         }
     }
 

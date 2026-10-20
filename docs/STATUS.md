@@ -1,11 +1,11 @@
 # Current status
 
 As of **20 October 2026**: an experimental compiler at `main` targeting engine
-contract **0.23.0** and its **core v1** profile (LA0, see
-[CORE_V1.md](CORE_V1.md)). It vendors the complete 91-file contract crate from
-engine `5976d47d6ab8` (A3 part 1), including the core v1 golden fixtures, which
+contract **0.24.0** and its **core v1** profile (LA0, see
+[CORE_V1.md](CORE_V1.md)). It vendors the complete 98-file contract crate from
+engine `5e2a1d9bbf71` (A4 part 2), including the core v1 golden fixtures, which
 `scripts/verify_contract.py` checks against `vendor/manifest.json`.
-`cargo test --workspace --locked` passes 213 tests locally. CI runs Linux, macOS
+`cargo test --workspace --locked` passes 214 tests locally. CI runs Linux, macOS
 and Windows plus WASM parity, and runs the engine's core v1 fixture harness on
 the vendored crate (`.github/workflows/ci.yml`).
 
@@ -28,9 +28,14 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
   source fact). The compiler emits no 0.22-only field: it has no syntax for
   the `write` command, node `valid_time` or claimed `provenance`, and it never
   supplies a writer or recorded time.
+- **Protocol 0.24.0 (engine A4):** plans, view templates and handler
+  artifacts are labelled 0.24.0, with the same commands and data as 0.23.0.
+  `describe --contract` classifies the new `nearest` and
+  `similar_candidates` expressions as core v1 for programs built through the
+  protocol.
 - **Protocol 0.23.0 (engine A3) and LA1 part 1 query syntax**
   ([TRAVERSAL.md](TRAVERSAL.md)): plans, view templates and handler
-  artifacts are labelled 0.23.0.
+  artifacts are labelled 0.23.0 (0.24.0 since the A4 vendor update).
   - Time travel: `use G graph "g" as_of T;` reads the branch as known at
     recorded time T and lowers a lens over it to `as_of`; `at` keeps selecting
     valid time.
@@ -68,10 +73,12 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
 
 ## Not supported, mapped to the [engine roadmap](https://github.com/weave-graph/weave-engine/blob/main/docs/ROADMAP.md)
 
-- **Hybrid search and embeddings: not yet supported.** `nearest`, candidate
-  relations and the space-descriptor check wait for engine A4
+- **Hybrid search and embeddings: not yet supported in source.** Engine A4
   ([weave-engine#13](https://github.com/weave-graph/weave-engine/issues/13))
-  and are LA1 part 2 ([#3](https://github.com/weave-graph/weave-language/issues/3)).
+  activated them in protocol 0.24.0, and `describe --contract` classifies
+  `nearest` and `similar_candidates` as core v1. The source syntax for
+  embeddings, `nearest`, candidate relations and the space-descriptor check
+  is LA1 part 2 ([#3](https://github.com/weave-graph/weave-language/issues/3)).
   The keywords `nearest` and `similar_candidates` are reserved and fail with
   `E_NOT_YET_SUPPORTED`.
 - Parameters for the LA1 clauses: seeds, relations, entities, times and
