@@ -66,7 +66,7 @@ weave-engine run --db /tmp/weave-demo.json --actor demo --write Fleet fleet.plan
 
 Use a new database path. The engine's current CLI host authority flags are a local development trust boundary; a submitted source file cannot set them. The language does not launch adapters or external programs.
 
-For source the host does not trust, `--untrusted`, `--read-only` and `--visible MANIFEST.json` add compile-time policy checks to every compiling command, and `weave effects FILE` lists every graph the plan reads, references or writes (LB1, [PERMISSIONS.md](PERMISSIONS.md)).
+For source the host does not trust, `--untrusted`, `--read-only` and `--visible MANIFEST.json` add compile-time policy checks to every compiling command, and `weave effects FILE` lists every graph the plan reads, references or writes (LB1, [PERMISSIONS.md](PERMISSIONS.md)). A host that cannot link the compiler runs `weave sdk`, which compiles one SDK request from stdin to stdout ([COMPILER_SDK.md](COMPILER_SDK.md#subprocess-mode-weave-sdk)).
 
 Diagnostics are JSON on stderr with `code`, `message`, and UTF-8 byte `start`/`end` offsets. Lexical/parser offsets identify the failing token. Semantic checks retain AST source spans and identify the actual offending declaration or graph reference, including quoted Unicode identities.
 

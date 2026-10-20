@@ -2,6 +2,10 @@ mod module_files;
 use std::{env, fs, io::Read, process};
 fn main() {
     let mut args: Vec<_> = env::args().skip(1).collect();
+    // `weave sdk` takes its own flags and reads only stdin.
+    if args.first().is_some_and(|arg| arg == "sdk") {
+        sdk_command(&args[1..]);
+    }
     // `describe --contract` adds the core contract v1 classification.
     let contract = args.first().is_some_and(|arg| arg == "describe")
         && args.iter().filter(|arg| *arg == "--contract").count() == 1;
@@ -23,7 +27,7 @@ fn main() {
     }
     let usage = || {
         eprintln!(
-            "Usage: weave <check|plan|ast|describe|fingerprint|values|artifacts|view-plan|handler-plan|effects> FILE.weave [--modules MAP.json] [--template NAME|--handler NAME] [--contract] [--untrusted] [--read-only] [--visible MANIFEST.json]\nview-plan requires --template; handler-plan requires --handler; --contract is for describe only; compilation never installs host artifacts.\n--untrusted, --read-only and --visible add compile-time policy checks; the engine still authorizes everything.\nweave fmt FILE.weave [--check|--write] formats one source file."
+            "Usage: weave <check|plan|ast|describe|fingerprint|values|artifacts|view-plan|handler-plan|effects> FILE.weave [--modules MAP.json] [--template NAME|--handler NAME] [--contract] [--untrusted] [--read-only] [--visible MANIFEST.json]\nview-plan requires --template; handler-plan requires --handler; --contract is for describe only; compilation never installs host artifacts.\n--untrusted, --read-only and --visible add compile-time policy checks; the engine still authorizes everything.\nweave fmt FILE.weave [--check|--write] formats one source file.\nweave sdk [--untrusted] [--read-only] compiles one weave-compiler-request/1 from stdin to stdout."
         );
         process::exit(2);
     };
@@ -407,4 +411,61 @@ fn write_formatted(path: &std::path::Path, original: &str, formatted: &str) -> s
         let _ = fs::remove_file(&temporary);
     }
     result
+}
+
+/// Exit codes of `weave sdk`: the response was `ok: true`.
+const SDK_EXIT_OK: i32 = 0;
+/// The response is a failure (`ok: false`): a compiler diagnostic or an
+/// `E_SDK_*` transport error, with the details in the response.
+const SDK_EXIT_FAILURE: i32 = 1;
+/// Invalid command line; no response is written.
+const SDK_EXIT_USAGE: i32 = 2;
+/// The response could not be written to stdout.
+const SDK_EXIT_OUTPUT: i32 = 3;
+
+/// `weave sdk`: one bounded `weave-compiler-request/1` from stdin, one
+/// response to stdout (LB1). It opens no file and no socket: everything it
+/// compiles is in the request, exactly as for the C ABI and WASM SDK, and the
+/// response bytes are those of `weave_language::sdk::compile_response`.
+/// `--untrusted` and `--read-only` set a host policy floor that the request's
+/// own `policy` cannot lower.
+fn sdk_command(flags: &[String]) -> ! {
+    use std::io::Write;
+    let mut floor = weave_language::sdk::PolicyFloor::default();
+    for flag in flags {
+        let field = match flag.as_str() {
+            "--untrusted" => &mut floor.untrusted,
+            "--read-only" => &mut floor.read_only,
+            _ => {
+                eprintln!("Usage: weave sdk [--untrusted] [--read-only] < REQUEST.json");
+                process::exit(SDK_EXIT_USAGE);
+            }
+        };
+        if *field {
+            eprintln!("Usage: weave sdk [--untrusted] [--read-only] < REQUEST.json");
+            process::exit(SDK_EXIT_USAGE);
+        }
+        *field = true;
+    }
+    // Read at most one byte past the request bound: a larger input is
+    // rejected without being read to its end.
+    let mut input = Vec::new();
+    let limit = weave_language::sdk::MAX_REQUEST_BYTES as u64 + 1;
+    let response = match std::io::stdin().lock().take(limit).read_to_end(&mut input) {
+        Ok(_) => weave_language::sdk::compile_response_with_floor(&input, &floor),
+        Err(_) => weave_language::sdk::transport_failure("E_SDK_IO", "Request could not be read"),
+    };
+    let mut stdout = std::io::stdout().lock();
+    if stdout
+        .write_all(&response.bytes)
+        .and_then(|()| stdout.flush())
+        .is_err()
+    {
+        process::exit(SDK_EXIT_OUTPUT);
+    }
+    process::exit(if response.ok {
+        SDK_EXIT_OK
+    } else {
+        SDK_EXIT_FAILURE
+    });
 }
