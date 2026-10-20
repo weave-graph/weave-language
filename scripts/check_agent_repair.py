@@ -257,7 +257,10 @@ check('repaired after one diagnostic', attempts == 1 and agent.dims == DIMS)
 check('repaired query runs', ran, result)
 hits = [n['embedding_id'] for n in result[0]['result']['neighbors']] if 'neighbors' in result[0]['result'] else None
 query = embed(question, DIMS)
-oracle = sorted(discovered[GRAPH]['embeddings'].values(), key=lambda e: (cosine_distance(query, e['vector']), e['id']))
+# The engine breaks distance ties by subject (kind, then ID), then embedding ID.
+oracle = sorted(discovered[GRAPH]['embeddings'].values(),
+                key=lambda e: (cosine_distance(query, e['vector']), e['subject']['kind'],
+                               e['subject'].get('node_id') or e['subject'].get('entity_id') or e['subject'].get('edge_id'), e['id']))
 check('hits equal an independent ranking of visible embeddings', hits == [e['id'] for e in oracle[:3]], (hits, result[0]['result'].get('neighbors')))
 
 attempts, (ran, written) = agent.record_finding(graph_id, 'bearing family shows recurring noise', manifest, manifest_path)

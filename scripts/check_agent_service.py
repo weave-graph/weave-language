@@ -175,19 +175,28 @@ try:
 
     space = {'kind': 'embedding_space', 'id': SPACE_ID, 'revision': '1', 'encoder': 'word-hash',
              'encoder_version': '1', 'preprocessing': 'words/v1', 'dimensions': DIMS, 'metric': 'cosine_distance'}
-    changes = [{'change': 'assert', 'fact': space}]
+    # Every principal, root included, asserts only record IDs that the service
+    # minted for it (engine #76); the embedding space is named freely.
+    def mint(count):
+        status, out = http('POST', '/v1/ids', ROOT, {'count': count})
+        check('root mints record IDs', status in (200, 201) and len(out['ids']) == count, out)
+        return out['ids']
+
     public_embeddings = {}
-    for i, text in enumerate(NOTES):
-        readers = [OWNER] if i % 3 == 2 else []
-        changes.append({'change': 'assert', 'fact': {'kind': 'node', 'id': f'note-{i}', 'entity_id': f'NOTE-{i}',
-                        'space_id': 'notes', 'properties': {PROPERTY: text}, 'metadata': [], 'readers': readers}})
-        vector = embed(text, DIMS)
-        changes.append({'change': 'assert', 'fact': {'kind': 'embedding', 'id': f'emb-{i}',
-                        'space': {'id': SPACE_ID, 'revision': '1'}, 'subject': {'kind': 'node', 'node_id': f'note-{i}'},
-                        'vector': vector, 'valid_time': {'start': 0, 'end': None}, 'readers': readers}})
-        if not readers:
-            public_embeddings[f'emb-{i}'] = vector
     for graph in [GRAPH, HIDDEN]:
+        ids = mint(2 * len(NOTES))
+        changes = [{'change': 'assert', 'fact': space}]
+        for i, text in enumerate(NOTES):
+            note, emb = ids[2 * i], ids[2 * i + 1]
+            readers = [OWNER] if i % 3 == 2 else []
+            changes.append({'change': 'assert', 'fact': {'kind': 'node', 'id': note, 'entity_id': f'NOTE-{i}',
+                            'space_id': 'notes', 'properties': {PROPERTY: text}, 'metadata': [], 'readers': readers}})
+            vector = embed(text, DIMS)
+            changes.append({'change': 'assert', 'fact': {'kind': 'embedding', 'id': emb,
+                            'space': {'id': SPACE_ID, 'revision': '1'}, 'subject': {'kind': 'node', 'node_id': note},
+                            'vector': vector, 'valid_time': {'start': 0, 'end': None}, 'readers': readers}})
+            if graph == GRAPH and not readers:
+                public_embeddings[emb] = (vector, note)
         status, out = http('POST', '/v1/execute', ROOT, {'version': '1.2.0', 'commands': [
             {'op': 'write', 'graph_id': graph, 'branch_id': 'main', 'changes': changes}]})
         check('host data written', status == 200, out)
@@ -287,7 +296,9 @@ try:
     check('repaired after one diagnostic and run', attempts == 1 and status == 200, result)
     hits = [n['embedding_id'] for n in result['results'][0]['result']['neighbors']]
     query = embed(question, DIMS)
-    oracle = sorted(public_embeddings, key=lambda e: (cosine_distance(query, public_embeddings[e]), e))[:3]
+    # The engine breaks distance ties by subject (kind, then ID), then embedding ID.
+    oracle = sorted(public_embeddings, key=lambda e: (cosine_distance(query, public_embeddings[e][0]),
+                                                      'node', public_embeddings[e][1], e))[:3]
     check('hits equal an independent ranking of visible embeddings', hits == oracle, (hits, oracle))
 
     record, attempts, (status, written) = agent.record_finding(graph_id, 'bearing family shows recurring noise')
