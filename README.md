@@ -28,16 +28,16 @@ graph functions, rules and explanations.
 
 ## Status
 
-**Language at Phase A parity, contract 1.0.0.** The compiler targets engine
-contract **1.0.0** (engine v1.0.0, the Phase A release) and its core v1
-profile ([migration note](docs/CORE_V1.md)), with 223 tests passing. Every
+**Language at Phase A parity, contract 1.1.0.** The compiler targets engine
+contract **1.1.0** (Phase A release 1.0.0 plus B1 group readers) and its core
+v1 profile ([migration note](docs/CORE_V1.md)), with 224 tests passing. Every
 Phase A operator has source syntax, and the five Phase A exit questions run
 from `.weave` source ([examples/phase_a](examples/phase_a)). The compiler is
 experimental and the syntax is provisional.
 
 | Works today | Not yet |
 |---|---|
-| Graphs, nodes, first-class edges, graph-valued metadata, pinned and live references | Permission syntax (sharing is engine-side) |
+| Graphs, nodes, first-class edges, graph-valued metadata, pinned and live references | Permission syntax, including 1.1.0 group readers (LB1; sharing is engine-side) |
 | Valid-time filters, `Window`/`Sequence`, `diff`, recorded and accepted history, as-of reads, k-hop `expand` and `changes` change sets | Approximate vector search (engine C5) |
 | Fact writes, embedding spaces and facts, exact `nearest`, `similar_candidates`, pure graph functions, joins, union, projection, four-valued support, bounded rules, `explain` | Reader restrictions on source writes (permission syntax, Phase B) |
 | Typed contexts, exact Decimal/Quantity, typed vectors, intervals, bytes, typed refs | Agent identity and agent-facing workflows (engine Phase B) |

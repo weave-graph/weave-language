@@ -1,4 +1,4 @@
-# Core contract v1: migration note from 0.21, with protocols 0.22 to 1.0.0
+# Core contract v1: migration note from 0.21, with protocols 0.22 to 1.1.0
 
 Introduced by LA0 ([#1](https://github.com/weave-graph/weave-language/issues/1)),
 which tracks engine epic A1. The normative specification is the engine's
@@ -16,15 +16,17 @@ This note covers what changes for weave-language users and tools.
   Engine A4 activated embedding facts, `nearest` and `similar_candidates` as
   protocol **0.24.0** (see [Protocol 0.24.0](#protocol-0240-engine-a4)).
   Engine v1.0.0 froze core v1 as protocol **1.0.0** with no wire change (see
-  [Protocol 1.0.0](#protocol-100-engine-v100-phase-a)). The compiler emits
-  `weave_contract::VERSION`, now `1.0.0`, equal to the vendored crate
-  version. **The language is at Phase A parity on contract 1.0.0.**
+  [Protocol 1.0.0](#protocol-100-engine-v100-phase-a)), and engine B1 part 1
+  added group readers and delegation provenance as protocol **1.1.0** (see
+  [Protocol 1.1.0](#protocol-110-engine-b1-part-1)). The compiler emits
+  `weave_contract::VERSION`, now `1.1.0`, equal to the vendored crate
+  version. **The language is at Phase A parity on contract 1.1.0.**
 - **Every emitted plan is checked against v1.** A golden test compiles every
   entry source in `examples/` and decodes the plan and its templates with the
   contract's strict decoder (`tests/core_v1_contract.rs`).
 - **The engine's golden fixtures run in language CI.** The vendored crate now
-  ships `fixtures/core-v1/` (30 positive and 25 negative JSON fixtures plus a
-  hash manifest at 1.0.0) and
+  ships `fixtures/core-v1/` (32 positive and 26 negative JSON fixtures plus a
+  hash manifest at 1.1.0) and
   `tests/core_v1_fixtures.rs`.
 - **`weave describe FILE --contract`** reports which core v1, extension and
   deferred features a source compiles to.
@@ -35,9 +37,9 @@ This note covers what changes for weave-language users and tools.
 |---|---|---|
 | Specification | 21 additive notes (`docs/contract/v0.1` to `v0.21`) | One consolidated document for everything classified core v1. The notes still govern extension and deferred features |
 | Decoding | serde decoding, one generic input error | `weave_contract::decode_program` checks size, strict JSON (no duplicate keys), then `version`, then structure, with stable codes `E_BUDGET`, `E_DECODE`, `E_VERSION`, `E_UNKNOWN_FIELD` and `E_UNKNOWN_VARIANT`. A program with an unknown version is never partially decoded. `weave-engine run` now reports these codes instead of `E_INPUT` |
-| Versions | Implicit | `SUPPORTED_VERSIONS` (`weave_contract::versions`, the one version table since 1.0.0) is the closed set 0.1.0 to 0.24.0 and 1.0.0. Each version keeps its published semantics, and a feature newer than the declared version fails with `E_VERSION` |
+| Versions | Implicit | `SUPPORTED_VERSIONS` (`weave_contract::versions`, the one version table since 1.0.0) is the closed set 0.1.0 to 0.24.0, 1.0.0 and 1.1.0. Each version keeps its published semantics, and a feature newer than the declared version fails with `E_VERSION` |
 | Feature status | Every feature equal | Each feature is *core v1*, *extension* or *deferred* (table below). No semantics change because of the class |
-| Reserved names | None | Rejected and reserved for later epics: `reader_groups` on fact records (B1); A3 released `expand` and `changes` in 0.23.0; A4 released `GraphData.embedding_spaces` and `embeddings`, result fields `candidates` and `exactness` and expressions `nearest` and `similar_candidates` in 0.24.0; the `weave:` predicate and ID namespace |
+| Reserved names | None | Rejected and reserved for later epics: the `weave:` predicate and ID namespace. Released: B1 activated `reader_groups` on fact records in 1.1.0; A3 released `expand` and `changes` in 0.23.0; A4 released `GraphData.embedding_spaces` and `embeddings`, result fields `candidates` and `exactness` and expressions `nearest` and `similar_candidates` in 0.24.0; the `weave:` predicate and ID namespace |
 | Provenance and embeddings | Not modelled | Records (`FactProvenance`, `ClaimedProvenance`, `EmbeddingSpace`, `EmbeddingFact`, `CandidateRelation`) are defined. Engine A2 activated provenance in 0.22.0. Engine A4 activated embedding spaces, embeddings and candidate relations in 0.24.0 |
 | Compatibility | Additive by convention | Written policy: before 1.0.0 every wire change is an additive minor bump; protocol 1.0.0 is cut at the engine Phase A release |
 
@@ -166,6 +168,32 @@ For weave-language:
 - **Language at Phase A parity.** Every core v1 operator has source syntax
   (LA1), and the Phase A exit questions run from source
   ([HYBRID.md](HYBRID.md#phase-a-exit-questions)).
+
+## Protocol 1.1.0 (engine B1 part 1)
+
+Engine B1 part 1 ([weave-engine#38](https://github.com/weave-graph/weave-engine/issues/38),
+ADR-0007) is the first additive minor version after the 1.0.0 freeze
+([version note](contract/v1.1/README.md)). It activates `reader_groups` on
+`Node`, `Edge`, `StructuralEdge`, `Assertion`, `MetadataAttachment` and
+`EmbeddingFact` (core v1 section 4 `fact.reader_groups`), and the
+engine-recorded `FactProvenance.on_behalf_of` delegation chain (section 6).
+Both are omitted when empty, so existing bytes, hashes and revision IDs are
+unchanged. `reader_groups` under a program older than 1.1.0 fails with
+`E_VERSION` at execution.
+
+For weave-language:
+
+- Plans, view templates and handler artifacts are labelled `1.1.0`. Their
+  commands, data and source revisions are byte-for-byte what 1.0.0 emitted.
+- `describe --contract` lists `reader_groups` as a **core v1 field, since
+  1.1**, at each record that names a group (in `commit` data and `write`
+  facts). This is the one core v1 data field it lists: it is gated by a
+  version after the freeze, so tools need to see it. Empty lists are not
+  reported. `on_behalf_of` is engine-recorded result data that no program can
+  carry, so it is not classified.
+- There is no source syntax for group readers; that is LB1
+  ([#5](https://github.com/weave-graph/weave-language/issues/5)). Source
+  records stay public, and the compiler never emits `reader_groups`.
 
 ## `describe --contract`
 

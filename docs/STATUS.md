@@ -1,15 +1,15 @@
 # Current status
 
 As of **20 October 2026**: **the language is at Phase A parity, on contract
-1.0.0.** The compiler at `main` targets engine contract **1.0.0** (engine
-v1.0.0, the Phase A release) and its **core v1** profile (LA0, see
+1.1.0.** The compiler at `main` targets engine contract **1.1.0** (engine B1
+part 1: group readers and delegation provenance) and its **core v1** profile (LA0, see
 [CORE_V1.md](CORE_V1.md)). Every Phase A operator has source syntax (LA1,
 [#3](https://github.com/weave-graph/weave-language/issues/3)), and the five
 Phase A exit questions run from `.weave` source on a real engine
-(`scripts/check_phase_a.py`). It vendors the complete 100-file contract crate
-from engine `ebfcd4691a0b` (v1.0.0), including the core v1 golden fixtures, which
+(`scripts/check_phase_a.py`). It vendors the complete 103-file contract crate
+from engine `5a19549` (B1 part 1), including the core v1 golden fixtures, which
 `scripts/verify_contract.py` checks against `vendor/manifest.json`.
-`cargo test --workspace --locked` passes 223 tests locally. CI runs Linux, macOS
+`cargo test --workspace --locked` passes 224 tests locally. CI runs Linux, macOS
 and Windows plus WASM parity, and runs the engine's core v1 fixture harness on
 the vendored crate (`.github/workflows/ci.yml`).
 
@@ -33,6 +33,11 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
   command with node valid time ([HYBRID.md](HYBRID.md)). There is no source
   syntax for claimed `provenance` or `readers`, and the compiler never
   supplies a writer or recorded time.
+- **Protocol 1.1.0 (engine B1 part 1):** plans, view templates and handler
+  artifacts are labelled 1.1.0, with the same commands and data as 1.0.0.
+  The compiler never emits `reader_groups`, so its plans have no group
+  readers; `describe --contract` lists `reader_groups` as a core v1 field
+  (since 1.1) where a program built through the protocol uses it.
 - **Protocol 1.0.0 (engine v1.0.0, A6):** plans, view templates and handler
   artifacts are labelled 1.0.0, with the same commands and data as 0.24.0.
   1.0.0 freezes core v1 as published in 0.24.0: there is no wire change.
@@ -103,6 +108,11 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
   facts. Correcting a restricted fact from source would publish its new
   version, so write restricted data through the protocol (permission syntax
   is LB1).
+- **Group readers (`reader_groups`, contract 1.1.0): not yet supported in
+  source.** Group-reader and other permission syntax is LB1
+  ([#5](https://github.com/weave-graph/weave-language/issues/5)). Results of
+  compiled plans can carry engine-recorded `on_behalf_of` delegation chains
+  in `fact_provenance`; the compiler never supplies them.
 - Permission syntax and agent-facing workflows (Phase B, planned as LB1). All
   source-created records are public; restricted fixtures are built through the
   protocol directly.

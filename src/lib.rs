@@ -1042,6 +1042,7 @@ fn lower_artifacts(
                                     .map(|(k, v)| (k, v.into_json()))
                                     .collect(),
                                 readers: Vec::new(),
+                                reader_groups: Vec::new(),
                             });
                         }
                         Item::Claim {
@@ -1099,6 +1100,7 @@ fn lower_artifacts(
                                     .collect(),
                                 metadata: refs(&metadata),
                                 readers: vec![],
+                                reader_groups: Vec::new(),
                                 derived_from: vec![],
                                 derived_snapshots: Vec::new(),
                                 derived_nodes: vec![],
@@ -1142,6 +1144,7 @@ fn lower_artifacts(
                                 valid_time,
                                 origin: None,
                                 readers: Vec::new(),
+                                reader_groups: Vec::new(),
                                 required,
                                 schema_revision: None,
                             });
@@ -1172,6 +1175,7 @@ fn lower_artifacts(
                                 .collect(),
                             metadata: refs(&metadata),
                             readers: Vec::new(),
+                            reader_groups: Vec::new(),
                         }),
                         Item::Edge {
                             id,
@@ -1236,6 +1240,7 @@ fn lower_artifacts(
                                     .collect(),
                                 metadata: refs(&metadata),
                                 readers: Vec::new(),
+                                reader_groups: Vec::new(),
                                 derived_from: Vec::new(),
                                 derived_snapshots: Vec::new(),
                                 derived_nodes: Vec::new(),
@@ -2178,6 +2183,7 @@ fn lower_change(
             properties: properties(values),
             metadata: refs(&metadata),
             readers: Vec::new(),
+            reader_groups: Vec::new(),
             derived_from: Vec::new(),
         }),
         syntax::WriteFact::Space { space, space_span } => {
@@ -2201,6 +2207,7 @@ fn lower_change(
                 vector: checked_vector(&space, &vector, vector_span)?,
                 valid_time: interval(valid_from, valid_to)?,
                 readers: Vec::new(),
+                reader_groups: Vec::new(),
                 derived_from: Vec::new(),
                 derived_nodes: Vec::new(),
                 derived_snapshots: Vec::new(),
