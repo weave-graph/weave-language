@@ -1,11 +1,15 @@
 # Current status
 
-As of **20 October 2026**: an experimental compiler at `main` targeting engine
-contract **0.24.0** and its **core v1** profile (LA0, see
-[CORE_V1.md](CORE_V1.md)). It vendors the complete 98-file contract crate from
-engine `5e2a1d9bbf71` (A4 part 2), including the core v1 golden fixtures, which
+As of **20 October 2026**: **the language is at Phase A parity, on contract
+1.0.0.** The compiler at `main` targets engine contract **1.0.0** (engine
+v1.0.0, the Phase A release) and its **core v1** profile (LA0, see
+[CORE_V1.md](CORE_V1.md)). Every Phase A operator has source syntax (LA1,
+[#3](https://github.com/weave-graph/weave-language/issues/3)), and the five
+Phase A exit questions run from `.weave` source on a real engine
+(`scripts/check_phase_a.py`). It vendors the complete 100-file contract crate
+from engine `ebfcd4691a0b` (v1.0.0), including the core v1 golden fixtures, which
 `scripts/verify_contract.py` checks against `vendor/manifest.json`.
-`cargo test --workspace --locked` passes 222 tests locally. CI runs Linux, macOS
+`cargo test --workspace --locked` passes 223 tests locally. CI runs Linux, macOS
 and Windows plus WASM parity, and runs the engine's core v1 fixture harness on
 the vendored crate (`.github/workflows/ci.yml`).
 
@@ -29,8 +33,12 @@ The per-version checkpoint ledger is in [STATUS_HISTORY.md](STATUS_HISTORY.md).
   command with node valid time ([HYBRID.md](HYBRID.md)). There is no source
   syntax for claimed `provenance` or `readers`, and the compiler never
   supplies a writer or recorded time.
+- **Protocol 1.0.0 (engine v1.0.0, A6):** plans, view templates and handler
+  artifacts are labelled 1.0.0, with the same commands and data as 0.24.0.
+  1.0.0 freezes core v1 as published in 0.24.0: there is no wire change.
 - **Protocol 0.24.0 (engine A4) and LA1 part 2** ([HYBRID.md](HYBRID.md)):
-  plans, view templates and handler artifacts are labelled 0.24.0.
+  plans, view templates and handler artifacts were labelled 0.24.0 (1.0.0
+  since the v1.0.0 vendor update).
   - Fact writes: `write W graph "g" { assert|correct node ...; assert|correct
     edge ...; retract edge "id"; assert space S; assert embedding ...; }`
     lowers to one `write` command (one fact revision).

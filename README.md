@@ -28,9 +28,12 @@ graph functions, rules and explanations.
 
 ## Status
 
-The compiler is experimental, with 222 tests passing, and it targets engine
-contract **0.24.0** and its core v1 profile
-([migration note](docs/CORE_V1.md)). The syntax is provisional.
+**Language at Phase A parity, contract 1.0.0.** The compiler targets engine
+contract **1.0.0** (engine v1.0.0, the Phase A release) and its core v1
+profile ([migration note](docs/CORE_V1.md)), with 223 tests passing. Every
+Phase A operator has source syntax, and the five Phase A exit questions run
+from `.weave` source ([examples/phase_a](examples/phase_a)). The compiler is
+experimental and the syntax is provisional.
 
 | Works today | Not yet |
 |---|---|

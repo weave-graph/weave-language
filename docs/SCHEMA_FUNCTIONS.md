@@ -1,6 +1,6 @@
 # Schema-constrained pure graph functions
 
-> Written for protocol 0.15. Version statements below describe that release; the compiler now targets 0.24.0 ([status](STATUS.md)).
+> Written for protocol 0.15. Version statements below describe that release; the compiler now targets 1.0.0 ([status](STATUS.md)).
 
 This source-only extension uses the graph schema contract introduced before protocol 0.15; the current compiler emits 0.15. It implements a bounded part of paper §§4–5: the compiler checks visible exact schema compatibility, while the runtime retains its independent validation, identity, visibility, context and budget checks.
 

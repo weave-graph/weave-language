@@ -467,3 +467,40 @@ fn describe_contract_classifies_nearest_and_similar_candidates_as_core_v1() {
         }
     }
 }
+
+#[test]
+fn every_classified_since_label_names_a_published_version() {
+    // `since` labels are introduction versions (core-v1.md section 12). Check
+    // them with the contract's one version table (1.0.0, `versions.rs`)
+    // instead of a copied list: each names a published version, and the
+    // emitted protocol has every feature introduced at or before it.
+    use weave_contract::versions::{is_current, is_supported_version, version_at_least};
+    assert!(is_current(VERSION));
+    let dir = root().join("vendor/weave-contract/fixtures/core-v1/positive");
+    let mut labels = BTreeSet::new();
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let fixture: Value =
+            serde_json::from_slice(&std::fs::read(entry.unwrap().path()).unwrap()).unwrap();
+        if fixture["type"] != "program" {
+            continue;
+        }
+        let Ok(program) = decode_program(&serde_json::to_vec(&fixture["input"]).unwrap()) else {
+            continue;
+        };
+        let profile = weave_language::contract_profile::classify(
+            &program,
+            &Default::default(),
+            &Default::default(),
+        );
+        labels.extend(profile.features.iter().map(|f| f.since));
+    }
+    assert!(
+        labels.contains("0.24") && labels.contains("0.1"),
+        "{labels:?}"
+    );
+    for since in labels {
+        let version = format!("{since}.0");
+        assert!(is_supported_version(&version), "{since}");
+        assert!(version_at_least(VERSION, &version), "{since}");
+    }
+}
