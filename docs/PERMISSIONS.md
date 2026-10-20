@@ -265,7 +265,9 @@ python3 scripts/check_agent_service.py --compiler target/debug/weave --service .
   `weave sdk` (request `policy` `{untrusted, read_only, visible}`, run with an
   empty environment in an empty directory), runs every plan with
   `POST /v1/execute`, and records its finding under a record ID minted by
-  `POST /v1/ids`.
+  `POST /v1/ids`. The host loads its fixtures under IDs it mints the same way,
+  because the service requires minted IDs from every principal, tenant
+  administrators included (engine #76).
 
 ## Diagnostics
 
