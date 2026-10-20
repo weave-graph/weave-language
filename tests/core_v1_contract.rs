@@ -52,9 +52,11 @@ fn module_units(map: &Path) -> BTreeSet<PathBuf> {
 
 /// Decode with the contract's strict wire decoder and require a canonical round trip.
 fn assert_canonical<T: serde::Serialize>(value: &Value, decoded: T, what: &str) {
+    // Re-encode to text (not through `Value`, which widens binary32 vector
+    // components to binary64) and compare the parsed results.
+    let reencoded: Value = serde_json::from_str(&serde_json::to_string(&decoded).unwrap()).unwrap();
     assert_eq!(
-        &serde_json::to_value(decoded).unwrap(),
-        value,
+        &reencoded, value,
         "{what}: decoding and re-encoding changed the emitted JSON"
     );
 }

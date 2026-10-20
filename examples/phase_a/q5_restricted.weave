@@ -1,0 +1,10 @@
+// Phase A exit question 5: per-record reader restrictions still hide restricted
+// units. Unit 4 is restricted to fleet-admin; for any other reader every
+// answer below is empty of it (scripts/check_phase_a.py runs all five).
+embedding_space Units id "hw-units" revision "1" encoder "weave-test-hash-embedder"
+  version "1" preprocessing "unit-profile/v1" dimensions 64 metric cosine_distance;
+use Fleet graph "fleet";
+expand Region from Fleet { seeds "unit-4"; hops 2; direction both; }
+similar_candidates LikeUnit4 from Fleet { space Units; k 3; at 3000; sources Region; }
+expand Around from Fleet { seeds from LikeUnit4; hops 1; match relation "located_at"; }
+changes ForUnit from Fleet { since as_of 0; entities "UNIT-4"; }

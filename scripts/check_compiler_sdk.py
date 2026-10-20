@@ -63,9 +63,15 @@ fixtures={name:root/'examples'/f'{name}.weave' for name in ['scalars','quantitie
 fixtures['view-template']=root/'examples/view_services/template.weave'
 # LA1 A3 query syntax: as_of, expand, changes and explain over them.
 for path in sorted((root/'examples/traversal').glob('*.weave')):fixtures['traversal-'+path.stem]=path
+# LA1 part 2: embedding spaces, writes, nearest, similar_candidates and the Phase A questions.
+for directory in ['hybrid','phase_a']:
+ for path in sorted((root/'examples'/directory).glob('*.weave')):fixtures[directory+'-'+path.stem]=path
+fixtures['embeddings']=root/'examples/embeddings.weave'
+notes_space='embedding_space Notes id "notes" revision "1" encoder "enc" version "v1" preprocessing "words/v1" dimensions 3 metric cosine_distance; use G graph "g"; '
+cases.append(('nearest-space-mismatch',request(notes_space+'nearest N from G { space Notes; vector [1.0, 0.0]; k 1; }')))
+cases.append(('write-hidden-effect-denial',request('function F revision "1" (graph input) { write W graph "g" { retract node "n"; } return input; }')))
 cases.append(('changes-terminal',request('use G graph "g"; changes D from G { since head; } explain W from D;')))
 cases.append(('expand-hidden-read-denial',request('function F revision "1" (graph input) { expand E from input { seeds "a"; hops 1; } return E; }')))
-cases.append(('nearest-not-yet-supported',request('use G graph "g"; nearest N from G {}')))
 b='module "b" revision "1"; import a module "a" revision "1" sha256 "'+('0'*64)+'";'
 a_unit='module "a" revision "1";'+imp('b','b',b)
 cases.append(('cycle',request(imp('a','a',a_unit),[unit('a',a_unit),unit('b',b)])))
@@ -123,7 +129,7 @@ with tempfile.TemporaryDirectory(prefix='weave-sdk-') as tmp:
    expected=json.loads(subprocess.check_output([str(a.compiler.resolve()),'artifacts',str(fixtures[name])]))
    result=json.loads(actual);assert result['ok'] and result['artifacts']==expected['artifacts'] and result['artifact_fingerprint']==expected['artifact_fingerprint'],name
   if name in ['exact-integers','diamond-modules','near-4MiB-decoded-budget','large-output','all-octets','recorded-handle-pin','recorded-checkpoint-view']:assert json.loads(actual)['ok'],actual
-  expected_errors={'bad-reference':'E_REFERENCE_VALUE','bad-bytes':'E_BYTES_LITERAL','missing-module':'E_MODULE_MISSING','recorded-hidden-read-denial':'E_FUNCTION_EFFECT','changes-terminal':'E_CHANGES_OPERAND','expand-hidden-read-denial':'E_FUNCTION_EFFECT','nearest-not-yet-supported':'E_NOT_YET_SUPPORTED','wrong-pin':'E_MODULE_DIGEST','cycle':'E_MODULE_CYCLE','invalid-utf8':'E_SDK_UTF8','invalid-json':'E_SDK_REQUEST','duplicate-fields':'E_SDK_REQUEST','decoded-bound':'E_SDK_BUDGET'}
+  expected_errors={'bad-reference':'E_REFERENCE_VALUE','bad-bytes':'E_BYTES_LITERAL','missing-module':'E_MODULE_MISSING','recorded-hidden-read-denial':'E_FUNCTION_EFFECT','changes-terminal':'E_CHANGES_OPERAND','expand-hidden-read-denial':'E_FUNCTION_EFFECT','nearest-space-mismatch':'E_SPACE_MISMATCH','write-hidden-effect-denial':'E_FUNCTION_EFFECT','wrong-pin':'E_MODULE_DIGEST','cycle':'E_MODULE_CYCLE','invalid-utf8':'E_SDK_UTF8','invalid-json':'E_SDK_REQUEST','duplicate-fields':'E_SDK_REQUEST','decoded-bound':'E_SDK_BUDGET'}
   if name in expected_errors:assert json.loads(actual)['error']['code']==expected_errors[name],actual
   if name in ['source-error','original-module-diagnostic']:assert json.loads(actual)['ok'] is False,actual
   reports.append({'name':name,'request_bytes':len(raw),'response_bytes':len(actual),'native_abi':timing})

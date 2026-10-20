@@ -323,6 +323,10 @@ fn lower_artifacts(
     }
     let mut active_batch: Option<(String, usize, Vec<SnapshotCommit>)> = None;
     let mut change_sets = BTreeSet::new();
+    let mut spaces: BTreeMap<String, weave_contract::embedding::EmbeddingSpace> = BTreeMap::new();
+    // The space each embedding ID was written in by this program.
+    let mut embedding_spaces: BTreeMap<String, weave_contract::embedding::SpaceRef> =
+        BTreeMap::new();
     for (statement_index, statement) in statements.into_iter().enumerate() {
         if let Some((name, count)) = batches.remove(&statement_index) {
             active_batch = Some((name, count, Vec::new()));
@@ -362,6 +366,35 @@ fn lower_artifacts(
                     name_span,
                 ));
             }
+            continue;
+        }
+        if let Statement::EmbeddingSpace {
+            name,
+            name_span,
+            definition,
+        } = statement
+        {
+            if spaces.contains_key(&name) {
+                return Err(diagnostic(
+                    "E_DUPLICATE",
+                    format!("Duplicate embedding space '{name}'"),
+                    name_span,
+                ));
+            }
+            if let Some((other, _)) = spaces
+                .iter()
+                .find(|(_, s)| s.reference() == definition.reference() && **s != definition)
+            {
+                return Err(diagnostic(
+                    "E_SPACE_MISMATCH",
+                    format!(
+                        "Embedding space '{other}' already declares '{}@{}' with another descriptor",
+                        definition.id, definition.revision
+                    ),
+                    name_span,
+                ));
+            }
+            spaces.insert(name, definition);
             continue;
         }
         if let Statement::Schema {
@@ -430,6 +463,9 @@ fn lower_artifacts(
             | Statement::Traversal {
                 name, name_span, ..
             }
+            | Statement::Write {
+                name, name_span, ..
+            }
             | Statement::Lens {
                 name, name_span, ..
             }
@@ -446,6 +482,7 @@ fn lower_artifacts(
                 name, name_span, ..
             } => (name, *name_span),
             Statement::ModuleHeader { .. }
+            | Statement::EmbeddingSpace { .. }
             | Statement::Import { .. }
             | Statement::ContextSchema { .. }
             | Statement::Schema { .. }
@@ -1527,6 +1564,26 @@ fn lower_artifacts(
                 lens.as_of = as_of;
                 names.insert(name, lens);
             }
+            Statement::EmbeddingSpace { .. } => unreachable!("declared before lowering"),
+            Statement::Write {
+                name: _,
+                name_span: _,
+                graph,
+                branch,
+                expected_head,
+                changes: source_changes,
+            } => {
+                let mut changes = Vec::with_capacity(source_changes.len());
+                for change in source_changes {
+                    changes.push(lower_change(change, &spaces, &mut embedding_spaces)?);
+                }
+                commands.push(Command::Write {
+                    graph_id: graph,
+                    branch_id: branch.unwrap_or_else(|| "main".into()),
+                    expected_head,
+                    changes,
+                });
+            }
             Statement::Traversal {
                 name,
                 name_span: _,
@@ -1542,8 +1599,8 @@ fn lower_artifacts(
                     ));
                 };
                 let changes = matches!(operation, syntax::TraversalOperation::Changes { .. });
-                // Both operators read the store directly, so their source must be a
-                // stored graph reference (`use` or `graph`) with no filters applied.
+                // Every store read takes a stored graph reference (`use` or
+                // `graph`) with no filters applied.
                 if lens.input.is_some()
                     || lens.recorded.is_some()
                     || lens.relation.is_some()
@@ -1553,20 +1610,35 @@ fn lower_artifacts(
                     || lens.query.include_metadata
                 {
                     return Err(diagnostic(
-                        if changes {
-                            "E_CHANGES_SOURCE"
-                        } else {
-                            "E_EXPAND_SOURCE"
+                        match operation {
+                            syntax::TraversalOperation::Changes { .. } => "E_CHANGES_SOURCE",
+                            syntax::TraversalOperation::Expand { .. } => "E_EXPAND_SOURCE",
+                            _ => "E_NEAREST_SOURCE",
                         },
-                        "Expand and changes read a stored graph reference declared with 'use' or 'graph'; put filters in their own clauses",
+                        "Store reads take a stored graph reference declared with 'use' or 'graph'; put filters in their own clauses",
                         source_span,
                     ));
                 }
                 let query = lens.query.clone();
                 let as_of = lens.as_of;
+                let value = |reference: Option<(String, syntax::Span)>| {
+                    reference
+                        .map(|(name, span)| graph_value(&names, &name, span).map(Box::new))
+                        .transpose()
+                };
+                let space_of = |name: &str, span| {
+                    spaces.get(name).cloned().ok_or_else(|| {
+                        diagnostic(
+                            "E_UNKNOWN_SPACE",
+                            format!("Unknown embedding space '{name}'"),
+                            span,
+                        )
+                    })
+                };
                 let expression = match operation {
                     syntax::TraversalOperation::Expand {
                         seeds,
+                        seeds_from,
                         hops,
                         direction,
                         predicates,
@@ -1578,13 +1650,109 @@ fn lower_artifacts(
                         revision: query.revision,
                         as_of,
                         seeds,
-                        seeds_from: None,
+                        seeds_from: value(seeds_from)?,
                         hops,
                         direction,
                         predicates,
                         valid_at,
                         limit: limit.unwrap_or(weave_contract::traversal::DEFAULT_LIMIT),
                     }),
+                    syntax::TraversalOperation::Nearest {
+                        space,
+                        space_span,
+                        query: source_query,
+                        k,
+                        valid_at,
+                        candidates,
+                    } => {
+                        let space = space_of(&space, space_span)?;
+                        let nearest_query = match source_query {
+                            syntax::NearestSource::Vector { values, span } => {
+                                weave_contract::embedding::NearestQuery::Vector {
+                                    vector: checked_vector(&space, &values, span)?,
+                                }
+                            }
+                            syntax::NearestSource::Value { name, span } => {
+                                let Some(scalars::ScalarValue::Vector(vector)) =
+                                    scalar_values.get(&name)
+                                else {
+                                    return Err(diagnostic(
+                                        "E_SCALAR_TYPE",
+                                        format!("'{name}' is not a typed vector value"),
+                                        span,
+                                    ));
+                                };
+                                if !descriptor_matches(&space, vector.descriptor()) {
+                                    return Err(diagnostic(
+                                        "E_SPACE_MISMATCH",
+                                        format!(
+                                            "Vector '{name}' has a different space descriptor than embedding space '{}@{}'",
+                                            space.id, space.revision
+                                        ),
+                                        span,
+                                    ));
+                                }
+                                weave_contract::embedding::NearestQuery::Vector {
+                                    vector: checked_vector(&space, vector.values(), span)?,
+                                }
+                            }
+                            syntax::NearestSource::Embedding { id, span } => {
+                                if let Some(other) = embedding_spaces.get(&id)
+                                    && *other != space.reference()
+                                {
+                                    return Err(diagnostic(
+                                        "E_SPACE_MISMATCH",
+                                        format!(
+                                            "Embedding '{id}' was written in space '{}@{}', not '{}@{}'",
+                                            other.id, other.revision, space.id, space.revision
+                                        ),
+                                        span,
+                                    ));
+                                }
+                                weave_contract::embedding::NearestQuery::Embedding {
+                                    embedding_id: id,
+                                }
+                            }
+                        };
+                        GraphExpression::Nearest(weave_contract::embedding::NearestPlan {
+                            graph_id: query.graph_id,
+                            branch_id: query.branch_id,
+                            revision: query.revision,
+                            as_of,
+                            space: space.reference(),
+                            query: nearest_query,
+                            k,
+                            valid_at,
+                            candidates: value(candidates)?,
+                        })
+                    }
+                    syntax::TraversalOperation::SimilarCandidates {
+                        space,
+                        space_span,
+                        k,
+                        max_score,
+                        valid_at,
+                        sources,
+                        targets,
+                        exclude_linked,
+                        limit,
+                    } => GraphExpression::SimilarCandidates(
+                        weave_contract::embedding::CandidatesPlan {
+                            graph_id: query.graph_id,
+                            branch_id: query.branch_id,
+                            revision: query.revision,
+                            as_of,
+                            space: space_of(&space, space_span)?.reference(),
+                            k,
+                            max_score,
+                            valid_at,
+                            sources: value(sources)?,
+                            targets: value(targets)?,
+                            exclude_linked,
+                            limit: limit
+                                .unwrap_or(weave_contract::embedding::DEFAULT_CANDIDATE_LIMIT),
+                        },
+                    ),
                     syntax::TraversalOperation::Changes {
                         from,
                         to,
@@ -1843,6 +2011,216 @@ fn lower_artifacts(
     })
 }
 
+/// A fully bound graph value used as an operator input (A4 candidate sets,
+/// `seeds from`).
+fn graph_value(
+    names: &BTreeMap<String, Lens>,
+    name: &str,
+    span: syntax::Span,
+) -> Result<GraphExpression, Diagnostic> {
+    let lens = names.get(name).ok_or_else(|| {
+        diagnostic(
+            "E_UNKNOWN_GRAPH",
+            format!("Unknown graph value '{name}'"),
+            span,
+        )
+    })?;
+    if lens.relation.is_some() || lens.time.is_some() {
+        return Err(diagnostic(
+            "E_UNBOUND_PARAMETER",
+            "Candidate and seed values must be fully bound",
+            span,
+        ));
+    }
+    Ok(lens.expression())
+}
+/// A typed source vector matches an embedding space when every descriptor
+/// field the source type carries is equal. Equal dimensions never suffice.
+fn descriptor_matches(
+    space: &weave_contract::embedding::EmbeddingSpace,
+    descriptor: &vectors::VectorDescriptor,
+) -> bool {
+    let source = descriptor.space();
+    match &source.geometry {
+        vectors::Geometry::Embedding {
+            encoder,
+            preprocessing,
+            dimensions,
+            metric,
+        } => {
+            source.id == space.id
+                && source.revision == space.revision
+                && *encoder == space.encoder
+                && *preprocessing == space.preprocessing
+                && *dimensions == space.dimensions as usize
+                && matches!(
+                    (metric, space.metric),
+                    (
+                        vectors::Metric::CosineDistance,
+                        weave_contract::embedding::EmbeddingMetric::CosineDistance
+                    ) | (
+                        vectors::Metric::Euclidean,
+                        weave_contract::embedding::EmbeddingMetric::Euclidean
+                    )
+                )
+        }
+        vectors::Geometry::Physical3d { .. } => false,
+    }
+}
+/// Round a source vector to binary32 and check it against its space.
+fn checked_vector(
+    space: &weave_contract::embedding::EmbeddingSpace,
+    values: &[f64],
+    span: syntax::Span,
+) -> Result<Vec<f32>, Diagnostic> {
+    let vector: Vec<f32> = values.iter().map(|v| *v as f32).collect();
+    space.validate_vector(&vector).map_err(|e| {
+        diagnostic(
+            "E_SPACE_MISMATCH",
+            format!(
+                "Vector does not fit embedding space '{}@{}' ({} dimensions, {:?}): {}",
+                space.id, space.revision, space.dimensions, space.metric, e.message
+            ),
+            span,
+        )
+    })?;
+    Ok(vector)
+}
+/// Lower one source write change to a contract fact change.
+fn lower_change(
+    change: syntax::WriteChange,
+    spaces: &BTreeMap<String, weave_contract::embedding::EmbeddingSpace>,
+    embedding_spaces: &mut BTreeMap<String, weave_contract::embedding::SpaceRef>,
+) -> Result<weave_contract::FactChange, Diagnostic> {
+    use weave_contract::{Fact, FactChange, FactTarget};
+    let span = change.span;
+    let interval = |start: i64, end: Option<i64>| {
+        let valid = Interval { start, end };
+        if valid.valid() {
+            Ok(valid)
+        } else {
+            Err(diagnostic(
+                "E_INTERVAL",
+                "Valid time must be nonempty and half-open",
+                span,
+            ))
+        }
+    };
+    let space_of = |name: &str, span| {
+        spaces.get(name).cloned().ok_or_else(|| {
+            diagnostic(
+                "E_UNKNOWN_SPACE",
+                format!("Unknown embedding space '{name}'"),
+                span,
+            )
+        })
+    };
+    let properties = |p: BTreeMap<String, scalars::LiteralExpr>| {
+        p.into_iter()
+            .map(|(k, v)| (k, v.into_json()))
+            .collect::<BTreeMap<_, _>>()
+    };
+    let fact = match change.fact {
+        syntax::WriteFact::Target { target, id } => {
+            return Ok(FactChange::Retract {
+                target: FactTarget { kind: target, id },
+                expected: None,
+            });
+        }
+        syntax::WriteFact::Node {
+            id,
+            entity,
+            space,
+            valid,
+            metadata,
+            properties: values,
+        } => {
+            let valid_time = valid.map(|(a, b)| interval(a, b)).transpose()?;
+            let value = serde_json::json!({"kind": "node", "id": id, "entity_id": entity, "space_id": space,
+                "valid_time": valid_time, "properties": properties(values), "metadata": refs(&metadata), "readers": []});
+            let mut value = value;
+            if valid_time.is_none() {
+                value.as_object_mut().unwrap().remove("valid_time");
+            }
+            serde_json::from_value::<Fact>(value)
+                .map_err(|e| diagnostic("E_WRITE", e.to_string(), span))?
+        }
+        syntax::WriteFact::Edge {
+            id,
+            from,
+            to,
+            predicate,
+            negative,
+            valid_from,
+            valid_to,
+            metadata,
+            properties: values,
+        } => Fact::Edge(Edge {
+            provenance: None,
+            derivations: Vec::new(),
+            derived_snapshots: Vec::new(),
+            derived_nodes: Vec::new(),
+            assertion_source: None,
+            assertion_context: None,
+            structural_ref: None,
+            assertion_properties: BTreeMap::new(),
+            type_id: None,
+            id,
+            predicate,
+            from,
+            to,
+            valid_time: interval(valid_from, valid_to)?,
+            polarity: if negative {
+                Polarity::Negative
+            } else {
+                Polarity::Positive
+            },
+            properties: properties(values),
+            metadata: refs(&metadata),
+            readers: Vec::new(),
+            derived_from: Vec::new(),
+        }),
+        syntax::WriteFact::Space { space, space_span } => {
+            Fact::EmbeddingSpace(space_of(&space, space_span)?)
+        }
+        syntax::WriteFact::Embedding {
+            id,
+            space,
+            space_span,
+            subject,
+            vector,
+            vector_span,
+            valid_from,
+            valid_to,
+        } => {
+            let space = space_of(&space, space_span)?;
+            let fact = weave_contract::embedding::EmbeddingFact {
+                id: id.clone(),
+                space: space.reference(),
+                subject,
+                vector: checked_vector(&space, &vector, vector_span)?,
+                valid_time: interval(valid_from, valid_to)?,
+                readers: Vec::new(),
+                derived_from: Vec::new(),
+                derived_nodes: Vec::new(),
+                derived_snapshots: Vec::new(),
+                provenance: None,
+            };
+            fact.validate(&space)
+                .map_err(|e| diagnostic(&e.code, e.message, span))?;
+            embedding_spaces.insert(id, space.reference());
+            Fact::Embedding(fact)
+        }
+    };
+    Ok(match change.change {
+        syntax::WriteKind::Assert => FactChange::Assert { fact },
+        syntax::WriteKind::Correct => FactChange::Correct {
+            fact,
+            expected: None,
+        },
+        syntax::WriteKind::Retract => unreachable!("retractions return above"),
+    })
+}
 /// The graph values a lowered statement consumes, with their source spans.
 fn graph_inputs(statement: &Statement) -> Vec<(&str, syntax::Span)> {
     match statement {
@@ -1909,12 +2287,30 @@ fn graph_inputs(statement: &Statement) -> Vec<(&str, syntax::Span)> {
             source,
             source_span,
             ..
-        }
-        | Statement::Traversal {
+        } => vec![(source.as_str(), *source_span)],
+        Statement::Traversal {
             source,
             source_span,
+            operation,
             ..
-        } => vec![(source.as_str(), *source_span)],
+        } => {
+            let mut inputs = vec![(source.as_str(), *source_span)];
+            let references = match operation {
+                syntax::TraversalOperation::Expand { seeds_from, .. } => vec![seeds_from],
+                syntax::TraversalOperation::Nearest { candidates, .. } => vec![candidates],
+                syntax::TraversalOperation::SimilarCandidates {
+                    sources, targets, ..
+                } => vec![sources, targets],
+                syntax::TraversalOperation::Changes { .. } => vec![],
+            };
+            inputs.extend(
+                references
+                    .into_iter()
+                    .flatten()
+                    .map(|(name, span)| (name.as_str(), *span)),
+            );
+            inputs
+        }
         _ => vec![],
     }
 }

@@ -1,0 +1,13 @@
+// Phase A exit question 3: maintenance notes similar to an incident, restricted
+// to the 2-hop neighborhood of the affected unit and valid at the incident time.
+embedding_space Notes id "hw-notes" revision "1" encoder "weave-test-hash-embedder"
+  version "1" preprocessing "lowercase-words/v1" dimensions 64 metric cosine_distance;
+use Fleet graph "fleet";
+expand Region from Fleet { seeds "unit-7"; hops 2; direction both; }
+nearest Similar from Fleet {
+  space Notes;
+  like embedding "emb:incident-7";
+  k 10;
+  at 1000;
+  candidates Region;
+}

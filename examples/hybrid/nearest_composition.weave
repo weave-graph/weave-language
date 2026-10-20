@@ -1,0 +1,11 @@
+// Graph to vector and vector to graph in one program (LA1 part 2). Mirrors the
+// engine core v1 fixture `nearest-composition`.
+embedding_space Notes id "notes" revision "1" encoder "text-embedding-3-small" version "2024-01-25"
+  preprocessing "weave-chunk/512-tokens/v1" dimensions 3 metric cosine_distance;
+use G graph "g";
+// Nearest notes among the 1-hop in-neighborhood of u1.
+expand AroundU1 from G { seeds "u1"; hops 1; direction in; }
+nearest NotesNearU1 from G { space Notes; vector [1.0, 0.0, 0.0]; k 10; candidates AroundU1; }
+// The nearest note, then what it mentions and where that is located.
+nearest Best from G { space Notes; vector [1.0, 0.1, 0.0]; k 1; }
+expand FromBest from G { seeds from Best; hops 2; match relation "weave:mentions", "located_at"; }

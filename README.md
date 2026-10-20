@@ -28,15 +28,15 @@ graph functions, rules and explanations.
 
 ## Status
 
-The compiler is experimental, with 214 tests passing, and it targets engine
+The compiler is experimental, with 222 tests passing, and it targets engine
 contract **0.24.0** and its core v1 profile
 ([migration note](docs/CORE_V1.md)). The syntax is provisional.
 
 | Works today | Not yet |
 |---|---|
 | Graphs, nodes, first-class edges, graph-valued metadata, pinned and live references | Permission syntax (sharing is engine-side) |
-| Valid-time filters, `Window`/`Sequence`, `diff`, recorded and accepted history, as-of reads, k-hop `expand` and `changes` change sets | Source syntax for fact-level writes (assert, correct, retract) |
-| Pure graph functions, joins, union, projection, four-valued support, bounded rules, `explain` | Vector search and hybrid retrieval operators (waiting on engine A4; `nearest` is reserved) |
+| Valid-time filters, `Window`/`Sequence`, `diff`, recorded and accepted history, as-of reads, k-hop `expand` and `changes` change sets | Approximate vector search (engine C5) |
+| Fact writes, embedding spaces and facts, exact `nearest`, `similar_candidates`, pure graph functions, joins, union, projection, four-valued support, bounded rules, `explain` | Reader restrictions on source writes (permission syntax, Phase B) |
 | Typed contexts, exact Decimal/Quantity, typed vectors, intervals, bytes, typed refs | Agent identity and agent-facing workflows (engine Phase B) |
 | `check`, `plan`, `ast`, `describe`, `fmt`, view and handler artifacts, native/C/WASM compiler SDK | Distributed and offline governance (deferred) |
 

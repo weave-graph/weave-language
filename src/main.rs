@@ -204,10 +204,23 @@ fn show_artifacts(
             "{}",
             serde_json::json!({"status":"valid","version":output.program.version,"commands":output.program.commands.len(),"view_templates":output.view_templates.len(),"handler_templates":output.handler_templates.len(),"host_registration_required":!output.view_templates.is_empty() || !output.handler_templates.is_empty()})
         ),
-        _ => println!(
-            "{}",
-            serde_json::json!({"artifacts":output,"artifact_fingerprint":output.fingerprint().unwrap()})
-        ),
+        _ => {
+            // Serialize directly (not through `serde_json::Value`), so binary32
+            // embedding components print as in `plan` and the SDK.
+            #[derive(serde::Serialize)]
+            struct Output<'a> {
+                artifacts: &'a weave_language::CompiledArtifacts,
+                artifact_fingerprint: String,
+            }
+            println!(
+                "{}",
+                serde_json::to_string(&Output {
+                    artifacts: &output,
+                    artifact_fingerprint: output.fingerprint().unwrap(),
+                })
+                .unwrap()
+            )
+        }
     }
 }
 fn module_fail<T>(error: weave_language::modules::ModuleDiagnostic) -> T {

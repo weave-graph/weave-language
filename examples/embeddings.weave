@@ -1,0 +1,24 @@
+// Embedding spaces, embedding facts and hybrid retrieval (LA1 part 2, protocol 0.24).
+embedding_space Notes id "notes" revision "1" encoder "example-encoder" version "2026-10"
+  preprocessing "words/v1" dimensions 4 metric cosine_distance;
+vector_type NoteVector space {"id":"notes","revision":"1","geometry":{"kind":"embedding","encoder":"example-encoder","preprocessing":"words/v1","dimensions":4,"metric":"cosine_distance"}} role embedding;
+value Incident vector NoteVector [1.0, 0.2, 0.0, 0.0];
+write Seed graph "docs" expected new {
+  assert node "unit" entity "UNIT-1" space "fleet";
+  assert node "note-a" entity "NOTE-A" space "notes" valid 0 until infinity property "text" "bearing noise";
+  assert node "note-b" entity "NOTE-B" space "notes" valid 0 until infinity property "text" "fan filter";
+  assert edge "about-a" from "note-a" to "unit" relation "performed_on" valid 0 until infinity;
+  assert edge "about-b" from "note-b" to "unit" relation "performed_on" valid 0 until infinity;
+  assert space Notes;
+  assert embedding "emb-a" in Notes subject node "note-a" vector [1.0, 0.1, 0.0, 0.0] valid 0 until infinity;
+  assert embedding "emb-b" in Notes subject node "note-b" vector [0.0, 0.0, 1.0, 0.3] valid 0 until infinity;
+}
+use Docs graph "docs";
+expand AroundUnit from Docs { seeds "unit"; hops 1; direction in; }
+// Typed query vector: its descriptor must equal the space's (E_SPACE_MISMATCH otherwise).
+nearest Closest from Docs { space Notes; vector value Incident; k 1; candidates AroundUnit; }
+nearest LikeA from Docs { space Notes; like embedding "emb-a"; k 1; }
+// Vector to graph: expand from the hits.
+expand HitUnits from Docs { seeds from Closest; hops 1; match relation "performed_on"; }
+similar_candidates Pairs from Docs { space Notes; k 1; max_score 2; exclude_linked; }
+write Retire graph "docs" { retract embedding "emb-b"; }

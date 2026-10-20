@@ -5,7 +5,7 @@ This is implemented experimental syntax, **not recovered white-paper syntax**. T
 The core declaration grammar below is an excerpt; later sections define explicit assertions, functions, algebra, rules, contexts and geometry.
 
 ```ebnf
-program = { schema | transaction | graph | use | lens | bind | join | metadata_query | expand | changes } ;
+program = { schema | transaction | graph | use | lens | bind | join | metadata_query | expand | changes | write | embedding_space | nearest | similar_candidates } ;
 transaction = "transaction", identifier, "{", graph, { graph }, "}" ;
 metadata_query = "metadata", identifier, "from", identifier, "on", host, "key", string, ";" ;
 host = ("node" | "edge" | "assertion" | "entity"), string | "graph" ;
@@ -316,4 +316,24 @@ use Fleet graph "fleet";
 changes Delta from Fleet { between as_of 1759000000000 and head; entities "UNIT-7"; }
 ```
 
-`use ... as_of T` selects recorded time and `at` valid time. `expand` lowers to the engine's k-hop `expand`, `changes` to its change set, and a lens over an `as_of` reference to `as_of`. A change set is terminal (`E_CHANGES_OPERAND`). `nearest` and `similar_candidates` are reserved and fail with `E_NOT_YET_SUPPORTED` until engine A4. See [the reference](TRAVERSAL.md) and [examples/traversal](../examples/traversal).
+`use ... as_of T` selects recorded time and `at` valid time. `expand` lowers to the engine's k-hop `expand`, `changes` to its change set, and a lens over an `as_of` reference to `as_of`. A change set is terminal (`E_CHANGES_OPERAND`). See [the reference](TRAVERSAL.md) and [examples/traversal](../examples/traversal).
+
+## Fact writes, embeddings and hybrid retrieval (protocol 0.24, LA1)
+
+```weave
+embedding_space Notes id "hw-notes" revision "1" encoder "enc" version "1"
+  preprocessing "words/v1" dimensions 3 metric cosine_distance;
+write Rollout graph "fleet" {
+  correct edge "runs:0" from "unit-2" to "fw-2" relation "runs" valid 0 until 2000;
+  assert edge "runs:1" from "unit-2" to "fw-3" relation "runs" valid 2000 until infinity;
+  assert space Notes;
+  assert embedding "emb:n1" in Notes subject node "n1" vector [0.9, 0.1, 0.0] valid 0 until infinity;
+}
+use Fleet graph "fleet";
+expand Region from Fleet { seeds "unit-7"; hops 2; direction both; }
+nearest Similar from Fleet { space Notes; like embedding "emb:incident-7"; k 10; at 1000; candidates Region; }
+expand Units from Fleet { seeds from Similar; hops 1; }
+similar_candidates Pairs from Fleet { space Notes; k 1; exclude_linked; }
+```
+
+Each `write` is one fact revision (assert, correct, retract). An `embedding_space` declares the complete descriptor, and every vector is checked against it at compile time (`E_SPACE_MISMATCH`). `nearest` ranks one space's embeddings, `candidates` and `seeds from` compose it with `expand`, and `similar_candidates` returns candidate relations. See [the reference](HYBRID.md), [examples/hybrid](../examples/hybrid) and the Phase A exit questions in [examples/phase_a](../examples/phase_a).

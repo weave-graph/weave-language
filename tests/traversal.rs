@@ -374,16 +374,6 @@ fn diagnostics_have_stable_codes_and_exact_spans() {
             "E_FUNCTION_EFFECT",
             "C",
         ),
-        (
-            format!("{use_g}nearest N from G {{ k 5; }}"),
-            "E_NOT_YET_SUPPORTED",
-            "nearest",
-        ),
-        (
-            format!("{use_g}similar_candidates N from G {{}}"),
-            "E_NOT_YET_SUPPORTED",
-            "similar_candidates",
-        ),
     ] {
         assert_eq!(
             error(&source),

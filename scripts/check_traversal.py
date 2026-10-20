@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """LA1 (weave-language#3) compiler -> engine acceptance for the A3 query syntax.
 
-1. Engine oracle fixtures: each `examples/traversal/<fixture>.weave` mirrors an
-   engine core v1 fixture. The fixture's setup programs run on the real engine,
+1. Engine oracle fixtures: each `examples/traversal/<fixture>.weave` (A3) and
+   `examples/hybrid/<fixture>.weave` (A4) mirrors an engine core v1 fixture. The fixture's setup programs run on the real engine,
    the source is compiled, and every result is compared with the fixture's
    recorded results. Fixture clock times are mapped to real recorded times.
 2. Phase A exit question 2 (`examples/traversal/fleet_questions.weave`) over a
@@ -10,7 +10,7 @@
    the engine's JSON reference plan and as an independent oracle, hides
    restricted units, cites provenance and replays after reopening the store.
 """
-import argparse, json, re, subprocess, tempfile, time
+import argparse, json, re, struct, subprocess, tempfile, time
 from pathlib import Path
 
 p = argparse.ArgumentParser()
@@ -24,6 +24,22 @@ fixtures = root / 'vendor/weave-contract/fixtures/core-v1/positive'
 version = json.loads((root / 'vendor/manifest.json').read_text())['contract_version']
 processes = 0
 checks = []
+
+
+def f32(x):
+    return struct.unpack('f', struct.pack('f', x))[0]
+
+
+def normalized(value, bound=None):
+    """An expression with references to earlier bindings inlined and vector
+    components rounded to binary32, as the engine decodes them."""
+    if isinstance(value, dict):
+        if value.get('kind') == 'reference' and bound is not None:
+            return bound[value['name']]
+        return {k: ([f32(x) for x in v] if k == 'vector' else normalized(v, bound)) for k, v in value.items()}
+    if isinstance(value, list):
+        return [normalized(v, bound) for v in value]
+    return value
 
 
 def now_ms():
@@ -66,19 +82,34 @@ with tempfile.TemporaryDirectory(prefix='weave-traversal-') as directory:
             got['nodes'] = sorted(n['id'] for n in result['graph']['nodes'])
         if 'edges' in expected:
             got['edges'] = sorted(e['id'] for e in result['graph']['edges'])
+        if 'neighbors' in expected:
+            got['neighbors'] = [n['embedding_id'] for n in result['neighbors']]
+        if 'candidates' in expected:
+            got['candidates'] = sorted([c['from'], c['to']] for c in result['candidates'])
+        if 'exactness' in expected:
+            got['exactness'] = result['exactness']
         if 'changes' in expected:
             got['changes'] = sorted([e['change'], e['kind'], e['id']] for e in result['changes']['entries'])
-        want = dict(expected)
-        for key in ['nodes', 'edges', 'changes']:
+        want = {k: v for k, v in expected.items() if k != 'fact_provenance'}
+        if 'fact_provenance' in expected:  # {count, methods, writers}
+            entries = result['fact_provenance']
+            assert len(entries) == expected['fact_provenance']['count']
+            assert sorted({e['provenance']['method']['kind'] for e in entries}) == expected['fact_provenance']['methods']
+            assert sorted({e['provenance']['writer'] for e in entries}) == expected['fact_provenance']['writers']
+        for key in ['nodes', 'edges', 'changes', 'candidates']:
             if key in want:
                 want[key] = sorted(want[key])
         return got, want
 
     # 1. Engine oracle fixtures.
-    for name, source in [('expand-k-hop', 'expand_k_hop'),
-                         ('expand-valid-time-as-of', 'expand_valid_time_as_of'),
-                         ('changes-between-times', 'changes_between_times'),
-                         ('as-of-partially-visible', 'as_of_partially_visible')]:
+    for name, source, selected in [
+            ('expand-k-hop', 'traversal/expand_k_hop', None),
+            ('expand-valid-time-as-of', 'traversal/expand_valid_time_as_of', None),
+            ('changes-between-times', 'traversal/changes_between_times', None),
+            ('as-of-partially-visible', 'traversal/as_of_partially_visible', None),
+            ('embedding-write-and-nearest', 'hybrid/embedding_write_and_nearest', None),
+            ('nearest-composition', 'hybrid/nearest_composition', ['NotesNearU1', 'FromBest']),
+            ('similar-candidates', 'hybrid/similar_candidates', None)]:
         fixture = json.loads((fixtures / f'{name}.json').read_text())
         setup = fixture['engine'].get('setup', [])
         db = work / f'{name}.db'
@@ -104,7 +135,7 @@ with tempfile.TemporaryDirectory(prefix='weave-traversal-') as directory:
                     return (after0 + before1) // 2
             return clocks[-1][2] + 10
 
-        text = (root / f'examples/traversal/{source}.weave').read_text()
+        text = (root / f'examples/{source}.weave').read_text()
         text = re.sub(r'\bas_of (\d+)', lambda m: f'as_of {real(int(m.group(1)))}', text)
         plan = compile_source(text)
         assert plan['version'] == version
@@ -116,9 +147,15 @@ with tempfile.TemporaryDirectory(prefix='weave-traversal-') as directory:
                               fixture['engine']['principal'], fixture['engine']['write_graphs'])
             assert [o['kind'] for o in outputs] == [r['kind'] for r in expected[:len(prefix)]]
             expected = expected[len(prefix):]
-        binds = [c for c in plan['commands'] if c['op'] == 'bind']
-        assert len(binds) == len(expected) == len(plan['commands']), name
-        outputs = execute(db, plan, fixture['engine']['principal'])
+        assert all(c['op'] == 'bind' for c in plan['commands']), name
+        all_outputs = execute(db, plan, fixture['engine']['principal'])
+        bound = {}
+        for c in plan['commands']:
+            bound[c['name']] = normalized(c['value'], bound)
+        picked = [i for i, c in enumerate(plan['commands']) if selected is None or c['name'] in selected]
+        binds = [plan['commands'][i] for i in picked]
+        outputs = [all_outputs[i] for i in picked]
+        assert len(binds) == len(expected), name
         for command, output, want in zip(binds, outputs, expected):
             got, want = summary(output, want)
             assert got == want, (name, command['name'], got, want)
@@ -127,7 +164,7 @@ with tempfile.TemporaryDirectory(prefix='weave-traversal-') as directory:
             {'op': 'evaluate', 'value': json.loads(re.sub(
                 r'"(as_of|unix_millis)": (\d+)', lambda m: f'"{m.group(1)}": {real(int(m.group(2)))}',
                 json.dumps(c['value'])))} for c in inline if c['op'] == 'evaluate']}
-        assert [c['value'] for c in reference['commands']] == [c['value'] for c in binds], name
+        assert [normalized(c['value']) for c in reference['commands']] == [bound[c['name']] for c in binds], name
         referenced = execute(db, reference, fixture['engine']['principal'])
         assert [r['result'] for r in referenced] == [r['result'] for r in outputs], name
         checks.append(f'oracle-fixture:{name}')
