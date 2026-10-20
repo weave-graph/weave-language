@@ -28,20 +28,21 @@ graph functions, rules and explanations.
 
 ## Status
 
-**Language at Phase A parity, contract 1.1.0.** The compiler targets engine
-contract **1.1.0** (Phase A release 1.0.0 plus B1 group readers) and its core
-v1 profile ([migration note](docs/CORE_V1.md)), with 224 tests passing. Every
+**Language at Phase A parity, contract 1.2.0.** The compiler targets engine
+contract **1.2.0** (Phase A release 1.0.0 plus B1 group readers and B2
+write-time propagation) and its core
+v1 profile ([migration note](docs/CORE_V1.md)), with 249 tests passing. Every
 Phase A operator has source syntax, and the five Phase A exit questions run
 from `.weave` source ([examples/phase_a](examples/phase_a)). The compiler is
 experimental and the syntax is provisional.
 
 | Works today | Not yet |
 |---|---|
-| Graphs, nodes, first-class edges, graph-valued metadata, pinned and live references | Permission syntax, including 1.1.0 group readers (LB1; sharing is engine-side) |
+| Graphs, nodes, first-class edges, graph-valued metadata, pinned and live references | Claimed provenance and evidence on source writes |
 | Valid-time filters, `Window`/`Sequence`, `diff`, recorded and accepted history, as-of reads, k-hop `expand` and `changes` change sets | Approximate vector search (engine C5) |
-| Fact writes, embedding spaces and facts, exact `nearest`, `similar_candidates`, pure graph functions, joins, union, projection, four-valued support, bounded rules, `explain` | Reader restrictions on source writes (permission syntax, Phase B) |
-| Typed contexts, exact Decimal/Quantity, typed vectors, intervals, bytes, typed refs | Agent identity and agent-facing workflows (engine Phase B) |
-| `check`, `plan`, `ast`, `describe`, `fmt`, view and handler artifacts, native/C/WASM compiler SDK | Distributed and offline governance (deferred) |
+| Fact writes with `readers`, `reader_groups`, `public` and `widen_readers`, embedding spaces and facts, exact `nearest`, `similar_candidates`, pure graph functions, joins, union, projection, four-valued support, bounded rules, `explain` | A compile tool on the engine's MCP server (engine B4, which will run `weave sdk`) |
+| Typed contexts, exact Decimal/Quantity, typed vectors, intervals, bytes, typed refs; `--untrusted`/`--read-only`/`--visible` compile policies for agent source | Parameters for readers and LA1 clauses |
+| `check`, `plan`, `ast`, `describe`, `effects`, `fmt`, `sdk`, view and handler artifacts, native/C/WASM compiler SDK | Distributed and offline governance (deferred) |
 
 See [docs/STATUS.md](docs/STATUS.md) for details and
 [docs/ROADMAP_PROPOSAL.md](docs/ROADMAP_PROPOSAL.md) for the approved plan.

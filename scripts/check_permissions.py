@@ -13,6 +13,15 @@ their own Read grants on the graphs, and carol is in no reader group), then, usi
    bob alone, and a group ID inside `readers` matches no one.
 2. A `correct` without readers does not compile (`E_VISIBILITY_REQUIRED`);
    restating the group keeps the new version hidden from carol.
+   Contract 1.2.0 write-time rules (B2): a correction that admits more
+   readers (`public`, or an added principal, even a group member: the
+   comparison is of lists) fails with `E_READERS_WIDENED` unless the source
+   says `widen_readers`, which `--untrusted` rejects at compile time; a
+   narrowing correction needs no flag; once widened on
+   purpose, carol sees the fact. A public fact citing a group-restricted fact
+   as provenance evidence fails with `E_DERIVED_READERS`, and passes when it
+   carries the same group. Source has no syntax for claimed provenance, so
+   that one write is JSON; every other write is compiled source.
 3. The engine rejects declarations that exceed the writer's authority: alice
    naming `finance` (a group she is not in) or an unknown group fails with the
    same `E_UNAVAILABLE`; agent `alice-blind`, which exercises none of alice's
@@ -159,6 +168,54 @@ run(plan_of('write W graph "fleet" { correct node "note-1" entity "NOTE-1" space
             'property "text" "bearing torqued" reader_groups "maintenance"; }'), 'bob')
 check('restated correction stays hidden', 'note-1' not in visible_nodes('carol')[0])
 check('restated correction is the live version', visible_nodes('bob')[0]['note-1']['properties']['text'] == 'bearing torqued')
+
+# ---- 2b. Contract 1.2.0: corrections may not widen readers silently.
+def draft(change, clause):
+    return (f'write W graph "fleet" {{ {change} node "draft-1" entity "DRAFT-1" space "notes" '
+            f'property "text" "draft" {clause}; }}')
+
+
+run(plan_of(draft('assert', 'readers "alice" reader_groups "maintenance"')), 'alice')
+check('draft hidden from carol', 'draft-1' not in visible_nodes('carol')[0])
+for clause in ['public', 'readers "carol" reader_groups "maintenance"']:
+    plan = plan_of(draft('correct', clause))
+    check('silent correction carries no flag', 'widen_readers' not in plan['commands'][0]['changes'][0])
+    success, error = run(plan, 'alice', ok=False)
+    check(f'engine rejects a widening correction ({clause})',
+          not success and error['code'] == 'E_READERS_WIDENED', error)
+check('rejected widening changed nothing', 'draft-1' not in visible_nodes('carol')[0])
+ok, diagnostic = compile_source(draft('correct', 'public widen_readers'), '--untrusted')
+check('untrusted source cannot widen', not ok and diagnostic['code'] == 'E_READERS_WIDENED', diagnostic)
+# Narrowing (to a subset of the old clause) needs no flag.
+run(plan_of(draft('correct', 'reader_groups "maintenance"')), 'alice')
+check('a narrowing correction commits without a flag', 'draft-1' in visible_nodes('bob')[0])
+# The comparison is of lists, never membership: re-adding alice, a member, is
+# still a widening.
+success, error = run(plan_of(draft('correct', 'readers "alice" reader_groups "maintenance"')), 'alice', ok=False)
+check('widening is syntactic', not success and error['code'] == 'E_READERS_WIDENED', error)
+plan = plan_of(draft('correct', 'public widen_readers'))
+check('widen_readers lowers to the correct flag', plan['commands'][0]['changes'][0]['widen_readers'] is True)
+run(plan, 'alice')
+check('an explicit widening publishes the new version', 'draft-1' in visible_nodes('carol')[0])
+
+# Declared derivations may not be broader than restricted evidence they cite.
+_, out = run(plan_of('use G graph "fleet"; lens All from G { }'), 'alice')
+note = next(f['fact'] for f in out[0]['result']['fact_provenance'] if f['fact'].get('node_id') == 'note-1')
+
+
+def summary(node, groups):
+    return {'version': plan['version'], 'commands': [{'op': 'write', 'graph_id': 'fleet', 'branch_id': 'main', 'changes': [
+        {'change': 'assert', 'fact': {'kind': 'node', 'id': node, 'entity_id': node.upper(), 'space_id': 'notes',
+         'properties': {}, 'metadata': [], 'readers': [], **({'reader_groups': groups} if groups else {}),
+         'provenance': {'method': {'kind': 'human'}, 'evidence': [
+             {'kind': 'node', 'graph_id': 'fleet', 'revision': note['revision'], 'node_id': 'note-1'}]}}}]}]}
+
+
+success, error = run(summary('summary-1', []), 'alice', ok=False)
+check('public fact citing restricted evidence fails', not success and error['code'] == 'E_DERIVED_READERS', error)
+run(summary('summary-2', ['maintenance']), 'alice')
+check('derived fact restricted like its evidence commits',
+      'summary-2' in visible_nodes('bob')[0] and 'summary-2' not in visible_nodes('carol')[0])
 
 # ---- 3. The engine rejects declarations beyond the writer's authority.
 def restricted(node, group):

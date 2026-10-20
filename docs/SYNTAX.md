@@ -19,7 +19,7 @@ node = "node", string, [ "type", identifier ], "entity", string, "space", string
 edge = "edge", string, [ "type", identifier ], "from", string, "to", string,
        "relation", string, [ "polarity", ("positive" | "negative") ], "valid", integer, "until", (integer | "infinity"),
        { metadata | property | visibility }, ";" ;
-visibility = "public" | "readers", string, { ",", string } | "reader_groups", string, { ",", string } ;
+visibility = "public" | "readers", string, { ",", string } | "reader_groups", string, { ",", string } | "widen_readers" ;
 metadata = "metadata", "graph", string, "revision", string ;
 attachment = "attachment", string, "on", host, "key", string, "graph", string,
              "revision", string, "valid", integer, "until", (integer | "infinity"), [ "required" ], [ "context", "graph", string, "revision", string ], { visibility }, ";" ;
@@ -45,7 +45,7 @@ Declarations are sequential; graph/lens names and object IDs within each graph c
 
 A bootstrap `lens` produces a graph value from a stored query or a previously computed value. Composing one with an earlier lens combines compatible relation/time filters and inherits metadata options; conflicting filters are rejected. Named string/relation and time parameters use `param name`. A `bind` declaration specializes any subset with typed values. Unbound templates emit no evaluation; fully bound lenses evaluate once and bind an immutable program-local graph value. Unknown, duplicate and incorrectly typed bindings fail compilation. This small filter language is **not yet general graph-valued functions or a rule evaluator**. Unknown operations, including writes or host authority fields inside a lens, fail parsing.
 
-Records are public unless they declare readers (LB1, contract 1.1.0): `readers "p", ...` names principals, `reader_groups "g", ...` names registry groups, and `public` states that a record is unrestricted. The clauses lower to the contract's `readers` and `reader_groups` and apply to snapshot nodes, edges, relations, claims and attachments and to written nodes, edges and embeddings. A `correct` must state one (`E_VISIBILITY_REQUIRED`), because it replaces the readers of the fact it corrects. The engine resolves groups and enforces every clause; the compiler grants nothing. See [readers and agent-safe compilation](PERMISSIONS.md).
+Records are public unless they declare readers (LB1, contract 1.1.0): `readers "p", ...` names principals, `reader_groups "g", ...` names registry groups, and `public` states that a record is unrestricted. The clauses lower to the contract's `readers` and `reader_groups` and apply to snapshot nodes, edges, relations, claims and attachments and to written nodes, edges and embeddings. A `correct` must state one (`E_VISIBILITY_REQUIRED`), because it replaces the readers of the fact it corrects. A `correct` that admits more readers than the version it replaces also says `widen_readers` (contract 1.2.0), or the engine rejects it with `E_READERS_WIDENED`; the clause is valid only on `correct`. The engine resolves groups and enforces every clause; the compiler grants nothing. See [readers and agent-safe compilation](PERMISSIONS.md).
 
 Metadata graph revisions are opaque references. The compiler does not pretend to verify their existence; the engine reports unavailable or depth-limited metadata as partial coverage. Cyclic metadata is never recursively inlined into the plan.
 

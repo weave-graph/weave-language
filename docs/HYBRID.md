@@ -72,7 +72,8 @@ fact = "node", string, "entity", string, "space", string, [ interval ], { metada
      | "space", identifier
      | "embedding", string, "in", identifier,
        "subject", ( "node" | "entity" | "edge" ), string, "vector", vector, interval, { visibility } ;
-visibility = "public" | "readers", string, { ",", string } | "reader_groups", string, { ",", string } ;
+visibility = "public" | "readers", string, { ",", string } | "reader_groups", string, { ",", string }
+           | "widen_readers" ;   (* on correct only, contract 1.2.0 *)
 interval = "valid", integer, "until", ( integer | "infinity" ) ;
 ```
 
@@ -82,7 +83,11 @@ version of the fact with that kind and ID, so it restates the whole fact.
 `retract` ends the live version; history keeps every version. Since LB1 a
 fact may declare `readers`, `reader_groups` or `public`
 ([PERMISSIONS.md](PERMISSIONS.md)), and a `correct` must declare one
-(`E_VISIBILITY_REQUIRED`), because it replaces the readers too. `expected head
+(`E_VISIBILITY_REQUIRED`), because it replaces the readers too. Since
+contract 1.2.0 the engine also rejects a correction whose readers admit
+anyone the replaced version did not (`E_READERS_WIDENED`), unless the change
+says `widen_readers`; the compiler emits 1.2.0, so every source correction
+gets that check. `expected head
 "r"` requires that head, `expected new` requires a new branch, and omitting
 it performs no head check. A node's optional `valid` interval is node valid
 time (0.22). The engine owns the writer and the recorded time; the compiler
@@ -159,6 +164,7 @@ the acceptance scripts check this.
 | `E_CONFLICT` | `correct space` | `space` |
 | `E_INTERVAL` | An empty valid interval | The change |
 | `E_VISIBILITY_REQUIRED` | A `correct` without `readers`, `reader_groups` or `public` (LB1) | The change |
+| `E_VISIBILITY` | `widen_readers` on an `assert` (it applies only to `correct`) | The clause |
 | `E_FUNCTION_EFFECT` | `write`, `nearest`, `similar_candidates` or `embedding_space` inside a pure function | The name |
 
 ## Phase A exit questions

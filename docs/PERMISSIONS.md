@@ -2,7 +2,8 @@
 
 Introduced by LB1 ([#5](https://github.com/weave-graph/weave-language/issues/5))
 on contract **1.1.0** (engine B1,
-[REGISTRY.md](https://github.com/weave-graph/weave-engine/blob/main/docs/REGISTRY.md)).
+[REGISTRY.md](https://github.com/weave-graph/weave-engine/blob/main/docs/REGISTRY.md));
+`widen_readers` since contract **1.2.0** (engine B2 write-time propagation).
 Source can now say who may read each fact it writes. The compiler lowers that
 intent to the contract's `readers` and `reader_groups` fields; the engine
 resolves groups and enforces every read and every write. Nothing here grants
@@ -27,7 +28,8 @@ The complete example is [examples/permissions/restricted_writes.weave](../exampl
 ```ebnf
 visibility = "public"
            | "readers", string, { ",", string }
-           | "reader_groups", string, { ",", string } ;
+           | "reader_groups", string, { ",", string }
+           | "widen_readers" ;          (* correct only, contract 1.2.0 *)
 ```
 
 A visibility clause may follow any record that has readers in the contract:
@@ -81,6 +83,31 @@ compiler cannot read the stored version, so it cannot copy its readers; the
 clause states the intent explicitly. `assert` (which never replaces a live
 fact) and `retract` (which writes no new version) are unchanged.
 
+## Widening a correction: `widen_readers`
+
+Since contract 1.2.0 the engine also refuses a correction that would make a
+fact readable by anyone its live version does not admit: the new clause is
+public while the old one is not, or it lists a principal or group the old one
+does not. The comparison is of the lists, never of group membership, so
+adding a member of a listed group is still a widening. Such a correction
+fails with `E_READERS_WIDENED`, unless it says so:
+
+```weave
+write Publish graph "fleet" {
+  correct node "note-1" entity "NOTE-1" space "notes" property "text" "released" public widen_readers;
+}
+```
+
+`widen_readers` lowers to `"widen_readers": true` on the `correct` change
+(omitted otherwise). It is intent, not a reader statement: the correction
+still states its readers or `public` (`E_VISIBILITY_REQUIRED`). It applies
+only to `correct`; on an `assert` or a snapshot record, which have no
+earlier version to widen, it is `E_VISIBILITY`. Restating or narrowing
+readers needs no flag. The compiler cannot see the stored readers, so it
+does not decide whether a correction widens; the engine does, and the flag
+only permits it. Under the untrusted policy the flag is rejected at compile
+time (`E_READERS_WIDENED`, at the clause).
+
 Snapshot replacement (`graph G replace revision "r" { ... }`) restates whole
 snapshots and keeps its earlier syntax; under the trusted default a record
 without a clause is public. Use the untrusted policy below to require a clause
@@ -96,7 +123,7 @@ plan without the policy.
 
 | Policy | CLI | SDK `policy` member | Rule |
 |---|---|---|---|
-| untrusted | `--untrusted` | `"untrusted": true` | Every written record states its readers (`E_VISIBILITY_REQUIRED` at the record), so nothing becomes public by omission. `context_value` (an always-public snapshot) and host view and handler templates (`E_UNTRUSTED_ARTIFACT`) are rejected |
+| untrusted | `--untrusted` | `"untrusted": true` | Every written record states its readers (`E_VISIBILITY_REQUIRED` at the record), so nothing becomes public by omission. `widen_readers` is rejected (`E_READERS_WIDENED`), so untrusted source can restate or narrow readers but never publish wider. `context_value` (an always-public snapshot) and host view and handler templates (`E_UNTRUSTED_ARTIFACT`) are rejected |
 | read-only | `--read-only` | `"read_only": true` | No `write`, `graph`, `transaction` or `context_value` declarations and no host templates (`E_EFFECT_DENIED` at the declaration); the emitted plan is also checked to contain no `commit`, `commit_batch` or `write` command |
 | visible | `--visible MANIFEST.json` | `"visible": {...}` | Graph, group and space references are checked against what one principal can see (next section) |
 
@@ -209,7 +236,12 @@ python3 scripts/check_agent_repair.py --compiler target/debug/weave --engine ../
 python3 scripts/check_agent_service.py --compiler target/debug/weave --service ../weave-engine/target/debug/weave-service
 ```
 
-- `check_permissions.py`: group-restricted source writes, corrections and
+- `check_permissions.py` (contract 1.2.0): a source correction that widens
+  readers fails with `E_READERS_WIDENED` (public, or an added principal, even
+  a group member), passes with `widen_readers`, which `--untrusted` rejects,
+  and a narrowing one needs no flag; a public fact citing restricted evidence
+  fails with `E_DERIVED_READERS` and passes when restricted like it. Also:
+  group-restricted source writes, corrections and
   snapshot records are visible to members and hidden from a non-member who
   can read the graph (lens, `expand`, `changes`, `nearest`); literal readers
   and a group ID in `readers` behave as in the engine; a correction without
@@ -239,8 +271,9 @@ python3 scripts/check_agent_service.py --compiler target/debug/weave --service .
 
 | Code | Cause | Span |
 |---|---|---|
-| `E_VISIBILITY_REQUIRED` | `correct` without a clause; under `--untrusted`, any written record without one, or `context_value` | The change, the record ID or the declaration name |
-| `E_VISIBILITY` | `public` together with `readers` or `reader_groups` | The later clause keyword |
+| `E_VISIBILITY_REQUIRED` | `correct` without a clause (`widen_readers` alone is not one); under `--untrusted`, any written record without one, or `context_value` | The change, the record ID or the declaration name |
+| `E_READERS_WIDENED` | `widen_readers` under `--untrusted` (the engine reports the same code for a widening correction without the flag) | The clause |
+| `E_VISIBILITY` | `public` together with `readers` or `reader_groups`; `widen_readers` outside a `correct` | The later clause keyword, or `widen_readers` |
 | `E_DUPLICATE` | A repeated clause, or a repeated entry in one clause | The keyword or the entry |
 | `E_ID` | An empty entry, one above 512 bytes, or one with a control character | The entry |
 | `E_BUDGET` | More than 256 entries in one clause | The 257th entry |
@@ -260,8 +293,14 @@ python3 scripts/check_agent_service.py --compiler target/debug/weave --service .
   stored readers": the contract has no such field, so the source restates
   them.
 - Snapshot `replace` records may omit a clause except under `--untrusted`.
-- Derived results (analytics, kNN, embeddings computed from restricted text)
-  follow the engine's current propagation; write-time leakage protection is
-  engine B2 and needs no source syntax yet.
+- Derived results follow the engine's propagation (B2). Its declared
+  derivation rule (`E_DERIVED_READERS`: a fact citing restricted provenance
+  evidence must be no broader) applies only to claimed `evidence`, which
+  source cannot express yet, so compiled plans never trigger it;
+  `scripts/check_permissions.py` exercises it with one JSON write.
+- Hidden live versions: since 1.2.0 the engine treats a live version the
+  writer cannot read as absent, so a source `correct` of a
+  fact the writer cannot see fails as for a missing fact, and an `assert` of
+  its ID fails with `E_CONFLICT` ("fact ID is not available").
 - The manifest's `schema` member is decoded but not yet used to type `use`
   reads.

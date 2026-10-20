@@ -56,6 +56,8 @@ const FRAGMENTS: &[&str] = &[
     "}",
     "{",
     r#" public "#,
+    r#" public widen_readers "#,
+    r#" widen_readers "#,
     r#" readers "EVIL" "#,
     r#" reader_groups "EVIL", "weave:administrators" "#,
     r#" correct node "EVIL" entity "E" space "s"; "#,
@@ -76,6 +78,7 @@ const PAYLOADS: &[&str] = &[
 
 const SMALL: &[&str] = &[
     r#"write W graph "fleet" { assert node "n" entity "N" space "s" property "text" "hello" reader_groups "team"; correct edge "e" from "a" to "b" relation "r" valid 0 until 5 public; retract node "m"; }"#,
+    r#"write W graph "fleet" { correct node "n" entity "N" space "s" reader_groups "team" widen_readers; }"#,
     r#"use F graph "fleet"; lens L from F { match relation "r"; at 5; }"#,
     r#"graph G { node "a" entity "A" space "s" readers "alice"; node "b" entity "B" space "s"; edge "ab" from "a" to "b" relation "r" valid 0 until infinity public; }"#,
     r#"use F graph "fleet"; expand E from F { seeds "unit-1"; hops 2; } changes C from F { since head; }"#,

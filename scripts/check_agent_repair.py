@@ -146,7 +146,7 @@ for i, text in enumerate(NOTES):
     changes += [{'change': 'assert', 'fact': node}, {'change': 'assert', 'fact': embedding}]
 for graph, actor in [(GRAPH, 'root'), (HIDDEN, 'root')]:
     ok, out = engine_cli(['run', '--db', db, '--actor', actor], {
-        'version': '1.1.0', 'commands': [{'op': 'write', 'graph_id': graph, 'branch_id': 'main', 'changes': changes}]})
+        'version': '1.2.0', 'commands': [{'op': 'write', 'graph_id': graph, 'branch_id': 'main', 'changes': changes}]})
     check(f'host data written', ok, out)
 
 

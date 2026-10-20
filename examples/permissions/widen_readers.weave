@@ -1,0 +1,9 @@
+// Contract 1.2.0: a correction that admits more readers than the version it
+// replaces says so. Without `widen_readers` the engine rejects it with
+// E_READERS_WIDENED; restating or narrowing readers needs no flag.
+write Narrow graph "fleet" {
+  correct node "note-1" entity "NOTE-1" space "notes" property "text" "bearing replaced" readers "alice";
+}
+write Publish graph "fleet" {
+  correct node "note-1" entity "NOTE-1" space "notes" property "text" "bearing replaced" public widen_readers;
+}

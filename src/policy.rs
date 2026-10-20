@@ -384,6 +384,16 @@ impl Checker<'_> {
         if self.policy.untrusted && visibility.is_unstated() {
             return Err(visibility_required(span));
         }
+        if let (true, Some(widen)) = (self.policy.untrusted, visibility.widen) {
+            // The engine's own code for a widening correction: untrusted
+            // source may restate or narrow readers, never publish wider.
+            return Err(Diagnostic::new(
+                "E_READERS_WIDENED",
+                "The untrusted policy forbids 'widen_readers': a correction from untrusted source may not make a fact readable by more principals",
+                widen.0,
+                widen.1,
+            ));
+        }
         self.visibility(visibility)
     }
     fn statements(&mut self, statements: &[Statement]) -> Result<(), Diagnostic> {

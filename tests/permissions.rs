@@ -74,7 +74,7 @@ fn readers_and_reader_groups_lower_to_the_contract_fields() {
         node["entity_id"] = json!("U1");
         node
     });
-    assert_eq!(p["version"], "1.1.0");
+    assert_eq!(p["version"], "1.2.0");
 }
 
 #[test]
@@ -478,5 +478,118 @@ write W graph "fleet" branch "draft" { retract node "n"; }"#;
                 Some("draft".into())
             ),
         ]
+    );
+}
+
+#[test]
+fn widen_readers_lowers_to_the_correct_flag() {
+    // Contract 1.2.0: a correction that admits more readers than the version
+    // it replaces fails with E_READERS_WIDENED unless it says so.
+    for (fact, clause) in [
+        (
+            r#"correct node "n" entity "N" space "s""#,
+            " public widen_readers",
+        ),
+        (
+            r#"correct edge "e" from "a" to "b" relation "r" valid 0 until 5"#,
+            " widen_readers reader_groups \"everyone\"",
+        ),
+        (
+            r#"correct embedding "x" in Notes subject node "n" vector [1.0, 0.0, 0.0] valid 0 until 5"#,
+            " readers \"alice\", \"bob\" widen_readers",
+        ),
+    ] {
+        let p = plan(&format!("{NOTES}write W graph \"g\" {{ {fact}{clause}; }}"));
+        let change = &p["commands"][0]["changes"][0];
+        assert_eq!(change["change"], "correct");
+        assert_eq!(change["widen_readers"], true, "{fact}");
+        let narrow = plan(&format!(
+            "{NOTES}write W graph \"g\" {{ {fact}{}; }}",
+            clause.replace(" widen_readers", "")
+        ));
+        assert!(
+            narrow["commands"][0]["changes"][0]
+                .get("widen_readers")
+                .is_none(),
+            "omitted when false"
+        );
+        assert_eq!(p["version"], "1.2.0");
+    }
+    // The flag is listed by describe --contract, at its exact location.
+    let source =
+        r#"write W graph "g" { correct node "n" entity "N" space "s" public widen_readers; }"#;
+    let description = weave_language::describe_contract(source).unwrap();
+    let widen = description
+        .contract
+        .features
+        .iter()
+        .find(|f| f.feature == "widen_readers")
+        .expect("listed");
+    assert_eq!((widen.since, widen.construct), ("1.2", "field"));
+    assert_eq!(
+        widen.locations,
+        ["/program/commands/0/changes/0/widen_readers"]
+    );
+    let plain = weave_language::describe_contract(&source.replace(" widen_readers", "")).unwrap();
+    assert!(
+        !plain
+            .contract
+            .features
+            .iter()
+            .any(|f| f.feature == "widen_readers")
+    );
+}
+
+#[test]
+fn widen_readers_is_correct_only_and_not_a_reader_statement() {
+    let w = r#"write W graph "g" {"#;
+    for (source, code, text) in [
+        (
+            format!(r#"{w} assert node "n" entity "N" space "s" public widen_readers; }}"#),
+            "E_VISIBILITY",
+            "widen_readers",
+        ),
+        (
+            r#"graph G { node "a" entity "A" space "s" widen_readers public; }"#.into(),
+            "E_VISIBILITY",
+            "widen_readers",
+        ),
+        (
+            format!(
+                r#"{w} correct node "n" entity "N" space "s" public widen_readers widen_readers; }}"#
+            ),
+            "E_DUPLICATE",
+            "widen_readers",
+        ),
+        // Widening states no readers: the correction still has to.
+        (
+            format!(r#"{w} correct node "n" entity "N" space "s" widen_readers; }}"#),
+            "E_VISIBILITY_REQUIRED",
+            r#"correct node "n" entity "N" space "s" widen_readers;"#,
+        ),
+    ] {
+        let (actual, span) = error(&source);
+        assert_eq!((actual.as_str(), span.as_str()), (code, text), "{source}");
+    }
+}
+
+#[test]
+fn untrusted_policy_rejects_widening() {
+    let untrusted = CompilePolicy {
+        untrusted: true,
+        ..Default::default()
+    };
+    let source = r#"write W graph "g" { correct node "n" entity "N" space "s" reader_groups "team" widen_readers; }"#;
+    let (code, text, _) = policy_error(source, &untrusted);
+    assert_eq!(
+        (code.as_str(), text.as_str()),
+        ("E_READERS_WIDENED", "widen_readers")
+    );
+    // The same correction without the flag (restating or narrowing) passes.
+    compile_with_policy(&source.replace(" widen_readers", ""), &untrusted).unwrap();
+    // A trusted compile keeps the flag.
+    assert_eq!(
+        plan(source)["commands"][0]["changes"][0]["widen_readers"],
+        true
     );
 }

@@ -1,4 +1,4 @@
-# Core contract v1: migration note from 0.21, with protocols 0.22 to 1.1.0
+# Core contract v1: migration note from 0.21, with protocols 0.22 to 1.2.0
 
 Introduced by LA0 ([#1](https://github.com/weave-graph/weave-language/issues/1)),
 which tracks engine epic A1. The normative specification is the engine's
@@ -18,15 +18,17 @@ This note covers what changes for weave-language users and tools.
   Engine v1.0.0 froze core v1 as protocol **1.0.0** with no wire change (see
   [Protocol 1.0.0](#protocol-100-engine-v100-phase-a)), and engine B1 part 1
   added group readers and delegation provenance as protocol **1.1.0** (see
-  [Protocol 1.1.0](#protocol-110-engine-b1-part-1)). The compiler emits
-  `weave_contract::VERSION`, now `1.1.0`, equal to the vendored crate
-  version. **The language is at Phase A parity on contract 1.1.0.**
+  [Protocol 1.1.0](#protocol-110-engine-b1-part-1)). Engine B2 part 2 added
+  write-time propagation as protocol **1.2.0** (see
+  [Protocol 1.2.0](#protocol-120-engine-b2-part-2)). The compiler emits
+  `weave_contract::VERSION`, now `1.2.0`, equal to the vendored crate
+  version. **The language is at Phase A parity on contract 1.2.0.**
 - **Every emitted plan is checked against v1.** A golden test compiles every
   entry source in `examples/` and decodes the plan and its templates with the
   contract's strict decoder (`tests/core_v1_contract.rs`).
 - **The engine's golden fixtures run in language CI.** The vendored crate now
-  ships `fixtures/core-v1/` (32 positive and 26 negative JSON fixtures plus a
-  hash manifest at 1.1.0) and
+  ships `fixtures/core-v1/` (33 positive and 30 negative JSON fixtures plus a
+  hash manifest at 1.2.0) and
   `tests/core_v1_fixtures.rs`.
 - **`weave describe FILE --contract`** reports which core v1, extension and
   deferred features a source compiles to.
@@ -37,7 +39,7 @@ This note covers what changes for weave-language users and tools.
 |---|---|---|
 | Specification | 21 additive notes (`docs/contract/v0.1` to `v0.21`) | One consolidated document for everything classified core v1. The notes still govern extension and deferred features |
 | Decoding | serde decoding, one generic input error | `weave_contract::decode_program` checks size, strict JSON (no duplicate keys), then `version`, then structure, with stable codes `E_BUDGET`, `E_DECODE`, `E_VERSION`, `E_UNKNOWN_FIELD` and `E_UNKNOWN_VARIANT`. A program with an unknown version is never partially decoded. `weave-engine run` now reports these codes instead of `E_INPUT` |
-| Versions | Implicit | `SUPPORTED_VERSIONS` (`weave_contract::versions`, the one version table since 1.0.0) is the closed set 0.1.0 to 0.24.0, 1.0.0 and 1.1.0. Each version keeps its published semantics, and a feature newer than the declared version fails with `E_VERSION` |
+| Versions | Implicit | `SUPPORTED_VERSIONS` (`weave_contract::versions`, the one version table since 1.0.0) is the closed set 0.1.0 to 0.24.0, 1.0.0, 1.1.0 and 1.2.0. Each version keeps its published semantics, and a feature newer than the declared version fails with `E_VERSION` |
 | Feature status | Every feature equal | Each feature is *core v1*, *extension* or *deferred* (table below). No semantics change because of the class |
 | Reserved names | None | Rejected and reserved for later epics: the `weave:` predicate and ID namespace. Released: B1 activated `reader_groups` on fact records in 1.1.0; A3 released `expand` and `changes` in 0.23.0; A4 released `GraphData.embedding_spaces` and `embeddings`, result fields `candidates` and `exactness` and expressions `nearest` and `similar_candidates` in 0.24.0; the `weave:` predicate and ID namespace |
 | Provenance and embeddings | Not modelled | Records (`FactProvenance`, `ClaimedProvenance`, `EmbeddingSpace`, `EmbeddingFact`, `CandidateRelation`) are defined. Engine A2 activated provenance in 0.22.0. Engine A4 activated embedding spaces, embeddings and candidate relations in 0.24.0 |
@@ -198,6 +200,38 @@ For weave-language:
   their 1.0.0 bytes, and `describe --contract` lists every emitted group
   field (for example, six locations for
   `examples/permissions/restricted_writes.weave`).
+
+## Protocol 1.2.0 (engine B2 part 2)
+
+Engine B2 part 2 ([weave-engine#5](https://github.com/weave-graph/weave-engine/issues/5),
+ADR-0008 section 3) is the second additive minor version after the freeze
+([version note](contract/v1.2/README.md)). It adds one optional field and two
+write rules for 1.2.0 programs (core v1 section 4 `fact.propagation`):
+
+- **`widen_readers`** on a `correct` change, omitted when false. A 1.2.0
+  correction whose `readers`/`reader_groups` lists admit anyone the replaced
+  version's lists do not (public, or an added principal or group, compared
+  syntactically, never by membership) fails with `E_READERS_WIDENED` unless
+  it sets the flag. Under older programs the flag fails with `E_VERSION`.
+- **Declared derivations.** A fact citing restricted provenance `evidence`
+  the writer can see must be no broader than it (`E_DERIVED_READERS`).
+- **Hidden live versions** (every version): a live version the writer cannot
+  read is absent for `correct`, `retract` and `expected`, and asserting its ID
+  fails with `E_CONFLICT` "fact ID is not available".
+
+For weave-language:
+
+- Plans, view templates and handler artifacts are labelled `1.2.0`. Commands
+  and data are byte-for-byte what 1.1.0 emitted for every source that does
+  not use `widen_readers`, but 1.2.0 corrections now get the widening check.
+  The compiler's `E_VISIBILITY_REQUIRED` rule already makes every source
+  `correct` restate its readers, as the version note asks of a compiler.
+- Source syntax: the `widen_readers` clause on `correct`
+  ([PERMISSIONS.md](PERMISSIONS.md#widening-a-correction-widen_readers)).
+  `describe --contract` lists it as a **core v1 field, since 1.2**, at each
+  change that sets it, for the same reason as `reader_groups`.
+- Source has no claimed-provenance syntax, so compiled plans never cite
+  evidence and cannot trigger `E_DERIVED_READERS`.
 
 ## `describe --contract`
 
