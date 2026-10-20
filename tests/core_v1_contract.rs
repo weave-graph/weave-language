@@ -131,8 +131,8 @@ fn emitted_plans_are_rejected_by_v1_when_they_drift() {
     )
     .unwrap();
     let mut extra = plan.clone();
-    // `provenance` is active from 0.22.0; `reader_groups` stays reserved (B1).
-    extra["commands"][0]["data"]["nodes"][0]["reader_groups"] = serde_json::json!([]);
+    // `reader_groups` is active from 1.1.0 (B1); a name no version defines is rejected.
+    extra["commands"][0]["data"]["nodes"][0]["undefined_field"] = serde_json::json!([]);
     let mut newer = plan.clone();
     newer["version"] = "0.99.0".into();
     for (value, code) in [(extra, "E_UNKNOWN_FIELD"), (newer, "E_VERSION")] {
@@ -503,4 +503,56 @@ fn every_classified_since_label_names_a_published_version() {
         assert!(is_supported_version(&version), "{since}");
         assert!(version_at_least(VERSION, &version), "{since}");
     }
+}
+
+#[test]
+fn describe_contract_lists_reader_groups_as_a_core_v1_field() {
+    // `reader_groups` (1.1, B1) is the one version-gated record field after
+    // the 1.0.0 freeze, so the profile lists where a program uses it. An
+    // empty list is omitted from encodings and is not listed.
+    let classify = |path: &str| {
+        let fixture: Value = serde_json::from_slice(
+            &std::fs::read(root().join(format!(
+                "vendor/weave-contract/fixtures/core-v1/{path}.json"
+            )))
+            .unwrap(),
+        )
+        .unwrap();
+        let program = decode_program(&serde_json::to_vec(&fixture["input"]).unwrap()).unwrap();
+        weave_language::contract_profile::classify(
+            &program,
+            &Default::default(),
+            &Default::default(),
+        )
+    };
+    for path in [
+        "negative/reader-groups-unknown-group",
+        "negative/reader-groups-version-gated",
+    ] {
+        let profile = classify(path);
+        assert!(profile.core_only, "{path}");
+        let groups = profile
+            .features
+            .iter()
+            .find(|f| f.feature == "reader_groups")
+            .unwrap_or_else(|| panic!("{path}: {:?}", profile.features));
+        assert_eq!(
+            (groups.class, groups.since, groups.construct),
+            (FeatureClass::CoreV1, "1.1", "field")
+        );
+        assert_eq!(
+            groups.locations,
+            ["/program/commands/0/changes/0/fact/reader_groups"]
+        );
+    }
+    let empty = classify("positive/reader-groups-omitted-when-empty");
+    assert!(!empty.features.iter().any(|f| f.feature == "reader_groups"));
+    // Source syntax never emits groups (LB1): every example plan has none.
+    let plan =
+        weave_language::compile(include_str!("../examples/phase_a/q1_fact_writes.weave")).unwrap();
+    assert!(
+        !serde_json::to_string(&plan)
+            .unwrap()
+            .contains("reader_groups")
+    );
 }

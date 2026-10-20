@@ -1,6 +1,6 @@
 # Experimental source release readiness
 
-> Written for protocol 0.19. Version statements below describe that release; the compiler now targets 1.0.0 ([status](STATUS.md)).
+> Written for protocol 0.19. Version statements below describe that release; the compiler now targets 1.1.0 ([status](STATUS.md)).
 
 This checklist concerns distribution of the current experimental source, not full-design acceptance. The [acceptance gaps](ACCEPTANCE_GAPS.md) remain authoritative for incomplete capabilities.
 

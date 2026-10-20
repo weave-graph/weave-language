@@ -1,8 +1,17 @@
 # Status history (verified checkpoint ledger)
 
 > **Historical record.** Newest-first ledger of verified checkpoints through
-> protocol 1.0.0, moved from `STATUS.md` on 2026-10-17. Each entry is accurate for
+> protocol 1.1.0, moved from `STATUS.md` on 2026-10-17. Each entry is accurate for
 > its stated protocol version. Current status: [STATUS.md](STATUS.md).
+
+## Contract 1.1.0 (B1 group readers and delegation provenance), 2026-10-20
+
+Re-vendored the complete 103-file contract crate from engine
+`5a19549` (B1 part 1,
+[weave-engine#38](https://github.com/weave-graph/weave-engine/issues/38)). The
+compiler labels plans and artifacts 1.1.0 and emits no group readers.
+`describe --contract` lists `reader_groups` as a core v1 field. Local results
+are in the PR that introduced this entry.
 
 ## Contract 1.0.0, language at Phase A parity, 2026-10-20
 

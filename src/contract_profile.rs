@@ -1,7 +1,7 @@
 //! Core contract v1 classification of emitted plans and artifacts.
 //!
 //! The engine's `docs/contract/core-v1.md` section 12 classifies every contract
-//! feature from 0.1 to 0.24 as *core v1*, *extension* or *deferred*. This module
+//! feature from 0.1 to 1.1 as *core v1*, *extension* or *deferred*. This module
 //! walks what the compiler actually emitted (commands, graph expressions, the
 //! data-level extension fields and host templates) and reports each feature
 //! with that class and the exact JSON locations that use it.
@@ -244,15 +244,39 @@ impl Collector {
     fn fact(&mut self, fact: &Fact, at: &str) {
         self.construct = "field";
         match fact {
-            Fact::Node(node) => self.node(node, at),
-            Fact::Attachment(attachment) => self.attachment(attachment, at),
-            // Embedding spaces and embeddings (0.24, section 7) are core v1
-            // data with no extension fields, so they are not listed.
-            Fact::Edge(_)
-            | Fact::StructuralEdge(_)
-            | Fact::Assertion(_)
-            | Fact::EmbeddingSpace(_)
-            | Fact::Embedding(_) => {}
+            Fact::Node(node) => {
+                self.node(node, at);
+                self.reader_groups(&node.reader_groups, at);
+            }
+            Fact::Attachment(attachment) => {
+                self.attachment(attachment, at);
+                self.reader_groups(&attachment.reader_groups, at);
+            }
+            Fact::Edge(edge) => self.reader_groups(&edge.reader_groups, at),
+            Fact::StructuralEdge(edge) => self.reader_groups(&edge.reader_groups, at),
+            Fact::Assertion(assertion) => self.reader_groups(&assertion.reader_groups, at),
+            Fact::Embedding(embedding) => self.reader_groups(&embedding.reader_groups, at),
+            // Embedding spaces (0.24, section 7) are core v1 data with no
+            // extension fields and no readers, so they are not listed.
+            Fact::EmbeddingSpace(_) => {}
+        }
+    }
+
+    /// `reader_groups` (1.1, B1; core v1 section 4 `fact.reader_groups`). It
+    /// is core v1 data, but it is listed: it is the one record field gated
+    /// by a version after the 1.0.0 freeze (`E_VERSION` under older
+    /// programs), so tools need to see where a program uses it. Empty lists
+    /// are omitted from encodings and are not reported.
+    fn reader_groups(&mut self, groups: &[String], at: &str) {
+        if !groups.is_empty() {
+            let construct = std::mem::replace(&mut self.construct, "field");
+            self.add(
+                "reader_groups",
+                "1.1",
+                FeatureClass::CoreV1,
+                &format!("{at}/reader_groups"),
+            );
+            self.construct = construct;
         }
     }
 
@@ -293,9 +317,29 @@ impl Collector {
         }
         for (index, node) in data.nodes.iter().enumerate() {
             self.node(node, &format!("{at}/nodes/{index}"));
+            self.reader_groups(&node.reader_groups, &format!("{at}/nodes/{index}"));
         }
         for (index, attachment) in data.attachments.iter().enumerate() {
             self.attachment(attachment, &format!("{at}/attachments/{index}"));
+            self.reader_groups(
+                &attachment.reader_groups,
+                &format!("{at}/attachments/{index}"),
+            );
+        }
+        for (index, edge) in data.edges.iter().enumerate() {
+            self.reader_groups(&edge.reader_groups, &format!("{at}/edges/{index}"));
+        }
+        for (index, edge) in data.structural_edges.iter().enumerate() {
+            self.reader_groups(
+                &edge.reader_groups,
+                &format!("{at}/structural_edges/{index}"),
+            );
+        }
+        for (index, assertion) in data.assertions.iter().enumerate() {
+            self.reader_groups(
+                &assertion.reader_groups,
+                &format!("{at}/assertions/{index}"),
+            );
         }
         if let Some(schema) = &data.schema {
             let nodes = schema
