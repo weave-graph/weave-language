@@ -1,6 +1,6 @@
 # Accepted graphs and explicit view artifacts (protocol 0.16)
 
-> Written for protocol 0.16. Version statements below describe that release; the compiler now targets 0.24.0 ([status](STATUS.md)).
+> Written for protocol 0.16. Version statements below describe that release; the compiler now targets 1.0.0 ([status](STATUS.md)).
 
 Accepted reads and current-view reads produce immutable graph values. View templates produce separate host registration artifacts. Compilation performs none of these host operations and never supplies authority or the authorization clock.
 

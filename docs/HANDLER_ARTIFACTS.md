@@ -1,6 +1,6 @@
 # Compiled event handlers
 
-> Written for protocol 0.18. Version statements below describe that release; the compiler now targets 0.24.0 ([status](STATUS.md)).
+> Written for protocol 0.18. Version statements below describe that release; the compiler now targets 1.0.0 ([status](STATUS.md)).
 
 The compiler implements inert protocol 0.18 handler artifacts. Actual compiler-to-native install/prepare/complete acceptance has passed locally; paired public CI and final release evidence are tracked in [status](STATUS.md).
 
