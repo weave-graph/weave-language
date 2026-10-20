@@ -4,6 +4,14 @@
 > protocol 0.24, moved from `STATUS.md` on 2026-10-17. Each entry is accurate for
 > its stated protocol version. Current status: [STATUS.md](STATUS.md).
 
+## LA1 part 2: fact writes, embeddings and hybrid retrieval source syntax (protocol 0.24.0), 2026-10-20
+
+Source syntax for `write`, `embedding_space`, `nearest`, `similar_candidates`
+and `expand ... seeds from`, see [HYBRID.md](HYBRID.md). With LA1 part 1, it
+covers every criterion of [#3](https://github.com/weave-graph/weave-language/issues/3).
+`scripts/check_phase_a.py` answers Phase A exit questions 1 to 5 from source on
+engine `5e2a1d9`. Local results are in the PR that introduced this entry.
+
 ## Embedding facts and hybrid retrieval (protocol 0.24.0), 2026-10-20
 
 Re-vendored the complete 98-file contract crate from engine

@@ -1,0 +1,7 @@
+// Candidate similarity relations (LA1 part 2). Mirrors the engine core v1
+// fixture `similar-candidates`. Candidates are result values, never facts.
+embedding_space Notes id "notes" revision "1" encoder "text-embedding-3-small" version "2024-01-25"
+  preprocessing "weave-chunk/512-tokens/v1" dimensions 3 metric cosine_distance;
+use G graph "g";
+similar_candidates All from G { space Notes; k 1; }
+similar_candidates Unlinked from G { space Notes; k 1; exclude_linked; }

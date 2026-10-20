@@ -1,0 +1,11 @@
+// Phase A exit question 4: similar-unit candidate relations that are absent
+// from the graph. Each candidate cites its two embeddings as provenance.
+embedding_space Units id "hw-units" revision "1" encoder "weave-test-hash-embedder"
+  version "1" preprocessing "unit-profile/v1" dimensions 64 metric cosine_distance;
+use Fleet graph "fleet";
+similar_candidates SimilarUnits from Fleet {
+  space Units;
+  k 1;
+  at 3000;
+  exclude_linked;
+}

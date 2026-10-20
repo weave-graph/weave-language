@@ -1,0 +1,7 @@
+// Exact nearest at two valid times (LA1 part 2). Mirrors the engine core v1
+// fixture `embedding-write-and-nearest` (its embeddings are written in JSON).
+embedding_space Notes id "notes" revision "1" encoder "text-embedding-3-small" version "2024-01-25"
+  preprocessing "weave-chunk/512-tokens/v1" dimensions 3 metric cosine_distance;
+use G graph "g";
+nearest AtFifty from G { space Notes; vector [1.0, 0.0, 0.0]; k 3; at 50; }
+nearest AtOneFifty from G { space Notes; vector [1.0, 0.0, 0.0]; k 3; at 150; }

@@ -46,7 +46,7 @@ is a guide and the command is authoritative.
 
 | Class | Constructs | Contract features |
 |---|---|---|
-| core v1 | `graph`, `transaction`, schemas with string, integer, float and boolean properties, claims and assertions (including a claim's `context graph`), attachments, `lens`, `pin`, live handles, `join`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, functions over graphs, `recorded_handle`, `recorded_range`, `use ... as_of`, `expand`, `changes` (LA1) | `commit`, `commit_batch`, `query`, `join`, `bind`, `evaluate`, expressions `query`, `reference`, `filter`, `join`, `metadata`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, `recorded_query`, command `recorded_range`, command `write` (0.22), expressions `expand`, `as_of` and `changes` (0.23, from `use ... as_of`, `expand` and `changes` source declarations). The compiler emits none of the 0.22 features yet |
+| core v1 | `graph`, `transaction`, schemas with string, integer, float and boolean properties, claims and assertions (including a claim's `context graph`), attachments, `lens`, `pin`, live handles, `join`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, functions over graphs, `recorded_handle`, `recorded_range`, `use ... as_of`, `expand`, `changes`, `write`, `embedding_space`, `nearest`, `similar_candidates` (LA1) | `commit`, `commit_batch`, `query`, `join`, `bind`, `evaluate`, expressions `query`, `reference`, `filter`, `join`, `metadata`, `union`, `diff`, `project`, `support`, `explain`, `window`, `sequence`, `recorded_query`, command `recorded_range`, command `write` (0.22), expressions `expand`, `as_of` and `changes` (0.23, from `use ... as_of`, `expand` and `changes` source declarations). The compiler emits none of the 0.22 features yet |
 | extension | `rules` and rule application, context selection and contextual attachments, typed contexts, `decimal` and `quantity` schema properties, geometry and typed-vector `distance` (including embedding-role vectors), `counterparts`, `resolve_identity`, `accepted_history`, `accepted_range`, `accepted`, `view_current`, view templates | `reason`, `context`, `attachment_context`, `context_scope`, `context_typing`, `typed_context`, `decimal`, `quantity`, `geometry`, `counterparts`, `resolve_identity`, `accepted_history`, `accepted_range`, `accepted_graph`, `current_view`, `compiled_view_template` |
 | deferred | `cluster_navigation`, handler templates | `cluster`, `compiled_handler_template` |
 
@@ -73,7 +73,8 @@ For weave-language:
 - Results of compiled plans now include `fact_provenance`: the
   engine-recorded writer and recorded time of each source fact the result
   cites. The compiler never supplies either.
-- There is no source syntax yet for `write`, node valid time or claimed
+- Since LA1 part 2, `write` declarations emit the `write` command, with node
+  valid time ([HYBRID.md](HYBRID.md)). There is no source syntax for claimed
   provenance. `describe --contract` classifies them (`write` as a core v1
   command; node `valid_time` and `provenance` as core v1 data, so they are not
   listed), so plans built through the protocol directly classify correctly.
@@ -134,10 +135,10 @@ For weave-language:
   and `targets` values, and the `seeds_from` value of `expand`, as inputs.
   Embedding spaces and embeddings in `write` changes are core v1 data and
   are not listed.
-- There is no source syntax yet for embeddings, `nearest` or
-  `similar_candidates`: the keywords stay reserved with
-  `E_NOT_YET_SUPPORTED`. That is LA1 part 2
-  ([#3](https://github.com/weave-graph/weave-language/issues/3)).
+- LA1 part 2 ([#3](https://github.com/weave-graph/weave-language/issues/3))
+  adds the source syntax: `embedding_space`, embedding facts in `write`,
+  `nearest`, `similar_candidates` and `expand ... seeds from`
+  ([HYBRID.md](HYBRID.md)).
 
 ## `describe --contract`
 

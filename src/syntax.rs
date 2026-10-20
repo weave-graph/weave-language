@@ -260,7 +260,25 @@ pub enum Statement {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         as_of: Option<i64>,
     },
-    /// Store reads over a stored graph reference (LA1, protocol 0.23 A3).
+    /// An embedding space descriptor (LA1 part 2, protocol 0.24).
+    EmbeddingSpace {
+        name: String,
+        name_span: Span,
+        definition: weave_contract::embedding::EmbeddingSpace,
+    },
+    /// One fact-level `write` command (LA1 part 2, protocol 0.22/0.24).
+    Write {
+        name: String,
+        name_span: Span,
+        graph: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        branch: Option<String>,
+        /// Absent: no head check; `Some(None)`: a new branch; `Some(Some(r))`: head `r`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        expected_head: Option<Option<String>>,
+        changes: Vec<WriteChange>,
+    },
+    /// Store reads over a stored graph reference (LA1, protocol 0.23 A3 and 0.24 A4).
     Traversal {
         name: String,
         name_span: Span,
@@ -279,17 +297,107 @@ pub enum Statement {
         max_depth: u32,
     },
 }
-/// An A3 store read declared over a stored graph reference (LA1).
+/// One change of a source `write` (LA1 part 2).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct WriteChange {
+    pub change: WriteKind,
+    pub span: Span,
+    pub fact: WriteFact,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WriteKind {
+    Assert,
+    Correct,
+    Retract,
+}
+/// The fact of a source write change, before lowering.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum WriteFact {
+    Node {
+        id: String,
+        entity: String,
+        space: String,
+        valid: Option<(i64, Option<i64>)>,
+        metadata: Vec<Metadata>,
+        properties: BTreeMap<String, LiteralExpr>,
+    },
+    Edge {
+        id: String,
+        from: String,
+        to: String,
+        predicate: String,
+        negative: bool,
+        valid_from: i64,
+        valid_to: Option<i64>,
+        metadata: Vec<Metadata>,
+        properties: BTreeMap<String, LiteralExpr>,
+    },
+    /// `space Name`: the declared embedding space descriptor as a fact.
+    Space { space: String, space_span: Span },
+    Embedding {
+        id: String,
+        space: String,
+        space_span: Span,
+        subject: weave_contract::embedding::EmbeddingSubject,
+        vector: Vec<f64>,
+        vector_span: Span,
+        valid_from: i64,
+        valid_to: Option<i64>,
+    },
+    /// The target of a retraction.
+    Target {
+        target: weave_contract::FactKind,
+        id: String,
+    },
+}
+/// The query of a source `nearest`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum NearestSource {
+    /// A literal vector.
+    Vector { values: Vec<f64>, span: Span },
+    /// A typed vector value (`vector value Q`).
+    Value { name: String, span: Span },
+    /// An embedding fact of the same revision (`like embedding "id"`).
+    Embedding { id: String, span: Span },
+}
+/// An A3 or A4 store read declared over a stored graph reference (LA1).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "operator", rename_all = "snake_case")]
 pub enum TraversalOperation {
     /// `expand`: the exact k-hop neighbourhood of seed nodes.
     Expand {
         seeds: Vec<String>,
+        /// `seeds from Value` (0.24): the nodes of another value are also seeds.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        seeds_from: Option<(String, Span)>,
         hops: u32,
         direction: weave_contract::Direction,
         predicates: Vec<String>,
         valid_at: Option<i64>,
+        limit: Option<u32>,
+    },
+    /// `nearest` (0.24): exact k nearest embeddings of one declared space.
+    Nearest {
+        space: String,
+        space_span: Span,
+        query: NearestSource,
+        k: u32,
+        valid_at: Option<i64>,
+        candidates: Option<(String, Span)>,
+    },
+    /// `similar_candidates` (0.24): candidate similarity relations.
+    SimilarCandidates {
+        space: String,
+        space_span: Span,
+        k: u32,
+        max_score: Option<f64>,
+        valid_at: Option<i64>,
+        sources: Option<(String, Span)>,
+        targets: Option<(String, Span)>,
+        exclude_linked: bool,
         limit: Option<u32>,
     },
     /// `changes`: the facts asserted, retracted or corrected between two bounds.
@@ -1643,17 +1751,310 @@ impl Parser {
             }
         }
     }
-    /// The `{ ... }` body of `expand` or `changes` (LA1). Each clause appears
-    /// at most once; bounds mirror `weave_contract::traversal`.
+    /// A bracketed list of finite numbers: `[1.0, -0.5, 2]`.
+    fn number_list(&mut self) -> Result<(Vec<f64>, Span), Diagnostic> {
+        let start = self.peek().start;
+        let value = self.literal(0)?;
+        let end = self.tokens[self.cursor.saturating_sub(1)].end;
+        let numbers = value.as_array().and_then(|items| {
+            items
+                .iter()
+                .map(serde_json::Value::as_f64)
+                .collect::<Option<Vec<_>>>()
+        });
+        match numbers {
+            Some(numbers) if !numbers.is_empty() => Ok((numbers, (start, end))),
+            _ => Err(Diagnostic::new(
+                "E_VECTOR_VALUE",
+                "A vector is a nonempty list of finite numbers",
+                start,
+                end,
+            )),
+        }
+    }
+    /// `id "x" revision "1" encoder "e" version "v" preprocessing "p"
+    /// dimensions N metric cosine_distance|euclidean` (LA1 part 2).
+    fn embedding_space(
+        &mut self,
+        name_span: Span,
+    ) -> Result<weave_contract::embedding::EmbeddingSpace, Diagnostic> {
+        self.word("id")?;
+        let id = self.selector_string()?;
+        self.word("revision")?;
+        let revision = self.selector_string()?;
+        self.word("encoder")?;
+        let encoder = self.selector_string()?;
+        self.word("version")?;
+        let encoder_version = self.selector_string()?;
+        self.word("preprocessing")?;
+        let preprocessing = self.selector_string()?;
+        self.word("dimensions")?;
+        let token = self.peek().clone();
+        let dimensions = self.number()?;
+        let dimensions = u32::try_from(dimensions).map_err(|_| {
+            Diagnostic::new(
+                "E_SPACE",
+                "Dimensions must be positive",
+                token.start,
+                token.end,
+            )
+        })?;
+        self.word("metric")?;
+        let metric = match self.name()?.as_str() {
+            "cosine_distance" => weave_contract::embedding::EmbeddingMetric::CosineDistance,
+            "euclidean" => weave_contract::embedding::EmbeddingMetric::Euclidean,
+            _ => {
+                self.cursor -= 1;
+                return Err(self.error("Expected metric cosine_distance or euclidean"));
+            }
+        };
+        let space = weave_contract::embedding::EmbeddingSpace {
+            id,
+            revision,
+            encoder,
+            encoder_version,
+            preprocessing,
+            dimensions,
+            metric,
+        };
+        space
+            .validate()
+            .map_err(|e| Diagnostic::new("E_SPACE", e.message, name_span.0, name_span.1))?;
+        Ok(space)
+    }
+    fn valid_interval(&mut self) -> Result<(i64, Option<i64>), Diagnostic> {
+        self.word("valid")?;
+        let start = self.number()?;
+        self.word("until")?;
+        let end = if self.peek().kind == Kind::Word("infinity".into()) {
+            self.take();
+            None
+        } else {
+            Some(self.number()?)
+        };
+        Ok((start, end))
+    }
+    /// `graph "g" [branch "b"] [expected head "r" | expected new] { change; ... }`.
+    #[allow(clippy::type_complexity)]
+    fn write_body(
+        &mut self,
+    ) -> Result<
+        (
+            String,
+            Option<String>,
+            Option<Option<String>>,
+            Vec<WriteChange>,
+        ),
+        Diagnostic,
+    > {
+        self.word("graph")?;
+        let graph = self.selector_string()?;
+        let branch = if self.peek().kind == Kind::Word("branch".into()) {
+            self.take();
+            Some(self.selector_string()?)
+        } else {
+            None
+        };
+        let expected_head = if self.peek().kind == Kind::Word("expected".into()) {
+            self.take();
+            match self.name()?.as_str() {
+                "head" => Some(Some(self.selector_string()?)),
+                "new" => Some(None),
+                _ => {
+                    self.cursor -= 1;
+                    return Err(
+                        self.error("Expected 'expected head \"revision\"' or 'expected new'")
+                    );
+                }
+            }
+        } else {
+            None
+        };
+        self.symbol('{')?;
+        let mut changes = Vec::new();
+        while self.peek().kind != Kind::Symbol('}') {
+            let start = self.peek().start;
+            let change = match self.name()?.as_str() {
+                "assert" => WriteKind::Assert,
+                "correct" => WriteKind::Correct,
+                "retract" => WriteKind::Retract,
+                _ => {
+                    self.cursor -= 1;
+                    return Err(self.error("Expected assert, correct or retract"));
+                }
+            };
+            let kind_token = self.peek().clone();
+            let kind = self.name()?;
+            let fact = if change == WriteKind::Retract {
+                let target = match kind.as_str() {
+                    "node" => weave_contract::FactKind::Node,
+                    "edge" => weave_contract::FactKind::Edge,
+                    "attachment" => weave_contract::FactKind::Attachment,
+                    "embedding" => weave_contract::FactKind::Embedding,
+                    _ => {
+                        return Err(Diagnostic::new(
+                            "E_PARSE",
+                            "Retract a node, edge, attachment or embedding",
+                            kind_token.start,
+                            kind_token.end,
+                        ));
+                    }
+                };
+                WriteFact::Target {
+                    target,
+                    id: self.selector_string()?,
+                }
+            } else {
+                match kind.as_str() {
+                    "node" => {
+                        let id = self.selector_string()?;
+                        self.word("entity")?;
+                        let entity = self.selector_string()?;
+                        self.word("space")?;
+                        let space = self.selector_string()?;
+                        let valid = if self.peek().kind == Kind::Word("valid".into()) {
+                            Some(self.valid_interval()?)
+                        } else {
+                            None
+                        };
+                        let (metadata, properties) = self.metadata()?;
+                        WriteFact::Node {
+                            id,
+                            entity,
+                            space,
+                            valid,
+                            metadata,
+                            properties,
+                        }
+                    }
+                    "edge" => {
+                        let id = self.selector_string()?;
+                        self.word("from")?;
+                        let from = self.selector_string()?;
+                        self.word("to")?;
+                        let to = self.selector_string()?;
+                        self.word("relation")?;
+                        let predicate = self.selector_string()?;
+                        let negative = if self.peek().kind == Kind::Word("polarity".into()) {
+                            self.take();
+                            match self.name()?.as_str() {
+                                "negative" => true,
+                                "positive" => false,
+                                _ => {
+                                    return Err(self.error("Polarity must be positive or negative"));
+                                }
+                            }
+                        } else {
+                            false
+                        };
+                        let (valid_from, valid_to) = self.valid_interval()?;
+                        let (metadata, properties) = self.metadata()?;
+                        WriteFact::Edge {
+                            id,
+                            from,
+                            to,
+                            predicate,
+                            negative,
+                            valid_from,
+                            valid_to,
+                            metadata,
+                            properties,
+                        }
+                    }
+                    "space" => {
+                        let (space, space_span) = self.spanned_name()?;
+                        WriteFact::Space { space, space_span }
+                    }
+                    "embedding" => {
+                        let id = self.selector_string()?;
+                        self.word("in")?;
+                        let (space, space_span) = self.spanned_name()?;
+                        self.word("subject")?;
+                        let subject_token = self.peek().clone();
+                        let subject = match self.name()?.as_str() {
+                            "node" => weave_contract::embedding::EmbeddingSubject::Node {
+                                node_id: self.selector_string()?,
+                            },
+                            "entity" => weave_contract::embedding::EmbeddingSubject::Entity {
+                                entity_id: self.selector_string()?,
+                            },
+                            "edge" => weave_contract::embedding::EmbeddingSubject::Edge {
+                                edge_id: self.selector_string()?,
+                            },
+                            _ => {
+                                return Err(Diagnostic::new(
+                                    "E_PARSE",
+                                    "An embedding subject is a node, entity or edge",
+                                    subject_token.start,
+                                    subject_token.end,
+                                ));
+                            }
+                        };
+                        self.word("vector")?;
+                        let (vector, vector_span) = self.number_list()?;
+                        let (valid_from, valid_to) = self.valid_interval()?;
+                        WriteFact::Embedding {
+                            id,
+                            space,
+                            space_span,
+                            subject,
+                            vector,
+                            vector_span,
+                            valid_from,
+                            valid_to,
+                        }
+                    }
+                    _ => {
+                        return Err(Diagnostic::new(
+                            "E_PARSE",
+                            "Write a node, edge, space or embedding",
+                            kind_token.start,
+                            kind_token.end,
+                        ));
+                    }
+                }
+            };
+            if change == WriteKind::Correct && matches!(fact, WriteFact::Space { .. }) {
+                return Err(Diagnostic::new(
+                    "E_CONFLICT",
+                    "An embedding space is immutable; declare a new revision instead",
+                    kind_token.start,
+                    kind_token.end,
+                ));
+            }
+            let end = self.peek().end;
+            self.symbol(';')?;
+            changes.push(WriteChange {
+                change,
+                span: (start, end),
+                fact,
+            });
+        }
+        if changes.is_empty() {
+            return Err(self.error("A write needs at least one change"));
+        }
+        self.symbol('}')?;
+        Ok((graph, branch, expected_head, changes))
+    }
+    /// A declared name with its span.
+    fn spanned_name(&mut self) -> Result<(String, Span), Diagnostic> {
+        let span = (self.peek().start, self.peek().end);
+        Ok((self.name()?, span))
+    }
+    /// The `{ ... }` body of `expand`, `changes`, `nearest` or
+    /// `similar_candidates` (LA1). Each clause appears at most once; bounds
+    /// mirror `weave_contract::traversal` and `weave_contract::embedding`.
     fn traversal_body(
         &mut self,
-        expand: bool,
+        op: &str,
         name_span: Span,
     ) -> Result<TraversalOperation, Diagnostic> {
+        use weave_contract::embedding::{MAX_CANDIDATE_LIMIT, MAX_K};
         use weave_contract::traversal::{MAX_HOPS, MAX_LIMIT, MAX_SCOPE, MAX_SEEDS};
         self.symbol('{')?;
         let mut seen = BTreeMap::new();
         let mut seeds = Vec::new();
+        let mut seeds_from = None;
         let mut hops = None;
         let mut direction = weave_contract::Direction::Out;
         let mut predicates = Vec::new();
@@ -1661,27 +2062,47 @@ impl Parser {
         let mut valid_at = None;
         let mut limit = None;
         let mut bounds = None;
+        let mut space = None;
+        let mut query = None;
+        let mut k = None;
+        let mut max_score = None;
+        let mut candidates = None;
+        let mut sources = None;
+        let mut targets = None;
+        let mut exclude_linked = false;
+        let allowed: &[&str] = match op {
+            "expand" => &["seeds", "hops", "direction", "match", "at", "limit"],
+            "changes" => &["between", "since", "entities", "match", "limit"],
+            "nearest" => &["space", "vector", "like", "k", "at", "candidates"],
+            _ => &[
+                "space",
+                "k",
+                "max_score",
+                "at",
+                "sources",
+                "targets",
+                "exclude_linked",
+                "limit",
+            ],
+        };
         while self.peek().kind != Kind::Symbol('}') {
             let clause = self.peek().clone();
             let clause_span = (clause.start, clause.end);
             let word = self.name()?;
-            let allowed: &[&str] = if expand {
-                &["seeds", "hops", "direction", "match", "at", "limit"]
-            } else {
-                &["between", "since", "entities", "match", "limit"]
-            };
             if !allowed.contains(&word.as_str()) {
                 self.cursor -= 1;
-                return Err(self.error(if expand {
-                    "Expand allows seeds, hops, direction, match relation, at and limit"
-                } else {
-                    "Changes allows between, since, entities, match relation and limit"
-                }));
+                return Err(self.error(&format!(
+                    "'{op}' allows only the clauses {}",
+                    allowed.join(", ")
+                )));
             }
-            let key = if word == "since" {
-                "between"
-            } else {
-                word.as_str()
+            let seeds_from_clause =
+                word == "seeds" && self.peek().kind == Kind::Word("from".into());
+            let key = match word.as_str() {
+                "since" => "between",
+                "like" => "vector",
+                "seeds" if seeds_from_clause => "seeds from",
+                other => other,
             };
             if seen.insert(key.to_owned(), clause_span).is_some() {
                 return Err(Diagnostic::new(
@@ -1703,24 +2124,29 @@ impl Parser {
                     Ok(())
                 }
             };
+            let bounded = |parser: &mut Self, low: i64, high: i64, low_code: &str, what: &str| {
+                let token = parser.peek().clone();
+                let value = parser.number()?;
+                if !(low..=high).contains(&value) {
+                    return Err(Diagnostic::new(
+                        if value < low { low_code } else { "E_BUDGET" },
+                        format!("{what} must be between {low} and {high}"),
+                        token.start,
+                        token.end,
+                    ));
+                }
+                Ok(value as u32)
+            };
             match word.as_str() {
+                "seeds" if seeds_from_clause => {
+                    self.take();
+                    seeds_from = Some(self.spanned_name()?);
+                }
                 "seeds" => {
                     seeds = self.selector_list()?;
                     list_bound(&seeds, MAX_SEEDS, "seeds")?;
                 }
-                "hops" => {
-                    let token = self.peek().clone();
-                    let value = self.number()?;
-                    if !(1..=i64::from(MAX_HOPS)).contains(&value) {
-                        return Err(Diagnostic::new(
-                            if value < 1 { "E_EXPAND" } else { "E_BUDGET" },
-                            format!("Expand traverses 1 to {MAX_HOPS} hops"),
-                            token.start,
-                            token.end,
-                        ));
-                    }
-                    hops = Some(value as u32);
-                }
+                "hops" => hops = Some(bounded(self, 1, i64::from(MAX_HOPS), "E_EXPAND", "Hops")?),
                 "direction" => {
                     direction = match self.name()?.as_str() {
                         "out" => weave_contract::Direction::Out,
@@ -1743,17 +2169,12 @@ impl Parser {
                 }
                 "at" => valid_at = Some(self.number()?),
                 "limit" => {
-                    let token = self.peek().clone();
-                    let value = self.number()?;
-                    if !(1..=i64::from(MAX_LIMIT)).contains(&value) {
-                        return Err(Diagnostic::new(
-                            "E_BUDGET",
-                            format!("Limit must be between 1 and {MAX_LIMIT}"),
-                            token.start,
-                            token.end,
-                        ));
-                    }
-                    limit = Some(value as u32);
+                    let max = if op == "similar_candidates" {
+                        MAX_CANDIDATE_LIMIT
+                    } else {
+                        MAX_LIMIT
+                    };
+                    limit = Some(bounded(self, 1, i64::from(max), "E_BUDGET", "Limit")?);
                 }
                 "between" => {
                     let from = self.change_bound()?;
@@ -1761,45 +2182,135 @@ impl Parser {
                     bounds = Some((from, self.change_bound()?));
                 }
                 "since" => bounds = Some((self.change_bound()?, weave_contract::ChangeBound::Head)),
+                "space" => space = Some(self.spanned_name()?),
+                "vector" => {
+                    query = Some(if self.peek().kind == Kind::Word("value".into()) {
+                        self.take();
+                        let (name, span) = self.spanned_name()?;
+                        NearestSource::Value { name, span }
+                    } else {
+                        let (values, span) = self.number_list()?;
+                        NearestSource::Vector { values, span }
+                    });
+                }
+                "like" => {
+                    self.word("embedding")?;
+                    let span = (self.peek().start, self.peek().end);
+                    query = Some(NearestSource::Embedding {
+                        id: self.selector_string()?,
+                        span,
+                    });
+                }
+                "k" => k = Some(bounded(self, 1, i64::from(MAX_K), "E_NEAREST", "k")?),
+                "max_score" => {
+                    let token = self.take();
+                    let value = match token.kind {
+                        Kind::Number(n) => n as f64,
+                        Kind::Float(f) => f,
+                        _ => {
+                            return Err(Diagnostic::new(
+                                "E_PARSE",
+                                "Expected a number",
+                                token.start,
+                                token.end,
+                            ));
+                        }
+                    };
+                    if !value.is_finite() || value < 0.0 {
+                        return Err(Diagnostic::new(
+                            "E_NEAREST",
+                            "max_score must be a finite nonnegative distance",
+                            token.start,
+                            token.end,
+                        ));
+                    }
+                    max_score = Some(value);
+                }
+                "candidates" => candidates = Some(self.spanned_name()?),
+                "sources" => sources = Some(self.spanned_name()?),
+                "targets" => targets = Some(self.spanned_name()?),
+                "exclude_linked" => exclude_linked = true,
                 _ => unreachable!("clause checked above"),
             }
             self.symbol(';')?;
         }
         let close = self.peek().clone();
         self.symbol('}')?;
-        if expand {
-            if seeds.is_empty() || hops.is_none() {
-                return Err(Diagnostic::new(
-                    "E_EXPAND",
-                    "Expand requires 'seeds' and 'hops' clauses",
-                    name_span.0,
-                    name_span.1,
-                ));
+        let missing = |what: &str, code: &str| {
+            Diagnostic::new(
+                code,
+                format!("'{op}' requires {what}"),
+                name_span.0,
+                name_span.1,
+            )
+        };
+        match op {
+            "expand" => {
+                if (seeds.is_empty() && seeds_from.is_none()) || hops.is_none() {
+                    return Err(missing(
+                        "'seeds' (or 'seeds from') and 'hops' clauses",
+                        "E_EXPAND",
+                    ));
+                }
+                Ok(TraversalOperation::Expand {
+                    seeds,
+                    seeds_from,
+                    hops: hops.unwrap_or(1),
+                    direction,
+                    predicates,
+                    valid_at,
+                    limit,
+                })
             }
-            Ok(TraversalOperation::Expand {
-                seeds,
-                hops: hops.unwrap_or(1),
-                direction,
-                predicates,
-                valid_at,
-                limit,
-            })
-        } else {
-            let Some((from, to)) = bounds else {
-                return Err(Diagnostic::new(
-                    "E_CHANGES_BOUND",
-                    "Changes requires a 'between FROM and TO' or 'since FROM' clause",
-                    close.start,
-                    close.end,
-                ));
-            };
-            Ok(TraversalOperation::Changes {
-                from,
-                to,
-                entities,
-                predicates,
-                limit,
-            })
+            "changes" => {
+                let Some((from, to)) = bounds else {
+                    return Err(Diagnostic::new(
+                        "E_CHANGES_BOUND",
+                        "Changes requires a 'between FROM and TO' or 'since FROM' clause",
+                        close.start,
+                        close.end,
+                    ));
+                };
+                Ok(TraversalOperation::Changes {
+                    from,
+                    to,
+                    entities,
+                    predicates,
+                    limit,
+                })
+            }
+            "nearest" => {
+                let (Some((space, space_span)), Some(query), Some(k)) = (space, query, k) else {
+                    return Err(missing(
+                        "'space', 'vector' or 'like embedding', and 'k' clauses",
+                        "E_NEAREST",
+                    ));
+                };
+                Ok(TraversalOperation::Nearest {
+                    space,
+                    space_span,
+                    query,
+                    k,
+                    valid_at,
+                    candidates,
+                })
+            }
+            _ => {
+                let (Some((space, space_span)), Some(k)) = (space, k) else {
+                    return Err(missing("'space' and 'k' clauses", "E_NEAREST"));
+                };
+                Ok(TraversalOperation::SimilarCandidates {
+                    space,
+                    space_span,
+                    k,
+                    max_score,
+                    valid_at,
+                    sources,
+                    targets,
+                    exclude_linked,
+                    limit,
+                })
+            }
         }
     }
     fn program(&mut self, context: u8) -> Result<Program, Diagnostic> {
@@ -1810,7 +2321,6 @@ impl Parser {
             if context == 2 && self.peek().kind == Kind::Word("return".into()) {
                 break;
             }
-            let kind_span = (self.peek().start, self.peek().end);
             let kind = self.name()?;
             let name_span = (self.peek().start, self.peek().end);
             if kind == "module" {
@@ -1881,6 +2391,10 @@ impl Parser {
                         | "import"
                         | "expand"
                         | "changes"
+                        | "nearest"
+                        | "similar_candidates"
+                        | "write"
+                        | "embedding_space"
                 )
             {
                 return Err(Diagnostic::new(
@@ -3254,11 +3768,11 @@ impl Parser {
                         as_of,
                     });
                 }
-                "expand" | "changes" => {
+                "expand" | "changes" | "nearest" | "similar_candidates" => {
                     self.word("from")?;
                     let source_span = (self.peek().start, self.peek().end);
                     let source = self.name()?;
-                    let operation = self.traversal_body(kind == "expand", name_span)?;
+                    let operation = self.traversal_body(&kind, name_span)?;
                     statements.push(Statement::Traversal {
                         name,
                         name_span,
@@ -3267,15 +3781,25 @@ impl Parser {
                         operation,
                     });
                 }
-                "nearest" | "similar_candidates" => {
-                    return Err(Diagnostic::new(
-                        "E_NOT_YET_SUPPORTED",
-                        format!(
-                            "'{kind}' (engine A4, protocol 0.24) has no source syntax yet; build it through the protocol"
-                        ),
-                        kind_span.0,
-                        kind_span.1,
-                    ));
+                "embedding_space" => {
+                    let definition = self.embedding_space(name_span)?;
+                    self.symbol(';')?;
+                    statements.push(Statement::EmbeddingSpace {
+                        name,
+                        name_span,
+                        definition,
+                    });
+                }
+                "write" => {
+                    let (graph, branch, expected_head, changes) = self.write_body()?;
+                    statements.push(Statement::Write {
+                        name,
+                        name_span,
+                        graph,
+                        branch,
+                        expected_head,
+                        changes,
+                    });
                 }
                 "window" | "sequence" => {
                     self.word("from")?;
@@ -3539,6 +4063,17 @@ pub(crate) fn scalar_expressions(statement: &mut Statement, f: &mut impl FnMut(&
                 },
             ..
         } => f(v),
+        Statement::Write { changes, .. } => {
+            for c in changes {
+                if let WriteFact::Node { properties, .. } | WriteFact::Edge { properties, .. } =
+                    &mut c.fact
+                {
+                    for v in properties.values_mut() {
+                        literal(v, f)
+                    }
+                }
+            }
+        }
         Statement::Graph { items, .. } => {
             for i in items {
                 match i {

@@ -156,7 +156,6 @@ change set cannot be explained (it is terminal); its entries' `before` and
 | `E_CHANGES_BOUND` | `changes` without `between` or `since` | The closing brace |
 | `E_CHANGES_OPERAND` | A change set used as an input | The reference |
 | `E_FUNCTION_EFFECT` | `expand` or `changes` inside a pure function | The declaration name |
-| `E_NOT_YET_SUPPORTED` | `nearest` or `similar_candidates` (engine A4) | The keyword |
 
 ## Examples and acceptance
 
@@ -187,10 +186,6 @@ change set cannot be explained (it is terminal); its entries' `before` and
   ("which units at site S ran firmware F") is answered by one expansion that
   holds the units at S, the firmware each ran and the supporting edges; the
   units running F are those with a `runs` edge to F in that result.
-- Fact-level writes (assert, correct, retract) still have no source syntax.
-- **Hybrid search is not yet supported.** `nearest` and `similar_candidates`
-  are reserved declaration keywords that fail with `E_NOT_YET_SUPPORTED`.
-  The engine A4 operators exist since protocol 0.24.0
-  ([weave-engine#13](https://github.com/weave-graph/weave-engine/issues/13)).
-  They will be added as further `expand`-style
-  declarations over a stored reference (LA1 part 2).
+- Fact writes, embeddings, `nearest`, `similar_candidates` and
+  `expand ... seeds from` (protocol 0.24, LA1 part 2) are described in
+  [HYBRID.md](HYBRID.md).

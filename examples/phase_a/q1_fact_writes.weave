@@ -1,0 +1,11 @@
+// Phase A exit question 1: incremental corrections and firmware rollouts as
+// individual fact writes (one `write`, one fact revision, each).
+// A rollout ends the current install and starts the next one.
+write Rollout graph "fleet" {
+  correct edge "runs:unit-2:0" from "unit-2" to "fw-2" relation "runs" valid 0 until 2000;
+  assert edge "runs:unit-2:1" from "unit-2" to "fw-3" relation "runs" valid 2000 until infinity;
+}
+// A correction replaces the live version of one fact; history keeps the old one.
+write Correction graph "fleet" {
+  correct node "unit-3" entity "UNIT-3" space "fleet" property "model" "M-1" property "status" "serviced";
+}

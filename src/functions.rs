@@ -229,6 +229,12 @@ pub(crate) fn declaration(statement: &Statement) -> (&str, Span) {
         | Statement::Traversal {
             name, name_span, ..
         }
+        | Statement::Write {
+            name, name_span, ..
+        }
+        | Statement::EmbeddingSpace {
+            name, name_span, ..
+        }
         | Statement::Lens {
             name, name_span, ..
         } => (name, *name_span),
